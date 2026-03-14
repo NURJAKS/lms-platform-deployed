@@ -75,8 +75,7 @@ def login(request: Request, data: UserLogin, db: Session = Depends(get_db)):
 @limiter.limit("5/minute")
 def google_login(request: Request, data: GoogleLoginRequest, db: Session = Depends(get_db)):
     try:
-        # Verify the Google ID token
-        # NOTE: settings.GOOGLE_CLIENT_ID must be set in the environment or config
+        
         idinfo = id_token.verify_oauth2_token(
             data.id_token, 
             google_requests.Request(), 

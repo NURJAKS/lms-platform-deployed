@@ -70,7 +70,7 @@ export function AppDashboardHeader() {
       <div className="flex items-center justify-between h-14 px-4 lg:px-6">
         <SearchHeader />
 
-        <div className="flex items-center gap-2">
+        <div className="hidden lg:flex items-center gap-2">
           <div className="relative hidden sm:block" ref={langRef}>
             <button
               type="button"

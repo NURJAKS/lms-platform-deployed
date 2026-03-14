@@ -687,7 +687,7 @@ export function TasksCalendar({ date, onDateChange, schedule, assignments, onEve
               {calendarDays.map((day, idx) => {
             // Пропускаем пустые ячейки (date === 0)
             if (day.date === 0) {
-              return <div key={idx} className="min-h-[100px]" />;
+              return <div key={idx} className="min-h-[70px] sm:min-h-[100px]" />;
             }
             
             const weekend = isWeekend(day.date, day.isCurrentMonth);
@@ -697,7 +697,7 @@ export function TasksCalendar({ date, onDateChange, schedule, assignments, onEve
             return (
               <div
                 key={idx}
-                className="relative min-h-[100px] p-1 rounded-lg transition-all"
+                className="relative min-h-[70px] sm:min-h-[100px] p-1 rounded-lg transition-all"
                 style={{
                   background: selected
                     ? "rgba(124, 58, 237, 0.1)"
@@ -742,7 +742,7 @@ export function TasksCalendar({ date, onDateChange, schedule, assignments, onEve
                   </div>
 
                   {/* Events - прокручиваемый контейнер */}
-                  <div className="w-full flex flex-col gap-0.5 mt-0.5 flex-1 min-h-0 overflow-y-auto max-h-[60px]">
+                  <div className="w-full flex flex-col gap-0.5 mt-0.5 flex-1 min-h-0 overflow-y-auto max-h-[44px] sm:max-h-[60px]">
                     {day.events.map((event, eventIdx) => {
                       const isCompleted = event.is_completed || false;
                       const isSchedule = event.type === "schedule";

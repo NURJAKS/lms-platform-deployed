@@ -41,11 +41,14 @@ export function Slider3D({ courses = [], onCardClick }: Slider3DProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [isClickPaused, setIsClickPaused] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [isNarrow, setIsNarrow] = useState(false);
   const isPaused = isHovered || isClickPaused;
 
   useEffect(() => {
     const checkMobile = () => {
-      setIsMobile(window.innerWidth <= 768);
+      const w = window.innerWidth;
+      setIsMobile(w <= 768);
+      setIsNarrow(w <= 480);
     };
     checkMobile();
     window.addEventListener("resize", checkMobile);
@@ -82,11 +85,11 @@ export function Slider3D({ courses = [], onCardClick }: Slider3DProps) {
   const getCardTransform = useCallback(
     (index: number) => {
       const angle = (360 / quantity) * index;
-      const translateZ = isMobile ? 200 : 280; // Расстояние от центра (меньше на мобильных)
+      const translateZ = isNarrow ? 160 : isMobile ? 200 : 280; // Меньше на узких экранах
       const tiltForward = -15; // Наклон вперед (отрицательное значение наклоняет верхний край к зрителю)
       return `rotateX(${tiltForward}deg) rotateY(${angle}deg) translateZ(${translateZ}px)`;
     },
-    [quantity, isMobile]
+    [quantity, isMobile, isNarrow]
   );
 
   return (

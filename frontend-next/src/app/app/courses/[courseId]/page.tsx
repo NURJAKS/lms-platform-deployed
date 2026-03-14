@@ -131,17 +131,22 @@ export default function CourseDetailPage() {
 
   const flattenedPath = useMemo((): FlattenedTopic[] => {
     if (!structure?.modules) return [];
-    const progressByTopic = new Map(progressList.map((p) => [p.topic_id, p]));
+    const progressByTopic = new Map(
+      progressList
+        .filter((p) => p.topic_id != null && typeof p.topic_id === "number")
+        .map((p) => [p.topic_id, p])
+    );
     const result: FlattenedTopic[] = [];
     let foundCurrent = false;
+    let allPrevCompleted = true;
     const sortedModules = [...structure.modules].sort((a, b) => (a.order_number ?? 0) - (b.order_number ?? 0));
     for (const mod of sortedModules) {
       const sortedTopics = [...(mod.topics || [])].sort((a, b) => (a.order_number ?? 0) - (b.order_number ?? 0));
       for (const topic of sortedTopics) {
         const prog = progressByTopic.get(topic.id);
-        const completed = prog?.is_completed ?? false;
-        const prevCompleted = result.length === 0 ? true : progressByTopic.get(result[result.length - 1].topic_id)?.is_completed ?? false;
-        const allowed = result.length === 0 || prevCompleted;
+        const rawCompleted = prog?.is_completed ?? false;
+        const completed = allPrevCompleted && rawCompleted;
+        const allowed = allPrevCompleted;
         let nodeType: FlattenedTopic["nodeType"] = "locked";
         if (completed) nodeType = "completed";
         else if (allowed && !foundCurrent) {
@@ -157,6 +162,8 @@ export default function CourseDetailPage() {
           topic_order: topic.order_number ?? 0,
           nodeType,
         });
+        // Обновляем флаг «все предыдущие завершены» по сырым данным прогресса.
+        allPrevCompleted = allPrevCompleted && rawCompleted;
       }
     }
     return result;
@@ -284,7 +291,7 @@ export default function CourseDetailPage() {
       <div className="max-w-2xl mx-auto text-center py-12">
         <Lock className="w-16 h-16 text-gray-400 mx-auto mb-4" />
         <h1 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">{course.title}</h1>
-        <p className="text-gray-600 dark:text-gray-400 mb-4">{course.description}</p>
+        <p className="text-gray-600 dark:text-gray-400 mb-4 line-clamp-3">{course.description}</p>
         <p className="text-amber-600 font-medium">🔒 {t("courseSoon")}</p>
         <button disabled className="mt-4 py-2 px-4 rounded-lg bg-gray-200 text-gray-500 cursor-not-allowed">{t("courseUnavailable")}</button>
       </div>
@@ -299,15 +306,15 @@ export default function CourseDetailPage() {
     <div className={enrolled ? "grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 lg:gap-8" : ""}>
       <div className={enrolled ? "min-w-0" : ""}>
       {paymentModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" role="dialog" aria-modal="true" aria-labelledby="payment-dialog-title">
-          <div className="rounded-xl shadow-xl p-6 max-w-md mx-4 w-full border backdrop-blur-xl bg-white dark:bg-[#1A2238] border-gray-200 dark:border-white/10">
-            <h2 id="payment-dialog-title" className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" role="dialog" aria-modal="true" aria-labelledby="payment-dialog-title">
+          <div className="rounded-xl shadow-xl p-6 max-w-md w-full max-h-[90vh] flex flex-col border backdrop-blur-xl bg-white dark:bg-[#1A2238] border-gray-200 dark:border-white/10">
+            <h2 id="payment-dialog-title" className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex-shrink-0">
               {paymentStep === "method" && t("paymentSelectMethod")}
               {paymentStep === "card" && t("paymentCardData")}
               {paymentStep === "loading" && t("paymentProcessing")}
               {paymentStep === "done" && t("paymentSuccess")}
             </h2>
-
+            <div className="min-h-0 max-h-[70vh] overflow-y-auto">
             {paymentStep === "method" && (
               <>
                 <p className="mb-4 text-gray-600 dark:text-gray-400">
@@ -493,6 +500,7 @@ export default function CourseDetailPage() {
                 </div>
               </div>
             )}
+            </div>
           </div>
         </div>
       )}
@@ -503,7 +511,7 @@ export default function CourseDetailPage() {
         </div>
         <div className="flex-1">
           <h1 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">{course.title}</h1>
-          <p className="text-gray-600 dark:text-gray-400 mb-4">{course.description}</p>
+          <p className="text-gray-600 dark:text-gray-400 mb-4 line-clamp-3">{course.description}</p>
           <p className="text-[#1a237e] dark:text-[#00b0ff] font-semibold mb-4">
             {course.is_premium_only ? t("premiumOnly") : `${Number(course.price)}₸`}
           </p>

@@ -44,18 +44,18 @@ const getPriorityColor = (priority: Deadline["priority"], isDark: boolean) => {
   }
 };
 
-const formatDueDate = (dateStr: string, t: (k: string) => string, lang: string) => {
+function formatDueDate<K extends string>(dateStr: string, t: (k: K) => string, lang: string): string {
   const date = new Date(dateStr);
   const now = new Date();
   const diffMs = date.getTime() - now.getTime();
   const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-  
-  if (diffDays < 0) return t("overdue");
-  if (diffDays === 0) return t("today");
-  if (diffDays === 1) return t("tomorrow");
-  if (diffDays < 7) return t("daysLeft").replace("{count}", String(diffDays));
+  const T = t as (k: string) => string;
+  if (diffDays < 0) return T("overdue");
+  if (diffDays === 0) return T("today");
+  if (diffDays === 1) return T("tomorrow");
+  if (diffDays < 7) return T("daysLeft").replace("{count}", String(diffDays));
   return date.toLocaleDateString(lang === "ru" ? "ru-RU" : lang === "kk" ? "kk-KZ" : "en-US", { day: "numeric", month: "short" });
-};
+}
 
 export function UpcomingDeadlinesWidget() {
   const { theme } = useTheme();

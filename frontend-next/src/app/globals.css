@@ -433,3 +433,12 @@ html.dark .glass-card-enhanced {
     margin-top: -50px;
   }
 }
+
+@media (max-width: 480px) {
+  .slider-3d-item {
+    width: 140px;
+    height: 88px;
+    margin-left: -70px;
+    margin-top: -44px;
+  }
+}

@@ -8,87 +8,86 @@ export type AppNotification = {
   created_at: string;
 };
 
-type TFunction = (key: string, vars?: Record<string, unknown>) => string;
-
-export function getLocalizedNotificationText(
+export function getLocalizedNotificationText<K extends string>(
   n: Pick<AppNotification, "type" | "title" | "message">,
-  t: TFunction,
+  t: (key: K) => string,
 ) {
+  const T = t as (key: string) => string;
   switch (n.type) {
     case "new_application":
       return {
-        title: t("notificationNewApplicationTitle"),
-        message: t("notificationNewApplicationBody"),
+        title: T("notificationNewApplicationTitle"),
+        message: T("notificationNewApplicationBody"),
       };
     case "application_approved":
       return {
-        title: t("notificationApplicationApprovedTitle"),
-        message: t("notificationApplicationApprovedBody"),
+        title: T("notificationApplicationApprovedTitle"),
+        message: T("notificationApplicationApprovedBody"),
       };
     case "add_student_task":
       return {
-        title: t("notificationAddStudentTaskTitle"),
-        message: t("notificationAddStudentTaskBody"),
+        title: T("notificationAddStudentTaskTitle"),
+        message: T("notificationAddStudentTaskBody"),
       };
     case "add_student_task_completed":
       return {
-        title: t("notificationAddStudentTaskCompletedTitle"),
-        message: t("notificationAddStudentTaskCompletedBody"),
+        title: T("notificationAddStudentTaskCompletedTitle"),
+        message: T("notificationAddStudentTaskCompletedBody"),
       };
     case "added_to_group":
       return {
-        title: t("notificationAddedToGroupTitle"),
-        message: t("notificationAddedToGroupBody"),
+        title: T("notificationAddedToGroupTitle"),
+        message: T("notificationAddedToGroupBody"),
       };
     case "course_purchased":
       return {
-        title: t("notificationCoursePurchasedTitle"),
-        message: t("notificationCoursePurchasedBody"),
+        title: T("notificationCoursePurchasedTitle"),
+        message: T("notificationCoursePurchasedBody"),
       };
     case "assignment_created":
       return {
-        title: t("notificationAssignmentCreatedTitle"),
-        message: t("notificationAssignmentCreatedBody"),
+        title: T("notificationAssignmentCreatedTitle"),
+        message: T("notificationAssignmentCreatedBody"),
       };
     case "assignment_submitted":
       return {
-        title: t("notificationAssignmentSubmittedTitle"),
-        message: t("notificationAssignmentSubmittedBody"),
+        title: T("notificationAssignmentSubmittedTitle"),
+        message: T("notificationAssignmentSubmittedBody"),
       };
     case "assignment_graded":
       return {
-        title: t("notificationAssignmentGradedTitle"),
-        message: t("notificationAssignmentGradedBody"),
+        title: T("notificationAssignmentGradedTitle"),
+        message: T("notificationAssignmentGradedBody"),
       };
     case "material_created":
       return {
-        title: t("notificationMaterialCreatedTitle"),
-        message: t("notificationMaterialCreatedBody"),
+        title: T("notificationMaterialCreatedTitle"),
+        message: T("notificationMaterialCreatedBody"),
       };
     case "question_created":
       return {
-        title: t("notificationQuestionCreatedTitle"),
-        message: t("notificationQuestionCreatedBody"),
+        title: T("notificationQuestionCreatedTitle"),
+        message: T("notificationQuestionCreatedBody"),
       };
     case "schedule_reminder":
       return {
-        title: t("notificationScheduleReminderTitle"),
-        message: t("notificationScheduleReminderBody"),
+        title: T("notificationScheduleReminderTitle"),
+        message: T("notificationScheduleReminderBody"),
       };
     case "coins_earned":
       return {
-        title: t("notificationCoinsEarnedTitle"),
-        message: t("notificationCoinsEarnedBody"),
+        title: T("notificationCoinsEarnedTitle"),
+        message: T("notificationCoinsEarnedBody"),
       };
     case "certificate_issued":
       return {
-        title: t("notificationCertificateIssuedTitle"),
-        message: t("notificationCertificateIssuedBody"),
+        title: T("notificationCertificateIssuedTitle"),
+        message: T("notificationCertificateIssuedBody"),
       };
     case "ai_challenge_result":
       return {
-        title: t("notificationAiChallengeResultTitle"),
-        message: t("notificationAiChallengeResultBody"),
+        title: T("notificationAiChallengeResultTitle"),
+        message: T("notificationAiChallengeResultBody"),
       };
     default:
       return {

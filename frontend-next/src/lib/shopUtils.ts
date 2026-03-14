@@ -1,5 +1,3 @@
-import type { Purchase } from "@/types";
-
 /** Maps API product title to translation key for localized display */
 export const PRODUCT_TITLE_KEYS: Record<string, string> = {
   // Kazakh (Primary)
@@ -64,25 +62,25 @@ export const CATEGORY_KEYS: Record<string, string> = {
   other: "shopOther",
 };
 
-export function getLocalizedProductTitle(
+export function getLocalizedProductTitle<K extends string>(
   title: string,
-  t: (key: string) => string
+  t: (key: K) => string
 ): string {
   const key = PRODUCT_TITLE_KEYS[title];
-  return key ? t(key) : title;
+  return key ? (t as (key: string) => string)(key) : title;
 }
 
-export function getLocalizedShopItemTitle(
+export function getLocalizedShopItemTitle<K extends string>(
   item: { title: string },
-  t: (key: string) => string
+  t: (key: K) => string
 ): string {
   return getLocalizedProductTitle(item.title, t);
 }
 
-export function getLocalizedShopItemDesc(
+export function getLocalizedShopItemDesc<K extends string>(
   item: { title: string; description: string | null },
-  t: (key: string) => string
+  t: (key: K) => string
 ): string {
   const key = PRODUCT_DESC_KEYS[item.title];
-  return key ? t(key) : (item.description ?? "");
+  return key ? (t as (key: string) => string)(key) : (item.description ?? "");
 }

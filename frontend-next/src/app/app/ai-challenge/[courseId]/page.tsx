@@ -753,7 +753,7 @@ export default function AIChallengePage() {
               </div>
             </div>
           </div>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">{t("question")} {currentQ + 1} / {questions.length}</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">{t("teacherCreateQuestion")} {currentQ + 1} / {questions.length}</p>
           <p className="text-sm text-amber-600 dark:text-amber-400 mb-4">{t("aiTime")}: {aiTimes[currentQ]?.toFixed(1)}с</p>
           <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-6">{questions[currentQ].question_text}</h2>
           <div className="space-y-3">

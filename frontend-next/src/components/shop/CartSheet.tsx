@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Image from "next/image";
-import { X, ShoppingCart, Trash2 } from "lucide-react";
+import { X, ShoppingCart, Trash2, ArrowLeft } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { useTheme } from "@/context/ThemeContext";
 import { useLanguage } from "@/context/LanguageContext";
@@ -79,15 +79,23 @@ export function CartSheet({
             style={cardStyle}
           >
             <div className="flex h-full flex-col">
-              <div className="flex items-center justify-between border-b p-4" style={{ borderColor: theme === "dark" ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)" }}>
-                <div className="flex items-center gap-2">
-                  <ShoppingCart className="w-5 h-5" style={{ color: "#FF4181" }} />
-                  <h2 className="text-lg font-semibold" style={{ color: textColors.primary }}>
+              <div className="flex items-center justify-between border-b p-4 gap-2" style={{ borderColor: theme === "dark" ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)" }}>
+                <button
+                  onClick={onClose}
+                  className="rounded-lg p-1.5 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-1.5 shrink-0"
+                  aria-label={t("back")}
+                >
+                  <ArrowLeft className="w-5 h-5" style={{ color: textColors.secondary }} />
+                  <span className="text-sm font-medium sm:hidden" style={{ color: textColors.secondary }}>{t("back")}</span>
+                </button>
+                <div className="flex items-center gap-2 min-w-0 flex-1 justify-center">
+                  <ShoppingCart className="w-5 h-5 shrink-0" style={{ color: "#FF4181" }} />
+                  <h2 className="text-lg font-semibold truncate" style={{ color: textColors.primary }}>
                     {t("shopCart")}
                   </h2>
                   {items.length > 0 && (
                     <span
-                      className="rounded-full px-2 py-0.5 text-xs font-medium"
+                      className="rounded-full px-2 py-0.5 text-xs font-medium shrink-0"
                       style={{
                         background: "linear-gradient(135deg, #FF4181 0%, #B938EB 100%)",
                         color: "#FFFFFF",
@@ -99,7 +107,8 @@ export function CartSheet({
                 </div>
                 <button
                   onClick={onClose}
-                  className="rounded-lg p-1.5 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
+                  className="rounded-lg p-1.5 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 shrink-0 hidden sm:flex"
+                  aria-label={t("back")}
                 >
                   <X className="w-5 h-5" style={{ color: textColors.secondary }} />
                 </button>

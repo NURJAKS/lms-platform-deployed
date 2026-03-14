@@ -419,14 +419,13 @@ export function AppDashboardSidebar() {
               <span>{lang.toUpperCase()}</span>
             </button>
             {langOpen && (
-              <div className="absolute right-0 top-full mt-1 py-1 w-36 rounded-xl shadow-xl z-50 backdrop-blur-xl" style={{ background: "rgba(26, 34, 56, 0.95)", backdropFilter: "blur(12px)", border: "1px solid rgba(255, 255, 255, 0.08)" }}>
+              <div className="absolute right-0 top-full mt-1 py-1 w-36 rounded-xl shadow-xl z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600">
                 {(["ru", "kk", "en"] as const).map((l) => (
                   <button
                     key={l}
                     type="button"
                     onClick={() => { setLang(l); setLangOpen(false); }}
-                    className={`w-full px-3 py-2 text-left text-sm ${lang === l ? "font-medium" : "hover:opacity-80"}`}
-                    style={lang === l ? { color: "#8B5CF6" } : { color: "#94A3B8" }}
+                    className={`w-full px-3 py-2 text-left text-sm ${lang === l ? "font-medium text-[var(--qit-accent)] dark:text-[var(--qit-accent)]" : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"}`}
                   >
                     {t(l === "ru" ? "russian" : l === "kk" ? "kazakh" : "english")}
                   </button>
@@ -453,12 +452,9 @@ export function AppDashboardSidebar() {
               </div>
             </button>
             {notifOpen && (
-              <div
-                className="absolute right-0 top-full mt-1 w-72 rounded-xl shadow-xl z-50 max-h-64 overflow-auto backdrop-blur-xl"
-                style={{ background: "rgba(26, 34, 56, 0.95)", backdropFilter: "blur(12px)", border: "1px solid rgba(255, 255, 255, 0.08)" }}
-              >
+              <div className="absolute right-0 top-full mt-1 w-72 rounded-xl shadow-xl z-50 max-h-64 overflow-auto bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600">
                 {notifications.length === 0 ? (
-                  <p className="p-4 text-sm" style={{ color: "#94A3B8" }}>
+                  <p className="p-4 text-sm text-gray-500 dark:text-gray-400">
                     {t("noNotifications")}
                   </p>
                 ) : (
@@ -469,14 +465,10 @@ export function AppDashboardSidebar() {
                         key={n.id}
                         type="button"
                         onClick={() => markRead(n.id, n.link)}
-                        className="w-full text-left px-4 py-3 last:border-0 hover:opacity-80"
-                        style={{
-                          borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
-                          background: !n.is_read ? "rgba(139, 92, 246, 0.1)" : "transparent",
-                        }}
+                        className={`w-full text-left px-4 py-3 border-b border-gray-200 dark:border-gray-600 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${!n.is_read ? "bg-[#ff4081]/5 dark:bg-[#ff4081]/10" : ""}`}
                       >
-                        <p className="font-medium text-sm text-white">{title}</p>
-                        <p className="text-xs truncate" style={{ color: "#94A3B8" }}>
+                        <p className="font-medium text-sm text-gray-800 dark:text-gray-200">{title}</p>
+                        <p className="text-xs truncate text-gray-600 dark:text-gray-400">
                           {message}
                         </p>
                       </button>
@@ -498,8 +490,8 @@ export function AppDashboardSidebar() {
               <ChevronDown className={`w-4 h-4 transition-transform ${userMenuOpen ? "rotate-180" : ""}`} />
             </button>
             {userMenuOpen && (
-              <div className="absolute right-0 top-full mt-1 py-1 w-48 rounded-xl shadow-xl z-50 backdrop-blur-xl" style={{ background: "rgba(26, 34, 56, 0.95)", backdropFilter: "blur(12px)", border: "1px solid rgba(255, 255, 255, 0.08)" }}>
-                <Link href="/app/profile" onClick={() => setUserMenuOpen(false)} className="flex items-center gap-2 px-4 py-2.5 hover:opacity-80 text-white">
+              <div className="absolute right-0 top-full mt-1 py-1 w-48 rounded-xl shadow-xl z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600">
+                <Link href="/app/profile" onClick={() => setUserMenuOpen(false)} className="flex items-center gap-2 px-4 py-2.5 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-t-xl transition-colors">
                   <User className="w-4 h-4" />
                   {t("profile")}
                 </Link>
@@ -510,7 +502,7 @@ export function AppDashboardSidebar() {
                     router.push("/");
                     setUserMenuOpen(false);
                   }}
-                  className="w-full flex items-center gap-2 px-4 py-2.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                  className="w-full flex items-center gap-2 px-4 py-2.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-b-xl transition-colors"
                 >
                   <LogOut className="w-4 h-4" />
                   {t("logout")}

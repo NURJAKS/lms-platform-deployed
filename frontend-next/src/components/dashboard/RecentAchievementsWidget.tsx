@@ -33,16 +33,16 @@ const getIcon = (icon: Achievement["icon"]) => {
   }
 };
 
-const formatDate = (dateStr: string, t: (k: string) => string, lang: string) => {
+function formatDate<K extends string>(dateStr: string, t: (k: K) => string, lang: string): string {
   const date = new Date(dateStr);
   const now = new Date();
   const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
-  
-  if (diffDays === 0) return t("today");
-  if (diffDays === 1) return t("yesterday");
-  if (diffDays < 7) return t("daysAgo").replace("{count}", String(diffDays));
+  const T = t as (k: string) => string;
+  if (diffDays === 0) return T("today");
+  if (diffDays === 1) return T("yesterday");
+  if (diffDays < 7) return T("daysAgo").replace("{count}", String(diffDays));
   return date.toLocaleDateString(lang === "ru" ? "ru-RU" : lang === "kk" ? "kk-KZ" : "en-US", { day: "numeric", month: "short" });
-};
+}
 
 export function RecentAchievementsWidget() {
   const { theme } = useTheme();

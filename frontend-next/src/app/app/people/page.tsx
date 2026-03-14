@@ -58,11 +58,12 @@ export default function PeoplePage() {
 
       {/* Tabs */}
       <BlurFade delay={0.15} duration={0.6} blur="8px" offset={20}>
-        <div className="flex gap-2 mb-6 border-b" style={{ borderColor: isDark ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.1)" }}>
+        <div className="overflow-x-auto mb-6 border-b" style={{ borderColor: isDark ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.1)" }}>
+          <div className="flex flex-nowrap sm:flex-wrap gap-2 min-w-max sm:min-w-0">
           <button
             type="button"
             onClick={() => setActiveTab("students")}
-            className={`flex items-center gap-2 px-6 py-3 font-medium rounded-t-lg transition-all relative ${
+            className={`flex items-center gap-2 px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base font-medium rounded-t-lg transition-all relative ${
               activeTab === "students"
                 ? "text-white"
                 : isDark
@@ -92,7 +93,7 @@ export default function PeoplePage() {
           <button
             type="button"
             onClick={() => setActiveTab("parents")}
-            className={`flex items-center gap-2 px-6 py-3 font-medium rounded-t-lg transition-all relative ${
+            className={`flex items-center gap-2 px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base font-medium rounded-t-lg transition-all relative ${
               activeTab === "parents"
                 ? "text-white"
                 : isDark
@@ -122,7 +123,7 @@ export default function PeoplePage() {
           <button
             type="button"
             onClick={() => setActiveTab("teachers")}
-            className={`flex items-center gap-2 px-6 py-3 font-medium rounded-t-lg transition-all relative ${
+            className={`flex items-center gap-2 px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base font-medium rounded-t-lg transition-all relative ${
               activeTab === "teachers"
                 ? "text-white"
                 : isDark
@@ -152,7 +153,7 @@ export default function PeoplePage() {
           <button
             type="button"
             onClick={() => setActiveTab("curators")}
-            className={`flex items-center gap-2 px-6 py-3 font-medium rounded-t-lg transition-all relative ${
+            className={`flex items-center gap-2 px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base font-medium rounded-t-lg transition-all relative ${
               activeTab === "curators"
                 ? "text-white"
                 : isDark
@@ -179,6 +180,7 @@ export default function PeoplePage() {
               />
             )}
           </button>
+          </div>
         </div>
       </BlurFade>
 

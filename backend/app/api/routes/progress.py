@@ -11,6 +11,8 @@ from app.core.database import get_db
 from app.models.user import User
 from app.models.progress import StudentProgress
 from app.models.enrollment import CourseEnrollment
+from app.models.course_module import CourseModule
+from app.models.course_topic import CourseTopic
 from app.services.coins import add_coins, has_received_coins_for_reason
 
 router = APIRouter(prefix="/progress", tags=["progress"])
@@ -92,7 +94,6 @@ def update_video_progress(
     is_premium = getattr(current_user, "is_premium", 0) == 1
     
     # Получаем тему для проверки существования и получения данных
-    from app.models.course_topic import CourseTopic
     topic = db.query(CourseTopic).filter(CourseTopic.id == body.topic_id).first()
     if not topic:
         raise HTTPException(status_code=404, detail="Тема не найдена")
@@ -142,6 +143,26 @@ def update_video_progress(
     return {"video_watched_seconds": prog.video_watched_seconds}
 
 
+def _ordered_topic_ids_for_course(db: Session, course_id: int) -> list[int]:
+    """Возвращает список topic_id в порядке прохождения курса (модули и темы по order_number)."""
+    modules = (
+        db.query(CourseModule)
+        .filter(CourseModule.course_id == course_id)
+        .order_by(CourseModule.order_number)
+        .all()
+    )
+    topic_ids: list[int] = []
+    for m in modules:
+        topics = (
+            db.query(CourseTopic)
+            .filter(CourseTopic.module_id == m.id)
+            .order_by(CourseTopic.order_number)
+            .all()
+        )
+        topic_ids.extend(t.id for t in topics)
+    return topic_ids
+
+
 @router.get("/course/{course_id}")
 def get_course_progress(
     course_id: int,
@@ -153,7 +174,29 @@ def get_course_progress(
         StudentProgress.user_id == current_user.id,
         StudentProgress.course_id == course_id,
     ).all()
-    return [{"topic_id": p.topic_id, "is_completed": p.is_completed, "test_score": float(p.test_score) if p.test_score else None, "video_watched_seconds": p.video_watched_seconds} for p in items]
+
+    ordered_topic_ids = _ordered_topic_ids_for_course(db, course_id)
+    raw_completed = {
+        p.topic_id for p in items if p.topic_id is not None and p.is_completed
+    }
+    completed_in_order: set[int] = set()
+    for i, tid in enumerate(ordered_topic_ids):
+        if tid not in raw_completed:
+            continue
+        if i == 0 or ordered_topic_ids[i - 1] in completed_in_order:
+            completed_in_order.add(tid)
+
+    out = []
+    for p in items:
+        if p.topic_id is None:
+            continue
+        out.append({
+            "topic_id": p.topic_id,
+            "is_completed": p.topic_id in completed_in_order,
+            "test_score": float(p.test_score) if p.test_score else None,
+            "video_watched_seconds": p.video_watched_seconds,
+        })
+    return out
 
 
 @router.get("/me")

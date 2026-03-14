@@ -7,6 +7,11 @@ export const metadata: Metadata = {
   description: "Современное образование с помощью искусственного интеллекта",
 };
 
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -30,7 +35,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="antialiased">
+      <body className="antialiased overflow-x-hidden">
         <Providers>{children}</Providers>
       </body>
     </html>

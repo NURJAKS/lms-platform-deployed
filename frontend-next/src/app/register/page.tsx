@@ -78,7 +78,7 @@ export default function RegisterPage() {
       <div className="absolute inset-0 bg-[#f5f7ff] dark:bg-gray-900" />
       <div className="absolute inset-0 bg-white/20 dark:bg-black/10 backdrop-blur-2xl" />
       <div className="relative z-10 w-full max-w-[880px] bg-white dark:bg-gray-800 rounded-2xl shadow-2xl shadow-black/40 overflow-hidden flex flex-col lg:flex-row">
-        <div className="lg:w-[45%] bg-gradient-to-br from-[#e8e0f5] via-[#f5f0fa] to-[#ebe5f2] dark:from-indigo-900/30 dark:via-indigo-800/20 dark:to-violet-900/30 p-8 lg:p-10 flex flex-col justify-center">
+        <div className="lg:w-[45%] bg-gradient-to-br from-[#e8e0f5] via-[#f5f0fa] to-[#ebe5f2] dark:from-indigo-900/30 dark:via-indigo-800/20 dark:to-violet-900/30 p-5 sm:p-8 lg:p-10 flex flex-col justify-center">
           <Link href="/" className="flex items-center gap-2 mb-6">
             <div className="w-9 h-9 rounded-lg bg-violet-500/20 flex items-center justify-center">
               <BookOpen className="w-5 h-5 text-violet-600" />
@@ -102,7 +102,7 @@ export default function RegisterPage() {
           </div>
         </div>
 
-        <div className="lg:w-[55%] p-8 lg:p-10 flex flex-col justify-center">
+        <div className="lg:w-[55%] p-5 sm:p-8 lg:p-10 flex flex-col justify-center">
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
             {t("createAccount")}
           </p>
@@ -201,7 +201,7 @@ export default function RegisterPage() {
             </div>
             <button
               type="submit"
-              className="w-full py-3 rounded-lg bg-indigo-600 text-white font-medium hover:bg-indigo-700 transition-colors mt-2"
+              className="w-full min-h-[44px] py-3 rounded-lg bg-indigo-600 text-white font-medium hover:bg-indigo-700 transition-colors mt-2 touch-manipulation"
             >
               {t("register")}
             </button>

@@ -72,28 +72,29 @@ export function ApprovedApplicationPaymentModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
     >
-      <div className="rounded-3xl shadow-2xl p-8 max-w-md mx-4 w-full border-0 overflow-hidden relative backdrop-blur-xl" style={modalStyle}>
+      <div className="rounded-3xl shadow-2xl p-8 max-w-md w-full max-h-[90vh] flex flex-col border-0 overflow-hidden relative backdrop-blur-xl" style={modalStyle}>
         {step !== "done" && (
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 p-2 rounded-full hover:opacity-80"
+            className="absolute top-4 right-4 p-2 rounded-full hover:opacity-80 z-10"
             style={{ color: textColors.secondary }}
           >
             ×
           </button>
         )}
 
-        <h2 className="text-2xl font-bold mb-6 text-center" style={{ color: textColors.primary }}>
+        <h2 className="text-2xl font-bold mb-6 text-center flex-shrink-0" style={{ color: textColors.primary }}>
           {step === "method" && t("paymentSelectMethod")}
           {step === "card" && t("paymentEnterCardData")}
           {step === "loading" && t("paymentProcessing")}
           {step === "done" && t("paymentAccepted")}
         </h2>
 
+        <div className="min-h-0 max-h-[85vh] overflow-y-auto">
         {step === "method" && (
           <>
             <div className="bg-blue-50 dark:bg-blue-900/20 rounded-2xl p-4 mb-6 border border-blue-100 dark:border-blue-800">
@@ -314,6 +315,7 @@ export function ApprovedApplicationPaymentModal({
             </button>
           </div>
         )}
+        </div>
       </div>
     </div>
   );

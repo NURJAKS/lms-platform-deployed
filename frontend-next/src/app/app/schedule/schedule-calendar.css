@@ -9,6 +9,27 @@
   padding: 1rem;
 }
 
+@media (max-width: 399px) {
+  .schedule-calendar {
+    max-width: 100%;
+    padding: 0.75rem;
+    border-radius: 0.75rem;
+  }
+  .schedule-calendar .react-calendar__navigation button {
+    min-width: 32px;
+    height: 32px;
+    font-size: 1rem;
+  }
+  .schedule-calendar .react-calendar__navigation__label {
+    font-size: 0.9rem;
+  }
+  .schedule-calendar .react-calendar__tile {
+    padding: 0.35rem;
+    font-size: 0.8rem;
+    min-height: 40px;
+  }
+}
+
 .dark .schedule-calendar {
   background: linear-gradient(145deg, rgba(0, 176, 255, 0.06) 0%, rgba(26, 35, 126, 0.08) 100%);
   border-color: rgba(255, 255, 255, 0.08);

@@ -16,10 +16,8 @@ from app.models import *  # noqa: F401 - register all models
 from app.api.routes import auth, admin, applications, courses, topics, tests, progress, users, ai_bot, ai_challenge, notifications, schedule, teacher, analytics, parent, payments, assignments, shop, dashboard, premium, reviews
 from app.jobs.daily_rewards import run_daily_leaderboard_rewards
 
-# Rate limiter
 limiter = Limiter(key_func=get_remote_address)
 
-# Conditionally disable docs in production
 docs_kwargs = {}
 if not settings.DEBUG:
     docs_kwargs = {"docs_url": None, "redoc_url": None}

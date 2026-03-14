@@ -9,13 +9,17 @@ export function getGlassCardStyle(theme: Theme) {
       background: "rgba(26, 34, 56, 0.7)",
       backdropFilter: "blur(20px) saturate(180%)",
       WebkitBackdropFilter: "blur(20px) saturate(180%)",
-      border: "1px solid rgba(255, 255, 255, 0.12)",
+      borderWidth: "1px",
+      borderStyle: "solid",
+      borderColor: "rgba(255, 255, 255, 0.12)",
       boxShadow: "0 8px 32px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.2)",
     };
   }
   return {
     background: "#FFFFFF",
-    border: "1px solid rgba(0, 0, 0, 0.06)",
+    borderWidth: "1px",
+    borderStyle: "solid",
+    borderColor: "rgba(0, 0, 0, 0.06)",
     boxShadow: "0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03)",
   };
 }

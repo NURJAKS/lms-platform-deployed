@@ -9,7 +9,7 @@ import { useAuthStore } from "@/store/authStore";
 import { useLanguage } from "@/context/LanguageContext";
 import type { TranslationKey } from "@/i18n/translations";
 import { AppHeader } from "@/components/common/AppHeader";
-import { Loader2, Clock, Signal, GraduationCap, Lock, Sparkles, CreditCard, Smartphone } from "lucide-react";
+import { Loader2, Clock, Signal, GraduationCap, Lock, Sparkles, CreditCard, Smartphone, X } from "lucide-react";
 import type { Course } from "@/types";
 import { CATEGORY_METRICS, COURSE_CARD_COLORS, courseImageUrl, getCategoryFromCourse, getLocalizedCourseTitle, getLocalizedCourseDesc } from "@/lib/courseUtils";
 
@@ -464,44 +464,44 @@ function CatalogPageContent() {
     <div className="min-h-screen bg-white dark:bg-gray-900">
       <header className="sticky top-0 z-50 bg-white/90 dark:bg-gray-900/90 backdrop-blur-md border-b border-gray-100 dark:border-gray-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16 gap-4 lg:gap-8">
-            <Link href="/" className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center justify-between h-16 gap-2 sm:gap-4 lg:gap-8 min-w-0">
+            <Link href="/" className="flex items-center gap-2 shrink-0 min-w-0">
               <div
-                className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-lg"
+                className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-white font-bold text-lg shrink-0"
                 style={{ background: "var(--qit-gradient-1)" }}
               >
                 Q
               </div>
-              <span className="text-xl font-bold text-gray-900 dark:text-white font-montserrat">
+              <span className="hidden sm:inline text-xl font-bold text-gray-900 dark:text-white font-montserrat truncate">
                 Qazaq IT Academy
               </span>
             </Link>
-            <nav className="flex items-center gap-4 lg:gap-6 flex-1 justify-center">
+            <nav className="hidden sm:flex items-center gap-4 lg:gap-6 flex-1 justify-center min-w-0">
               <Link href="/" className="shrink-0 py-2 text-gray-600 dark:text-gray-300 hover:text-[#1a237e] dark:hover:text-[#00b0ff] font-medium whitespace-nowrap">
                 {t("navHome")}
               </Link>
               <span className="shrink-0 py-2 text-[#1a237e] dark:text-[#00b0ff] font-semibold whitespace-nowrap">{t("courseCatalog")}</span>
-              <div className="flex items-center gap-6 shrink-0">
-                <AppHeader />
-                {token ? (
-                  <Link
-                    href="/app"
-                    className="px-5 py-2.5 rounded-full font-semibold text-white transition-all hover:opacity-90 whitespace-nowrap"
-                    style={{ background: "var(--qit-gradient-3)" }}
-                  >
-                    {t("navPersonalCabinet")}
-                  </Link>
-                ) : (
-                  <Link
-                    href="/login"
-                    className="px-5 py-2.5 rounded-full font-semibold text-white transition-all hover:opacity-90 whitespace-nowrap"
-                    style={{ background: "var(--qit-gradient-3)" }}
-                  >
-                    {t("navPersonalCabinet")}
-                  </Link>
-                )}
-              </div>
             </nav>
+            <div className="flex items-center gap-2 sm:gap-4 lg:gap-6 shrink-0 min-w-0">
+              <AppHeader />
+              {token ? (
+                <Link
+                  href="/app"
+                  className="px-3 py-2 sm:px-5 sm:py-2.5 rounded-full font-semibold text-white transition-all hover:opacity-90 whitespace-nowrap text-sm sm:text-base"
+                  style={{ background: "var(--qit-gradient-3)" }}
+                >
+                  {t("navPersonalCabinet")}
+                </Link>
+              ) : (
+                <Link
+                  href="/login"
+                  className="px-3 py-2 sm:px-5 sm:py-2.5 rounded-full font-semibold text-white transition-all hover:opacity-90 whitespace-nowrap text-sm sm:text-base"
+                  style={{ background: "var(--qit-gradient-3)" }}
+                >
+                  {t("navPersonalCabinet")}
+                </Link>
+              )}
+            </div>
           </div>
         </div>
       </header>
@@ -600,28 +600,41 @@ function CatalogPageContent() {
           }}
         >
           <div
-            className="rounded-xl shadow-xl p-6 max-w-3xl mx-4 w-full border backdrop-blur-xl bg-white dark:bg-[#1A2238] border-gray-200 dark:border-white/10"
+            className="rounded-xl shadow-xl p-4 sm:p-6 max-w-3xl mx-2 sm:mx-4 w-full min-w-0 h-[95dvh] max-h-[100dvh] sm:h-auto sm:max-h-[85vh] flex flex-col border backdrop-blur-xl bg-white dark:bg-[#1A2238] border-gray-200 dark:border-white/10"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 id="buy-modal-title" className="text-2xl font-bold text-gray-900 dark:text-white mb-2 text-center font-montserrat px-4">
-              {submitStep === "form" && t("buyCourse")}
-              {submitStep === "payment_method" && t("paymentSelectMethod")}
-              {submitStep === "card_details" && t("cardDetails")}
-              {submitStep === "loading" && t("paymentProcessing")}
-              {submitStep === "done" && t("paymentSuccess")}
-            </h2>
-            {submitStep !== "done" && submitStep !== "loading" && (
-              <p className="text-gray-500 dark:text-gray-400 text-center mb-8 px-4">
-                {buyModal.title} — <span className="text-[#00b0ff] font-bold">{Number(buyModal.price)} ₸</span>
-              </p>
-            )}
+            <div className="flex items-start gap-2 flex-shrink-0 pb-3 sm:pb-4 border-b border-gray-200 dark:border-white/10">
+              <div className="flex-1 min-w-0">
+                <h2 id="buy-modal-title" className="text-base sm:text-2xl font-bold text-gray-900 dark:text-white font-montserrat truncate pr-1">
+                  {submitStep === "form" && t("buyCourse")}
+                  {submitStep === "payment_method" && t("paymentSelectMethod")}
+                  {submitStep === "card_details" && t("cardDetails")}
+                  {submitStep === "loading" && t("paymentProcessing")}
+                  {submitStep === "done" && t("paymentSuccess")}
+                </h2>
+                {submitStep !== "done" && submitStep !== "loading" && (
+                  <p className="text-gray-500 dark:text-gray-400 text-sm sm:text-base truncate mt-0.5">
+                    {buyModal.title} — <span className="text-[#00b0ff] font-bold">{Number(buyModal.price)} ₸</span>
+                  </p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => closeBuyModal("close")}
+                className="flex-shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-white/10 transition-colors touch-manipulation"
+                aria-label={t("cancel")}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
+            <div className="flex-1 min-h-0 overflow-y-auto">
             {submitStep === "form" && (
               <>
-                <p className="text-gray-600 dark:text-gray-400 mb-4">
+                <p className="text-gray-600 dark:text-gray-400 mb-3 sm:mb-4 text-sm line-clamp-2">
                   &quot;{buyModal.title}&quot; — {Number(buyModal.price)}₸
                 </p>
-                <div className="space-y-4 mb-4">
+                <div className="space-y-3 sm:space-y-4 mb-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">
@@ -800,7 +813,7 @@ function CatalogPageContent() {
                       e.stopPropagation();
                       closeBuyModal("cancel");
                     }}
-                    className="py-2 px-4 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"
+                    className="min-h-[44px] py-2 px-4 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 touch-manipulation"
                   >
                     {t("cancel")}
                   </button>
@@ -817,7 +830,7 @@ function CatalogPageContent() {
                       !formData.parent_email.trim() ||
                       !formData.parent_full_name.trim()
                     }
-                    className="flex-1 py-2 px-4 rounded-lg text-white disabled:opacity-50"
+                    className="flex-1 min-h-[44px] py-2 px-4 rounded-lg text-white disabled:opacity-50 touch-manipulation"
                     style={{ background: "var(--qit-primary)" }}
                   >
                     {t("goToPayment")}
@@ -945,7 +958,7 @@ function CatalogPageContent() {
                   <button
                     type="button"
                     onClick={() => setSubmitStep("form")}
-                    className="flex-1 py-4 px-6 rounded-2xl font-bold bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                    className="flex-1 min-h-[44px] py-4 px-6 rounded-2xl font-bold bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors touch-manipulation"
                   >
                     {t("back")}
                   </button>
@@ -997,7 +1010,7 @@ function CatalogPageContent() {
                       setSubmitError("");
                       setSubmitStep("payment_method");
                     }}
-                    className="flex-1 py-4 px-6 rounded-2xl font-bold bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                    className="flex-1 min-h-[44px] py-4 px-6 rounded-2xl font-bold bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors touch-manipulation"
                   >
                     {t("back")}
                   </button>
@@ -1005,7 +1018,7 @@ function CatalogPageContent() {
                     type="button"
                     onClick={handlePay}
                     disabled={!cardData.number || !cardData.expiry || !cardData.cvv}
-                    className="flex-[2] py-4 px-6 rounded-2xl font-bold text-white shadow-lg shadow-blue-500/30 hover:shadow-blue-500/40 transition-all disabled:opacity-50"
+                    className="flex-[2] min-h-[44px] py-4 px-6 rounded-2xl font-bold text-white shadow-lg shadow-blue-500/30 hover:shadow-blue-500/40 transition-all disabled:opacity-50 touch-manipulation"
                     style={{ background: "var(--qit-gradient-1)" }}
                   >
                     {t("paymentPay")}
@@ -1062,7 +1075,7 @@ function CatalogPageContent() {
                           closeBuyModal("done");
                           router.push(`/app/courses/${buyModal.id}`);
                         }}
-                        className="flex-1 py-4 rounded-2xl font-bold text-white shadow-lg shadow-blue-500/30 hover:shadow-blue-500/40 transition-all"
+                        className="flex-1 min-h-[44px] py-4 rounded-2xl font-bold text-white shadow-lg shadow-blue-500/30 hover:shadow-blue-500/40 transition-all touch-manipulation"
                         style={{ background: "var(--qit-gradient-1)" }}
                       >
                         Перейти к курсу
@@ -1070,7 +1083,7 @@ function CatalogPageContent() {
                       <button
                         type="button"
                         onClick={() => closeBuyModal("done")}
-                        className="flex-1 py-4 rounded-2xl font-bold bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                        className="flex-1 min-h-[44px] py-4 rounded-2xl font-bold bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors touch-manipulation"
                       >
                         Закрыть
                       </button>
@@ -1102,7 +1115,7 @@ function CatalogPageContent() {
                     <button
                       type="button"
                       onClick={() => closeBuyModal("done")}
-                      className="w-full max-w-sm py-4 rounded-2xl font-bold text-white shadow-lg shadow-blue-500/30 hover:shadow-blue-500/40 transition-all"
+                      className="w-full max-w-sm min-h-[44px] py-4 rounded-2xl font-bold text-white shadow-lg shadow-blue-500/30 hover:shadow-blue-500/40 transition-all touch-manipulation"
                       style={{ background: "var(--qit-gradient-1)" }}
                     >
                       Платформаға оралу
@@ -1111,6 +1124,7 @@ function CatalogPageContent() {
                 )}
               </div>
             )}
+            </div>
           </div>
         </div>
       )}

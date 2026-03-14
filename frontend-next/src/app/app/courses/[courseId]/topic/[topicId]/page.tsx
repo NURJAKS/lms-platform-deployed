@@ -10,13 +10,29 @@ import { useAuthStore } from "@/store/authStore";
 import { VideoPlayer } from "@/components/courses/VideoPlayer";
 import { TestComponent } from "@/components/tests/TestComponent";
 import { TopicNotes } from "@/components/courses/TopicNotes";
+import { TopicTheoryContent } from "@/components/courses/TopicTheoryContent";
 import { ChevronLeft, Lock, Sparkles, Coins, CheckCircle2 } from "lucide-react";
 import { getLocalizedTopicTitle } from "@/lib/courseUtils";
 
 const VIDEO_TOPIC_TITLES = ["Python дегеніміз не?", "HTML тегтері"];
+const PYTHON_INTRO_CACHE_BUST = "?v=2";
 
 function hasVideo(topic: { title: string; video_url?: string | null }): boolean {
   return VIDEO_TOPIC_TITLES.includes(topic.title) && !!topic.video_url;
+}
+
+function buildVideoSrc(
+  videoUrl: string | undefined | null,
+  courseId: string,
+  topicId: string,
+  topicTitle: string
+): string | undefined {
+  if (!videoUrl) return undefined;
+  const base =
+    videoUrl.startsWith("http") ? videoUrl : videoUrl.startsWith("/") ? videoUrl : `/uploads/${videoUrl}`;
+  const isFirstPythonLesson =
+    (courseId === "1" && topicId === "1") || topicTitle === "Python дегеніміз не?";
+  return base + (isFirstPythonLesson ? PYTHON_INTRO_CACHE_BUST : "");
 }
 
 export default function TopicViewPage() {
@@ -241,7 +257,6 @@ export default function TopicViewPage() {
         <>
           {isVideoTopic ? (
             <>
-              {topic.description && <p className="text-gray-600 dark:text-gray-400 mb-4">{topic.description}</p>}
               {isPremium && <TopicNotes topicId={tId} />}
               {!isPremium && dailyVideoLimit && !dailyVideoLimit.is_allowed && (
                 <div className="mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
@@ -292,7 +307,7 @@ export default function TopicViewPage() {
                   </div>
                 )}
                 <VideoPlayer
-                  src={topic.video_url ? (topic.video_url.startsWith("http") ? topic.video_url : topic.video_url.startsWith("/") ? topic.video_url : `/uploads/${topic.video_url}`) : undefined}
+                  src={buildVideoSrc(topic.video_url, courseId, topicId, topic.title)}
                   duration={topic.video_duration ?? 300}
                   initialWatched={videoWatched}
                   onProgress={onVideoProgress}
@@ -314,13 +329,20 @@ export default function TopicViewPage() {
                   </p>
                 )}
               </div>
+              {topic.description && (
+                <div className="mb-6">
+                  <TopicTheoryContent content={topic.description} />
+                </div>
+              )}
             </>
           ) : (
             <>
-              <div className="prose prose-gray dark:prose-invert max-w-none mb-6">
-                <div className="text-gray-600 dark:text-gray-300 whitespace-pre-wrap leading-relaxed">
-                  {topic.description || t("materialPreparing")}
-                </div>
+              <div className="mb-6">
+                {topic.description ? (
+                  <TopicTheoryContent content={topic.description} />
+                ) : (
+                  <p className="text-gray-600 dark:text-gray-300">{t("materialPreparing")}</p>
+                )}
               </div>
               {isPremium && <TopicNotes topicId={tId} />}
             </>

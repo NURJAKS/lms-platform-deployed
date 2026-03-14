@@ -26,7 +26,7 @@ export function AppHeader() {
       <button
         type="button"
         onClick={toggleTheme}
-        className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200 transition-colors"
+        className="min-h-[44px] min-w-[44px] flex items-center justify-center p-2 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200 transition-colors touch-manipulation"
         title={theme === "light" ? t("darkTheme") : t("lightTheme")}
         aria-label={theme === "light" ? t("darkTheme") : t("lightTheme")}
       >
@@ -41,7 +41,7 @@ export function AppHeader() {
         <button
           type="button"
           onClick={() => setLangOpen(!langOpen)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-all text-sm font-medium shadow-sm"
+          className="flex items-center gap-1.5 min-h-[44px] px-3 py-2 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-all text-sm font-medium shadow-sm touch-manipulation"
           title={t("language")}
           aria-label={t("language")}
         >
@@ -59,7 +59,7 @@ export function AppHeader() {
                   setLang(l);
                   setLangOpen(false);
                 }}
-                className={`w-full px-3 py-2 text-left text-sm ${lang === l
+                className={`w-full min-h-[44px] flex items-center px-3 py-2 text-left text-sm ${lang === l
                   ? "bg-[var(--qit-primary)]/10 text-[var(--qit-primary)] dark:text-[var(--qit-secondary)] font-medium"
                   : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                   }`}

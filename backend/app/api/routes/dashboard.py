@@ -1,4 +1,3 @@
-"""Dashboard API: stats, continue-watching, daily quests."""
 from datetime import date, timedelta, datetime, timezone
 from typing import Annotated
 

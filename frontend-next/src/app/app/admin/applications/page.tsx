@@ -281,7 +281,7 @@ export default function AdminApplicationsPage() {
                       {showParentPhone && (
                         <td className="py-4 px-6 text-sm text-gray-600 dark:text-gray-400">{app.parent_phone || "—"}</td>
                       )}
-                      <td className="py-4 px-6 text-sm text-gray-900 dark:text-white">{app.course_title ? getLocalizedCourseTitle({ title: app.course_title } as any, t) : "—"}</td>
+                      <td className="py-4 px-6 text-sm text-gray-900 dark:text-white">{app.course_title ? getLocalizedCourseTitle({ title: app.course_title } as any, t as (k: string) => string) : "—"}</td>
                       <td className="py-4 px-6">
                         <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${getStatusBadgeColor(app.status)}`}>
                           {statusLabel(app.status)}
@@ -342,7 +342,7 @@ export default function AdminApplicationsPage() {
             <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">{t("credentialsForStudent")}</h2>
             <div className="space-y-3 mb-4">
               <div className="flex items-center gap-2">
-                <span className="text-gray-600 dark:text-gray-400 w-20">{t("login")}:</span>
+                <span className="text-gray-600 dark:text-gray-400 w-20">{t("loginLabel")}</span>
                 <code className="flex-1 bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded text-sm">{approveModal.login}</code>
                 <button type="button" onClick={() => copyToClipboard(approveModal.login)} className="p-2 rounded hover:bg-gray-200 dark:hover:bg-gray-600">
                   <Copy className="w-4 h-4" />

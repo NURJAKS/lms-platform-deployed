@@ -259,15 +259,15 @@ export default function PremiumPage() {
     <div className="max-w-4xl mx-auto">
       {/* Payment simulation modal */}
       {paymentModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" role="dialog" aria-modal="true" aria-labelledby="premium-payment-title">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 max-w-md mx-4 w-full">
-            <h2 id="premium-payment-title" className="text-lg font-semibold text-gray-800 dark:text-white mb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" role="dialog" aria-modal="true" aria-labelledby="premium-payment-title">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 max-w-md w-full max-h-[90vh] flex flex-col">
+            <h2 id="premium-payment-title" className="text-lg font-semibold text-gray-800 dark:text-white mb-4 flex-shrink-0">
               {paymentStep === "method" && t("paymentSelectMethod")}
               {paymentStep === "card" && t("paymentCardData")}
               {paymentStep === "loading" && t("paymentProcessing")}
               {paymentStep === "done" && t("paymentSuccess")}
             </h2>
-
+            <div className="min-h-0 max-h-[70vh] overflow-y-auto">
             {paymentStep === "method" && (
               <>
                 <p className="text-gray-600 dark:text-gray-400 mb-4">
@@ -359,6 +359,7 @@ export default function PremiumPage() {
                 )}
               </div>
             )}
+            </div>
           </div>
         </div>
       )}

@@ -163,25 +163,25 @@ export function getCategoryFromCourse(c: Course): { key: string; labelKey: strin
   return { key: "data", labelKey: "coursesFilterData" };
 }
 
-export function getLocalizedCourseTitle(
+export function getLocalizedCourseTitle<K extends string>(
   course: Course,
-  t: (key: string) => string
+  t: (key: K) => string
 ): string {
   const key = COURSE_TITLE_KEYS[course.title];
-  return key ? t(key) : course.title;
+  return key ? (t as (key: string) => string)(key) : course.title;
 }
 
-export function getLocalizedCourseDesc(
+export function getLocalizedCourseDesc<K extends string>(
   course: Course,
-  t: (key: string) => string
+  t: (key: K) => string
 ): string {
   const key = COURSE_DESC_KEYS[course.title];
-  return key ? t(key) : (course.description ?? "");
+  return key ? (t as (key: string) => string)(key) : (course.description ?? "");
 }
 
-export function getLocalizedTopicTitle(title: string, t: (key: string) => string): string {
+export function getLocalizedTopicTitle<K extends string>(title: string, t: (key: K) => string): string {
   const key = TOPIC_TITLE_KEYS[title];
-  return key ? t(key) : title;
+  return key ? (t as (key: string) => string)(key) : title;
 }
 
 export function getLocalizedModuleTitle(title: string, t: (key: string) => string): string {

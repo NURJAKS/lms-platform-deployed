@@ -12,7 +12,7 @@ import {
 } from "motion/react";
 import "./ScrollVelocity.css";
 
-function useElementWidth(ref: React.RefObject<HTMLDivElement>) {
+function useElementWidth(ref: React.RefObject<HTMLDivElement | null>) {
   const [width, setWidth] = useState(0);
 
   useLayoutEffect(() => {

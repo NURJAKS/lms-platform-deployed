@@ -231,7 +231,7 @@ export function AdminDashboard() {
   const mainMetrics = [
     {
       id: "users",
-      label: t("adminUsersTotal"),
+      label: t("adminTotalUsers"),
       value: totalUsers,
       icon: Users,
       color: "from-blue-500 to-cyan-500",

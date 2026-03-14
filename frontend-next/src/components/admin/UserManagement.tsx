@@ -349,9 +349,8 @@ export function UserManagement() {
               </tr>
             </thead>
             <tbody>
-              {users.map((u, index) => (
-                <BlurFade key={u.id} delay={0.2 + index * 0.04} duration={0.4} blur="4px" offset={12} direction="up">
-                  <tr className={`border-b ${isDark ? "border-white/10 hover:bg-white/5" : "border-gray-200 hover:bg-gray-50"} transition-colors`}>
+              {users.map((u) => (
+                  <tr key={u.id} className={`border-b ${isDark ? "border-white/10 hover:bg-white/5" : "border-gray-200 hover:bg-gray-50"} transition-colors`}>
                 <td className="py-4 px-6">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold text-sm shrink-0" style={{ background: "linear-gradient(135deg, #14b8a6 0%, #3b82f6 100%)" }}>
@@ -406,7 +405,6 @@ export function UserManagement() {
                   </td>
                   )}
                     </tr>
-                  </BlurFade>
                 ))}
             </tbody>
           </table>
@@ -438,7 +436,6 @@ export function UserManagement() {
             </thead>
             <tbody>
               {studentsWithoutGroup.length === 0 ? (
-                <BlurFade delay={0.2} duration={0.4} blur="4px" offset={12}>
                   <tr>
                     <td colSpan={6} className="py-12 text-center">
                       <div className="flex flex-col items-center">
@@ -449,11 +446,9 @@ export function UserManagement() {
                       </div>
                     </td>
                   </tr>
-                </BlurFade>
               ) : (
-                studentsWithoutGroup.map((s, index) => (
-                  <BlurFade key={`${s.id}-${s.course_id}`} delay={0.2 + index * 0.04} duration={0.4} blur="4px" offset={12} direction="up">
-                    <tr className={`border-b ${isDark ? "border-white/10 hover:bg-white/5" : "border-gray-200 hover:bg-gray-50"} transition-colors`}>
+                studentsWithoutGroup.map((s) => (
+                    <tr key={`${s.id}-${s.course_id}`} className={`border-b ${isDark ? "border-white/10 hover:bg-white/5" : "border-gray-200 hover:bg-gray-50"} transition-colors`}>
                   <td className="py-4 px-6">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-semibold shrink-0" style={{ background: "linear-gradient(135deg, #14b8a6 0%, #3b82f6 100%)" }}>
@@ -479,7 +474,6 @@ export function UserManagement() {
                       </button>
                     </td>
                     </tr>
-                  </BlurFade>
                 ))
               )}
             </tbody>
@@ -518,7 +512,6 @@ export function UserManagement() {
             </thead>
             <tbody>
               {applications.length === 0 ? (
-                <BlurFade delay={0.2} duration={0.4} blur="4px" offset={12}>
                   <tr>
                     <td colSpan={8} className="py-12 text-center">
                       <div className="flex flex-col items-center">
@@ -529,11 +522,9 @@ export function UserManagement() {
                       </div>
                     </td>
                   </tr>
-                </BlurFade>
               ) : (
-                applications.map((app, index) => (
-                  <BlurFade key={app.id} delay={0.2 + index * 0.04} duration={0.4} blur="4px" offset={12} direction="up">
-                    <tr className={`border-b ${isDark ? "border-white/10 hover:bg-white/5" : "border-gray-200 hover:bg-gray-50"} transition-colors`}>
+                applications.map((app) => (
+                    <tr key={app.id} className={`border-b ${isDark ? "border-white/10 hover:bg-white/5" : "border-gray-200 hover:bg-gray-50"} transition-colors`}>
                   <td className="py-4 px-6 text-sm" style={{ color: textColors.secondary }}>{formatDate(app.created_at)}</td>
                   <td className="py-4 px-6">
                     <div className="flex items-center gap-3">
@@ -554,7 +545,6 @@ export function UserManagement() {
                     </span>
                     </td>
                     </tr>
-                  </BlurFade>
                 ))
               )}
             </tbody>

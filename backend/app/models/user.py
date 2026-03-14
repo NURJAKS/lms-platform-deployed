@@ -12,8 +12,8 @@ class User(Base):
     email = Column(String(255), unique=True, nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)
     full_name = Column(String(255), nullable=False)
-    role = Column(String(50), nullable=False, index=True)  # admin, director, curator, teacher, student, parent, courier
-    is_approved = Column(Boolean, default=True, nullable=False)  # False = pending admin approval
+    role = Column(String(50), nullable=False, index=True)
+    is_approved = Column(Boolean, default=True, nullable=False)
     parent_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     photo_url = Column(String(500))
     description = Column(Text)
@@ -21,8 +21,8 @@ class User(Base):
     birth_date = Column(Date)
     city = Column(String(100))
     address = Column(String(500))
-    points = Column(Integer, default=0)  # геймификация: очки для покупок
-    is_premium = Column(Integer, default=0)  # 1 = Premium подписка
+    points = Column(Integer, default=0)
+    is_premium = Column(Integer, default=0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     enrollments = relationship("CourseEnrollment", back_populates="user")

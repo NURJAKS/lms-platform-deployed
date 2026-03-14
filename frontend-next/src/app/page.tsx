@@ -25,9 +25,15 @@ import {
   Trophy,
   Loader2,
   ChevronRight,
+  Menu,
+  X,
+  Globe,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import { useLanguage } from "@/context/LanguageContext";
+import { useTheme } from "@/context/ThemeContext";
 import type { TranslationKey } from "@/i18n/translations";
 import { api } from "@/api/client";
 import type { Course } from "@/types";
@@ -104,7 +110,8 @@ const ADVANTAGES = [
 ] as const;
 
 export default function HomePage() {
-  const { t } = useLanguage();
+  const { t, lang, setLang } = useLanguage();
+  const { theme, toggleTheme } = useTheme();
   const router = useRouter();
   const token = useAuthStore((s) => s.token);
   const [category, setCategory] = useState<string>("all");
@@ -116,6 +123,7 @@ export default function HomePage() {
   const [highlightedCourseId, setHighlightedCourseId] = useState<number | null>(null);
   const heroBtnRef = useRef<HTMLAnchorElement>(null);
   const [heroBtnTilt, setHeroBtnTilt] = useState({ x: 0, y: 0 });
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const { data: courses = [], isLoading: coursesLoading, isError: coursesError } = useQuery({
     queryKey: ["courses-all"],
@@ -186,61 +194,228 @@ export default function HomePage() {
     return () => obs.disconnect();
   }, []);
 
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [mobileMenuOpen]);
+
   if (token) return null;
 
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900 overflow-x-hidden">
-      {/* Header */}
       <header
         id="home"
         className="fixed top-0 left-0 right-0 z-50 bg-white/90 dark:bg-gray-900/90 backdrop-blur-md border-b border-gray-100 dark:border-gray-800"
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16 lg:h-20 gap-4 sm:gap-6 lg:gap-8">
-            <Link href="/" className="flex items-center gap-2 shrink-0">
+            <Link href="/" className="flex items-center gap-2 shrink-0 min-w-0">
               <div
-                className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-lg animate-[spin_3s_linear_infinite]"
+                className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-lg animate-[spin_3s_linear_infinite] shrink-0"
                 style={{ background: "var(--qit-gradient-1)" }}
               >
                 Q
               </div>
-              <span className="text-xl font-bold text-gray-900 dark:text-white font-montserrat">
+              <span className="hidden sm:inline text-xl font-bold text-gray-900 dark:text-white font-montserrat truncate">
                 Qazaq IT Academy
               </span>
             </Link>
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen(true)}
+              className="md:hidden flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors touch-manipulation"
+              aria-label={t("openMenu")}
+            >
+              <Menu className="w-6 h-6" />
+            </button>
             <nav className="hidden md:flex items-center justify-center gap-4 lg:gap-6 flex-1">
-              <button type="button" onClick={() => scrollTo("home")} className="shrink-0 py-2 text-gray-600 dark:text-gray-300 hover:text-[#1a237e] dark:hover:text-[#00b0ff] font-medium transition-colors whitespace-nowrap text-center">
+              <button
+                type="button"
+                onClick={() => scrollTo("home")}
+                className="shrink-0 py-2 text-gray-600 dark:text-gray-300 hover:text-[#1a237e] dark:hover:text-[#00b0ff] font-medium transition-colors whitespace-nowrap text-center"
+              >
                 {t("navHome")}
               </button>
-              <Link href="/courses" className="shrink-0 py-2 text-gray-600 dark:text-gray-300 hover:text-[#1a237e] dark:hover:text-[#00b0ff] font-medium transition-colors whitespace-nowrap text-center">
+              <Link
+                href="/courses"
+                className="shrink-0 py-2 text-gray-600 dark:text-gray-300 hover:text-[#1a237e] dark:hover:text-[#00b0ff] font-medium transition-colors whitespace-nowrap text-center"
+              >
                 {t("courseCatalog")}
               </Link>
-              <button type="button" onClick={() => scrollTo("ai")} className="shrink-0 py-2 text-gray-600 dark:text-gray-300 hover:text-[#1a237e] dark:hover:text-[#00b0ff] font-medium transition-colors whitespace-nowrap text-center">
+              <button
+                type="button"
+                onClick={() => scrollTo("ai")}
+                className="shrink-0 py-2 text-gray-600 dark:text-gray-300 hover:text-[#1a237e] dark:hover:text-[#00b0ff] font-medium transition-colors whitespace-nowrap text-center"
+              >
                 {t("navCoursePicker")}
               </button>
-              <button type="button" onClick={() => scrollTo("ai")} className="shrink-0 py-2 text-gray-600 dark:text-gray-300 hover:text-[#1a237e] dark:hover:text-[#00b0ff] font-medium transition-colors whitespace-nowrap text-center">
+              <button
+                type="button"
+                onClick={() => scrollTo("ai")}
+                className="shrink-0 py-2 text-gray-600 dark:text-gray-300 hover:text-[#1a237e] dark:hover:text-[#00b0ff] font-medium transition-colors whitespace-nowrap text-center"
+              >
                 {t("navAi")}
               </button>
-              <button type="button" onClick={() => scrollTo("about")} className="shrink-0 py-2 text-gray-600 dark:text-gray-300 hover:text-[#1a237e] dark:hover:text-[#00b0ff] font-medium transition-colors whitespace-nowrap text-center">
+              <button
+                type="button"
+                onClick={() => scrollTo("about")}
+                className="shrink-0 py-2 text-gray-600 dark:text-gray-300 hover:text-[#1a237e] dark:hover:text-[#00b0ff] font-medium transition-colors whitespace-nowrap text-center"
+              >
                 {t("navAbout")}
               </button>
-              <button type="button" onClick={() => scrollTo("contact")} className="shrink-0 py-2 text-gray-600 dark:text-gray-300 hover:text-[#1a237e] dark:hover:text-[#00b0ff] font-medium transition-colors whitespace-nowrap text-center">
+              <button
+                type="button"
+                onClick={() => scrollTo("reviews")}
+                className="shrink-0 py-2 text-gray-600 dark:text-gray-300 hover:text-[#1a237e] dark:hover:text-[#00b0ff] font-medium transition-colors whitespace-nowrap text-center"
+              >
+                {t("navReviews")}
+              </button>
+              <button
+                type="button"
+                onClick={() => scrollTo("contact")}
+                className="shrink-0 py-2 text-gray-600 dark:text-gray-300 hover:text-[#1a237e] dark:hover:text-[#00b0ff] font-medium transition-colors whitespace-nowrap text-center"
+              >
                 {t("navContact")}
               </button>
             </nav>
-            <div className="flex items-center gap-6 ml-auto shrink-0">
+            <div className="flex items-center gap-2 sm:gap-6 ml-auto shrink-0">
               <Link
                 href="/login"
-                className="px-5 py-2.5 rounded-full font-semibold text-white transition-all hover:opacity-90 whitespace-nowrap"
+                className="px-4 sm:px-5 py-2.5 rounded-full font-semibold text-white transition-all hover:opacity-90 whitespace-nowrap text-sm sm:text-base"
                 style={{ background: "var(--qit-gradient-3)" }}
               >
                 {t("navPersonalCabinet")}
               </Link>
-              <AppHeader />
+              <div className="hidden md:block">
+                <AppHeader />
+              </div>
             </div>
           </div>
         </div>
       </header>
+
+      {/* Mobile menu drawer */}
+      {mobileMenuOpen && (
+        <>
+          <div
+            className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm md:hidden"
+            onClick={() => setMobileMenuOpen(false)}
+            aria-hidden="true"
+          />
+          <div
+            className="fixed top-0 right-0 bottom-0 z-50 w-full max-w-sm bg-white dark:bg-gray-900 shadow-2xl md:hidden flex flex-col"
+            role="dialog"
+            aria-modal="true"
+            aria-label={t("openMenu")}
+          >
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+              <span className="font-semibold text-gray-900 dark:text-white">{t("openMenu")}</span>
+              <button
+                type="button"
+                onClick={() => setMobileMenuOpen(false)}
+                className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors touch-manipulation"
+                aria-label={t("cancel")}
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <nav className="flex-1 overflow-y-auto p-4 space-y-1">
+              <button
+                type="button"
+                onClick={() => { scrollTo("home"); setMobileMenuOpen(false); }}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 font-medium"
+              >
+                {t("navHome")}
+              </button>
+              <Link
+                href="/courses"
+                onClick={() => setMobileMenuOpen(false)}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 font-medium"
+              >
+                {t("courseCatalog")}
+              </Link>
+              <button
+                type="button"
+                onClick={() => { scrollTo("ai"); setMobileMenuOpen(false); }}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 font-medium"
+              >
+                {t("navCoursePicker")}
+              </button>
+              <button
+                type="button"
+                onClick={() => { scrollTo("ai"); setMobileMenuOpen(false); }}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 font-medium"
+              >
+                {t("navAi")}
+              </button>
+              <button
+                type="button"
+                onClick={() => { scrollTo("about"); setMobileMenuOpen(false); }}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 font-medium"
+              >
+                {t("navAbout")}
+              </button>
+              <button
+                type="button"
+                onClick={() => { scrollTo("reviews"); setMobileMenuOpen(false); }}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 font-medium"
+              >
+                {t("navReviews")}
+              </button>
+              <button
+                type="button"
+                onClick={() => { scrollTo("contact"); setMobileMenuOpen(false); }}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 font-medium"
+              >
+                {t("navContact")}
+              </button>
+              <div className="pt-4 mt-4 border-t border-gray-200 dark:border-gray-700 space-y-2">
+                <p className="px-4 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">{t("language")}</p>
+                {(["ru", "kk", "en"] as const).map((l) => (
+                  <button
+                    key={l}
+                    type="button"
+                    onClick={() => setLang(l)}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left font-medium min-h-[44px] touch-manipulation ${
+                      lang === l
+                        ? "bg-[var(--qit-primary)]/10 text-[var(--qit-primary)] dark:text-[var(--qit-secondary)]"
+                        : "text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+                    }`}
+                  >
+                    <Globe className="w-5 h-5 shrink-0" />
+                    {t(l === "ru" ? "russian" : l === "kk" ? "kazakh" : "english")}
+                  </button>
+                ))}
+              </div>
+              <div className="pt-4 mt-4 border-t border-gray-200 dark:border-gray-700">
+                <p className="px-4 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">{theme === "light" ? t("darkTheme") : t("lightTheme")}</p>
+                <button
+                  type="button"
+                  onClick={() => toggleTheme()}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 font-medium min-h-[44px] touch-manipulation"
+                >
+                  {theme === "light" ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
+                  <span>{theme === "light" ? t("darkTheme") : t("lightTheme")}</span>
+                </button>
+              </div>
+              <Link
+                href="/login"
+                onClick={() => setMobileMenuOpen(false)}
+                className="mt-4 flex items-center justify-center gap-2 w-full py-3 rounded-xl font-semibold text-white transition-all hover:opacity-90"
+                style={{ background: "var(--qit-gradient-3)" }}
+              >
+                {t("navPersonalCabinet")}
+              </Link>
+            </nav>
+          </div>
+        </>
+      )}
 
       <section className="relative min-h-[90vh] flex items-center justify-center pt-20 overflow-hidden">
         <div
@@ -630,7 +805,7 @@ export default function HomePage() {
       </section>
 
       {/* Reviews Section */}
-      <section className="py-20 overflow-hidden bg-white dark:bg-[#0B0F19]">
+      <section id="reviews" className="py-20 overflow-hidden bg-white dark:bg-[#0B0F19]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-12 text-center">
           <h2 className="text-3xl lg:text-4xl font-extrabold text-gray-900 dark:text-white mb-4 font-geologica tracking-tight">
             {t("reviewsTitle")}

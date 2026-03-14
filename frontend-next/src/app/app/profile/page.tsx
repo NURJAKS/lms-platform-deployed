@@ -14,7 +14,7 @@ import { useTheme } from "@/context/ThemeContext";
 import { getGlassCardStyle, getTextColors } from "@/utils/themeStyles";
 import { formatDateLocalized } from "@/lib/dateUtils";
 import type { TranslationKey } from "@/i18n/translations";
-import { getLocalizedCourseTitle } from "@/lib/courseUtils";
+import { getLocalizedCourseTitle, COURSE_TITLE_KEYS } from "@/lib/courseUtils";
 import {
   User as UserIcon,
   BookOpen,
@@ -1157,7 +1157,7 @@ export default function ProfilePage() {
                   <PieChart>
                     <Pie
                       data={courseStatsForPie}
-                      cx="30%"
+                      cx="50%"
                       cy="50%"
                       labelLine={false}
                       outerRadius={105}
@@ -1174,15 +1174,17 @@ export default function ProfilePage() {
                         border: `1px solid ${isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"}`,
                         borderRadius: "12px",
                       }}
-                      formatter={(value: number, name: string, props: any) => {
-                        const percent = ((props.payload.value / courseStatsForPie.reduce((sum, item) => sum + item.value, 0)) * 100).toFixed(0);
-                        return [`${value} (${percent}%)`, props.payload.name];
-                      }}
+                      formatter={((value: number, name: string, props: any) => {
+                        const v = value ?? 0;
+                        const total = courseStatsForPie.reduce((sum, item) => sum + item.value, 0);
+                        const percent = total > 0 ? ((props?.payload?.value ?? v) / total * 100).toFixed(0) : "0";
+                        return [`${v} (${percent}%)`, props?.payload?.name ?? name];
+                      }) as any}
                     />
                     <Legend
-                      layout="vertical"
-                      align="right"
-                      verticalAlign="middle"
+                      layout="horizontal"
+                      align="center"
+                      verticalAlign="bottom"
                       iconType="circle"
                       formatter={(value, entry: any) => {
                         const data = courseStatsForPie.find((item) => item.name === value);
@@ -1476,11 +1478,13 @@ export default function ProfilePage() {
 
   return (
     <>
-      <ScrollProgress />
+      <div className="hidden md:block">
+        <ScrollProgress />
+      </div>
       <Confetti ref={confettiRef} manualstart />
       
       {/* Фоновое изображение позади всех блоков */}
-      <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
+      <div className="hidden sm:block fixed inset-0 -z-10 overflow-hidden pointer-events-none">
         <div
           className="absolute inset-0 opacity-30 dark:opacity-20"
           style={{
@@ -1521,7 +1525,7 @@ export default function ProfilePage() {
           </AnimatedGradientText>
           
           <MagicCard className="bg-white dark:bg-gray-800 rounded-[20px] shadow-lg p-6 mb-6 border border-gray-200 dark:border-gray-700 relative overflow-hidden">
-            <RetroGrid className="opacity-20" />
+            <RetroGrid className="opacity-20 hidden md:block" />
             {userCard}
             {tabs}
 

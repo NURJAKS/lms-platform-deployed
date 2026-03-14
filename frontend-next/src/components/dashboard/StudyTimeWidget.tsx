@@ -25,18 +25,14 @@ const generateMockData = (): StudyTimeData => {
   };
 };
 
-const formatTime = (minutes: number, t: (k: string) => string) => {
+function formatTime<K extends string>(minutes: number, t: (k: K) => string): string {
+  const T = t as (k: string) => string;
   const hours = Math.floor(minutes / 60);
   const mins = minutes % 60;
-  
-  if (hours === 0) {
-    return `${mins} ${t("unitMinute")}`;
-  }
-  if (mins === 0) {
-    return `${hours} ${t("unitHour")}`;
-  }
-  return `${hours} ${t("unitHour")} ${mins} ${t("unitMinute")}`;
-};
+  if (hours === 0) return `${mins} ${T("unitMinute")}`;
+  if (mins === 0) return `${hours} ${T("unitHour")}`;
+  return `${hours} ${T("unitHour")} ${mins} ${T("unitMinute")}`;
+}
 
 export function StudyTimeWidget() {
   const { theme } = useTheme();

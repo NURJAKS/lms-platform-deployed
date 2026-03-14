@@ -7,7 +7,8 @@ services:
       DATABASE_URL: sqlite:///./data/education.db
       SECRET_KEY: change-me-in-production-secret-key-123
     volumes:
-      - backend_uploads:/app/uploads
+      # Host uploads so course videos (e.g. course1/intro.mp4) are visible when using Docker
+      - ./backend/uploads:/app/uploads
       - backend_db:/app/data
 
   frontend:
@@ -22,5 +23,4 @@ services:
       - backend
 
 volumes:
-  backend_uploads:
   backend_db:

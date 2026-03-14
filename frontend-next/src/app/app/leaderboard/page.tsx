@@ -42,7 +42,7 @@ function RatingTable({
   onCoursesClick?: (row: LeaderboardRow) => void;
 }) {
   return (
-    <table className="w-full">
+    <table className="w-full min-w-[480px]">
       <thead className="bg-gray-50/80 dark:bg-gray-700/80 backdrop-blur-sm sticky top-0 z-10">
         <tr>
           <th className="text-left py-4 px-4 font-semibold text-gray-700 dark:text-gray-200">
