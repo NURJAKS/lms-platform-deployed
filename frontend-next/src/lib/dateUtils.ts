@@ -40,6 +40,11 @@ export function formatDateTimeLocalized(
   return d.toLocaleString(locale, { ...baseOptions, ...(options ?? {}) });
 }
 
+const KK_MONTHS = [
+  'Қаңтар', 'Ақпан', 'Наурыз', 'Сәуір', 'Мамыр', 'Маусым',
+  'Шілде', 'Тамыз', 'Қыркүйек', 'Қазан', 'Қараша', 'Желтоқсан'
+];
+
 export function formatDateLocalized(
   value: DateInput,
   lang: Lang | string | undefined,
@@ -55,6 +60,16 @@ export function formatDateLocalized(
     year: "numeric",
   };
 
-  return d.toLocaleDateString(locale, { ...baseOptions, ...(options ?? {}) });
+  const finalOptions = { ...baseOptions, ...(options ?? {}) };
+
+  // Manual fallback for Kazakh long month names
+  if (lang === 'kk' && finalOptions.month === 'long') {
+    const day = d.getDate();
+    const month = KK_MONTHS[d.getMonth()];
+    const year = d.getFullYear();
+    return `${day} ${month} ${year}`;
+  }
+
+  return d.toLocaleDateString(locale, finalOptions);
 }
 

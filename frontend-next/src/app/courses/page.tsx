@@ -126,7 +126,7 @@ function CatalogCourseCard({
           </span>
         </div>
         <p className="text-xl font-bold text-[#00b0ff] mb-4">
-          {locked ? t("premiumOnly") : `${Number(c.price)}₸`}
+          {locked ? t("premiumOnly") : (isPremiumOnly && isPremiumUser ? t("catalogPremiumFree" as TranslationKey) : `${Number(c.price)}₸`)}
         </p>
         <div className="mt-auto">
           <CtaButton />
@@ -467,27 +467,27 @@ function CatalogPageContent() {
           <div className="flex items-center justify-between h-16 gap-2 sm:gap-4 lg:gap-8 min-w-0">
             <Link href="/" className="flex items-center gap-2 shrink-0 min-w-0">
               <div
-                className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-white font-bold text-lg shrink-0"
+                className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-white font-bold text-lg shrink-0 aspect-square"
                 style={{ background: "var(--qit-gradient-1)" }}
               >
                 Q
               </div>
-              <span className="hidden sm:inline text-xl font-bold text-gray-900 dark:text-white font-montserrat truncate">
+              <span className="hidden lg:inline text-xl font-bold text-gray-900 dark:text-white font-montserrat truncate">
                 Qazaq IT Academy
               </span>
             </Link>
-            <nav className="hidden sm:flex items-center gap-4 lg:gap-6 flex-1 justify-center min-w-0">
-              <Link href="/" className="shrink-0 py-2 text-gray-600 dark:text-gray-300 hover:text-[#1a237e] dark:hover:text-[#00b0ff] font-medium whitespace-nowrap">
+            <nav className="hidden sm:flex items-center gap-2 md:gap-3 xl:gap-6 flex-1 justify-center min-w-0">
+              <Link href="/" className="shrink-0 py-2 text-sm xl:text-base text-gray-600 dark:text-gray-300 hover:text-[#1a237e] dark:hover:text-[#00b0ff] font-medium whitespace-nowrap">
                 {t("navHome")}
               </Link>
-              <span className="shrink-0 py-2 text-[#1a237e] dark:text-[#00b0ff] font-semibold whitespace-nowrap">{t("courseCatalog")}</span>
+              <span className="shrink-0 py-2 text-sm xl:text-base text-[#1a237e] dark:text-[#00b0ff] font-semibold whitespace-nowrap">{t("courseCatalog")}</span>
             </nav>
             <div className="flex items-center gap-2 sm:gap-4 lg:gap-6 shrink-0 min-w-0">
               <AppHeader />
               {token ? (
                 <Link
                   href="/app"
-                  className="px-3 py-2 sm:px-5 sm:py-2.5 rounded-full font-semibold text-white transition-all hover:opacity-90 whitespace-nowrap text-sm sm:text-base"
+                  className="px-3 py-2 xl:px-5 xl:py-2.5 text-sm xl:text-base rounded-full font-semibold text-white transition-all hover:opacity-90 whitespace-nowrap"
                   style={{ background: "var(--qit-gradient-3)" }}
                 >
                   {t("navPersonalCabinet")}
@@ -495,7 +495,7 @@ function CatalogPageContent() {
               ) : (
                 <Link
                   href="/login"
-                  className="px-3 py-2 sm:px-5 sm:py-2.5 rounded-full font-semibold text-white transition-all hover:opacity-90 whitespace-nowrap text-sm sm:text-base"
+                  className="px-3 py-2 xl:px-5 xl:py-2.5 text-sm xl:text-base rounded-full font-semibold text-white transition-all hover:opacity-90 whitespace-nowrap"
                   style={{ background: "var(--qit-gradient-3)" }}
                 >
                   {t("navPersonalCabinet")}
@@ -570,19 +570,37 @@ function CatalogPageContent() {
 
         {!coursesLoading && !coursesError && premiumCourses.length > 0 && (
           <div className="mt-12 pt-8 border-t border-gray-200 dark:border-gray-700">
-            <div className="flex items-center gap-2 mb-4">
-              <Sparkles className="w-5 h-5 text-purple-500" />
-              <h2 className="text-lg font-semibold text-gray-800 dark:text-white">{t("catalogPremiumOnlyHint")}</h2>
-            </div>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">{t("catalogPremiumOnlyDesc")}</p>
-            <Link
-              href="/app/premium"
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-white transition-all hover:opacity-90"
-              style={{ background: "linear-gradient(135deg, #7c3aed, #5b21b6)" }}
-            >
-              <Lock className="w-4 h-4" />
-              {t("premiumGetSubscription")}
-            </Link>
+            {isPremiumUser ? (
+              <div className="p-6 rounded-2xl bg-gradient-to-br from-purple-500/10 via-pink-500/10 to-blue-500/10 border border-purple-200/50 dark:border-purple-800/30">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="p-2 rounded-lg bg-purple-500/20">
+                    <Sparkles className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+                  </div>
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                    {t("catalogPremiumCongratulationsTitle" as TranslationKey)}
+                  </h2>
+                </div>
+                <p className="text-gray-600 dark:text-gray-400 mb-0 leading-relaxed max-w-2xl">
+                  {t("catalogPremiumCongratulationsDesc" as TranslationKey)}
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-2 mb-4">
+                  <Sparkles className="w-5 h-5 text-purple-500" />
+                  <h2 className="text-lg font-semibold text-gray-800 dark:text-white">{t("catalogPremiumOnlyHint")}</h2>
+                </div>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">{t("catalogPremiumOnlyDesc")}</p>
+                <Link
+                  href="/app/premium"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-white transition-all hover:opacity-90"
+                  style={{ background: "linear-gradient(135deg, #7c3aed, #5b21b6)" }}
+                >
+                  <Lock className="w-4 h-4" />
+                  {t("premiumGetSubscription")}
+                </Link>
+              </>
+            )}
           </div>
         )}
       </main>

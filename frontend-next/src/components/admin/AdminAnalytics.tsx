@@ -32,6 +32,7 @@ import { AnimatedNumber } from "./AnimatedNumber";
 import { StaggeredAnimation } from "./StaggeredAnimation";
 import { GlareEffect } from "./GlareEffect";
 import { CourseStatsChart } from "./CourseStatsChart";
+import { ShimmerButton } from "@/components/ui/shimmer-button";
 
 type CourseStat = {
   course_id: number;
@@ -164,17 +165,36 @@ export function AdminAnalytics() {
 
   const handleExportCsv = async () => {
     try {
-      const { data } = await api.get<Blob>("/analytics/leaderboard/csv", {
+      const { data } = await api.get<Blob>("/analytics/leaderboard/csv?limit=20", {
         responseType: "blob",
       });
       const url = URL.createObjectURL(data);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "leaderboard.csv";
+      a.download = "leaderboard-top20.csv";
       a.click();
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error("Failed to export CSV:", error);
+      const err = error as { response?: { data?: { detail?: string }; status?: number }; message?: string };
+      const errorMessage = err?.response?.data?.detail || err?.message || t("csvExportError");
+      alert(errorMessage);
+    }
+  };
+
+  const handleExportExcel = async () => {
+    try {
+      const { data } = await api.get<Blob>("/analytics/leaderboard/excel?limit=20", {
+        responseType: "blob",
+      });
+      const url = URL.createObjectURL(data);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "leaderboard-top20.xlsx";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Failed to export Excel:", error);
       const err = error as { response?: { data?: { detail?: string }; status?: number }; message?: string };
       const errorMessage = err?.response?.data?.detail || err?.message || t("csvExportError");
       alert(errorMessage);
@@ -391,7 +411,10 @@ export function AdminAnalytics() {
                     backdropFilter: "blur(10px)",
                     boxShadow: isDark ? "0 8px 32px rgba(0, 0, 0, 0.3)" : "0 4px 16px rgba(0, 0, 0, 0.15)"
                   }}
-                  formatter={(value: number | undefined) => [value ?? 0, t("adminCompleted")]}
+                  formatter={(value: any, name: any) => {
+                    if (name === "count") return [value ?? 0, t("adminCompleted")];
+                    return [value ?? 0, String(name)];
+                  }}
                   labelFormatter={(label) => label}
                 />
                 <Area 
@@ -442,7 +465,10 @@ export function AdminAnalytics() {
                     backdropFilter: "blur(10px)",
                     boxShadow: isDark ? "0 8px 32px rgba(0, 0, 0, 0.3)" : "0 4px 16px rgba(0, 0, 0, 0.15)"
                   }}
-                  formatter={(value: number | undefined) => [value ?? 0, t("adminNewUsers")]}
+                  formatter={(value: any, name: any) => {
+                    if (name === "count") return [value ?? 0, t("adminNewUsers")];
+                    return [value ?? 0, String(name)];
+                  }}
                   labelFormatter={(label) => label}
                 />
                 <Bar 
@@ -478,13 +504,23 @@ export function AdminAnalytics() {
                 <h2 className={`font-semibold flex items-center gap-2 text-lg ${isDark ? "text-white" : "text-gray-900"}`}>
                   <Trophy className="w-5 h-5 text-[#FBBF24]" /> {t("adminLeaderboardTop20")}
                 </h2>
-            <button
-              type="button"
-              onClick={handleExportCsv}
-              className="flex items-center gap-1 py-1.5 px-3 rounded-lg border border-blue-600 dark:border-qit-primary text-blue-600 dark:text-qit-primary hover:bg-blue-50 dark:hover:bg-qit-primary/10 text-sm transition-colors"
-            >
-              <Download className="w-4 h-4" /> CSV
-            </button>
+                <div className="flex gap-2">
+                  <ShimmerButton
+                    onClick={handleExportCsv}
+                    background={isDark ? "rgba(255, 255, 255, 0.1)" : "rgba(243, 244, 246, 1)"}
+                    shimmerColor={isDark ? "#ffffff" : "#000000"}
+                    className="flex items-center gap-1 py-1.5 px-3 rounded-xl text-xs border-0 text-gray-900 dark:text-white"
+                  >
+                    <Download className="w-4 h-4" /> CSV
+                  </ShimmerButton>
+                  <ShimmerButton
+                    onClick={handleExportExcel}
+                    className="flex items-center gap-1 py-1.5 px-3 rounded-xl text-white text-xs border-0 bg-gradient-to-r from-blue-600 to-purple-600"
+                    shimmerColor="#ffffff"
+                  >
+                    <Download className="w-4 h-4" /> Excel
+                  </ShimmerButton>
+                </div>
           </div>
           <div className="overflow-x-auto max-h-80 overflow-y-auto">
             <table className="w-full text-sm">

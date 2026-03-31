@@ -1,8 +1,12 @@
 from datetime import date, datetime, timedelta, timezone
+import json
+import logging
 from pathlib import Path
 from typing import Annotated
+from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, Response
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
@@ -17,14 +21,233 @@ from app.models.course_topic import CourseTopic
 from app.models.enrollment import CourseEnrollment
 from app.models.progress import StudentProgress
 from app.models.user import User
+from app.models.student_profile import StudentProfile
+from app.schemas.student_profile import StudentProfileMergedResponse, StudentProfileUpdate
 from app.models.teacher_group import TeacherGroup
 from app.models.group_student import GroupStudent
 from app.schemas.user import UserResponse, UserUpdate
 
 router = APIRouter(prefix="/users", tags=["users"])
+logger = logging.getLogger(__name__)
 
 ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
 
+_GENDERS = ["Мужской", "Женский", "Другое"]
+_KINSHIP_DEGREES = ["Отец", "Мать", "Опекун", "Другое"]
+_EDU_PROCESS_ROLES = ["Законный представитель", "Опекун"]
+
+
+class ParentLinkRequest(BaseModel):
+    student_id: int
+
+
+def _ensure_parent_profile_fields(db: Session, user: User) -> bool:
+    """
+    Fill missing parent personal fields with fake values.
+    Returns True if any field was updated.
+    """
+    if user.role != "parent":
+        return False
+
+    changed = False
+
+    if not user.birth_date:
+        # 30-55 y.o. deterministic-ish by user.id
+        base = date(1985, 6, 15)
+        delta_days = (user.id * 137) % (25 * 365)
+        user.birth_date = base.replace(year=base.year - (delta_days // 365))
+        changed = True
+
+    if not getattr(user, "gender", None):
+        user.gender = _GENDERS[user.id % len(_GENDERS)]
+        changed = True
+
+    if not getattr(user, "identity_card", None):
+        user.identity_card = f"KZ{(user.id * 1000007) % 10_000_000:07d}"
+        changed = True
+
+    if not user.phone:
+        user.phone = f"+7 701 {(user.id * 37) % 900:03d} {(user.id * 91) % 9000:04d}"
+        changed = True
+
+    if not user.address:
+        user.address = f"г. Алматы, ул. Абая, д. {(user.id % 120) + 1}, кв. {(user.id % 80) + 1}"
+        changed = True
+
+    if not getattr(user, "email_work", None):
+        local = f"parent{user.id}"
+        user.email_work = f"{local}@company.kz"
+        changed = True
+
+    if not getattr(user, "phone_work", None):
+        user.phone_work = f"+7 727 {(user.id * 53) % 900:03d} {(user.id * 19) % 9000:04d}"
+        changed = True
+
+    if not getattr(user, "work_place", None):
+        workplaces = ["Qazaq IT Academy", "KazTech Group", "Almaty Logistics", "EduSoft KZ", "Baiterek Service"]
+        user.work_place = workplaces[user.id % len(workplaces)]
+        changed = True
+
+    if not getattr(user, "position", None):
+        positions = ["Менеджер", "Инженер", "Бухгалтер", "HR специалист", "Руководитель отдела"]
+        user.position = positions[user.id % len(positions)]
+        changed = True
+
+    if not getattr(user, "kinship_degree", None):
+        user.kinship_degree = _KINSHIP_DEGREES[user.id % len(_KINSHIP_DEGREES)]
+        changed = True
+
+    if not getattr(user, "educational_process_role", None):
+        user.educational_process_role = _EDU_PROCESS_ROLES[user.id % len(_EDU_PROCESS_ROLES)]
+        changed = True
+
+    # Default user status if missing.
+    # This prevents profile preview showing "--" for parents.
+    if getattr(user, "status", None) is None:
+        user.status = "Активный"
+        changed = True
+
+    return changed
+
+
+
+def _get_last_login_dt(db: Session, user_id: int):
+    row = (
+        db.query(UserActivityLog)
+        .filter(UserActivityLog.user_id == user_id, UserActivityLog.action == "login")
+        .order_by(UserActivityLog.created_at.desc())
+        .first()
+    )
+    return row.created_at if row else None
+
+
+def _ensure_student_profile(db: Session, user: User) -> StudentProfile | None:
+    sp = db.query(StudentProfile).filter(StudentProfile.user_id == user.id).first()
+    if sp:
+        if sp.status in (None, "", "Отчислен"):
+            sp.status = "Активный"
+            db.commit()
+            db.refresh(sp)
+    return sp
+
+
+def _ensure_admin_profile_fields(db: Session, user: User) -> None:
+    """Ensure admin profile fields are normalized (no fake generation)."""
+    if user.role not in ("admin", "director"):
+        return
+
+    dirty = False
+    if getattr(user, "status", None) is None:
+        user.status = "Активный"
+        dirty = True
+    
+    if dirty:
+        db.commit()
+        db.refresh(user)
+
+
+def _ensure_curator_profile_fields(db: Session, user: User) -> None:
+    """Ensure curator profile fields are normalized."""
+    if user.role != "teacher":
+        return
+
+    dirty = False
+    if getattr(user, "status", None) is None:
+        user.status = "Активный"
+        dirty = True
+
+    if dirty:
+        db.commit()
+        db.refresh(user)
+
+
+@router.get("/me/student-profile", response_model=StudentProfileMergedResponse)
+def get_my_student_profile(
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    if current_user.role != "student":
+        raise HTTPException(status_code=403, detail="Доступно только для студентов")
+    sp = _ensure_student_profile(db, current_user)
+    last_login = _get_last_login_dt(db, current_user.id)
+    return StudentProfileMergedResponse(
+        id=current_user.id,
+        email=current_user.email,
+        full_name=current_user.full_name,
+        photo_url=current_user.photo_url,
+        phone=current_user.phone,
+        birth_date=current_user.birth_date,
+        address=current_user.address,
+        city=current_user.city,
+        created_at=current_user.created_at,
+        gender=sp.gender,
+        nationality=sp.nationality,
+        identity_card=sp.identity_card,
+        iin=sp.iin,
+        phone_alternative=sp.phone_alternative,
+        postal_code=sp.postal_code,
+        country=sp.country,
+        student_id_card_number=sp.student_id_card_number,
+        specialty=sp.specialty,
+        course=sp.course,
+        group=sp.group,
+        study_form=sp.study_form,
+        admission_date=sp.admission_date,
+        graduation_date_planned=sp.graduation_date_planned,
+        status=sp.status,
+        interface_language=sp.interface_language,
+        timezone=sp.timezone,
+        last_login=last_login,
+    )
+
+
+@router.patch("/me/student-profile", response_model=StudentProfileMergedResponse)
+def update_my_student_profile(
+    data: StudentProfileUpdate,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    if current_user.role != "student":
+        raise HTTPException(status_code=403, detail="Доступно только для студентов")
+    sp = _ensure_student_profile(db, current_user)
+    patch = data.model_dump(exclude_unset=True)
+    if "status" in patch:
+        patch["status"] = "Активный"
+    for k, v in patch.items():
+        if hasattr(sp, k):
+            setattr(sp, k, v)
+    db.commit()
+    db.refresh(sp)
+    last_login = _get_last_login_dt(db, current_user.id)
+    return StudentProfileMergedResponse(
+        id=current_user.id,
+        email=current_user.email,
+        full_name=current_user.full_name,
+        photo_url=current_user.photo_url,
+        phone=current_user.phone,
+        birth_date=current_user.birth_date,
+        address=current_user.address,
+        city=current_user.city,
+        created_at=current_user.created_at,
+        gender=sp.gender,
+        nationality=sp.nationality,
+        identity_card=sp.identity_card,
+        iin=sp.iin,
+        phone_alternative=sp.phone_alternative,
+        postal_code=sp.postal_code,
+        country=sp.country,
+        student_id_card_number=sp.student_id_card_number,
+        specialty=sp.specialty,
+        course=sp.course,
+        group=sp.group,
+        study_form=sp.study_form,
+        admission_date=sp.admission_date,
+        graduation_date_planned=sp.graduation_date_planned,
+        status=sp.status,
+        interface_language=sp.interface_language,
+        timezone=sp.timezone,
+        last_login=last_login,
+    )
 
 @router.get("/me", response_model=UserResponse)
 def get_me(
@@ -92,11 +315,125 @@ def update_me(
         current_user.city = data.city
     if data.address is not None:
         current_user.address = data.address
+    # Teacher profile fields (optional; stored on users)
+    if getattr(data, "gender", None) is not None:
+        current_user.gender = data.gender
+    if getattr(data, "identity_card", None) is not None:
+        current_user.identity_card = data.identity_card
+    if getattr(data, "iin", None) is not None:
+        current_user.iin = data.iin
+    # Curator profile fields (teacher role)
+    if getattr(data, "curated_courses", None) is not None:
+        current_user.curated_courses = data.curated_courses
+    if getattr(data, "consultation_schedule", None) is not None:
+        current_user.consultation_schedule = data.consultation_schedule
+    if getattr(data, "consultation_location", None) is not None:
+        current_user.consultation_location = data.consultation_location
+    if getattr(data, "can_view_performance", None) is not None:
+        current_user.can_view_performance = data.can_view_performance
+    if getattr(data, "can_message_students", None) is not None:
+        current_user.can_message_students = data.can_message_students
+    if getattr(data, "can_view_attendance", None) is not None:
+        current_user.can_view_attendance = data.can_view_attendance
+    if getattr(data, "can_call_parent_teacher_meetings", None) is not None:
+        current_user.can_call_parent_teacher_meetings = data.can_call_parent_teacher_meetings
+    if getattr(data, "can_create_group_announcements", None) is not None:
+        current_user.can_create_group_announcements = data.can_create_group_announcements
+    # Parent profile fields (optional; stored on users)
+    if getattr(data, "work_place", None) is not None:
+        current_user.work_place = data.work_place
+    if getattr(data, "kinship_degree", None) is not None:
+        current_user.kinship_degree = data.kinship_degree
+    if getattr(data, "educational_process_role", None) is not None:
+        current_user.educational_process_role = data.educational_process_role
+    if getattr(data, "education", None) is not None:
+        current_user.education = data.education
+    if getattr(data, "academic_degree", None) is not None:
+        current_user.academic_degree = data.academic_degree
+    if getattr(data, "email_work", None) is not None:
+        current_user.email_work = data.email_work
+    if getattr(data, "phone_work", None) is not None:
+        current_user.phone_work = data.phone_work
+    if getattr(data, "office", None) is not None:
+        current_user.office = data.office
+    if getattr(data, "reception_hours", None) is not None:
+        current_user.reception_hours = data.reception_hours
+    if getattr(data, "employee_number", None) is not None:
+        current_user.employee_number = data.employee_number
+    if getattr(data, "position", None) is not None:
+        current_user.position = data.position
+    if getattr(data, "department", None) is not None:
+        current_user.department = data.department
+    if getattr(data, "hire_date", None) is not None:
+        current_user.hire_date = data.hire_date
+    if getattr(data, "employment_status", None) is not None:
+        current_user.employment_status = data.employment_status
+    if getattr(data, "academic_interests", None) is not None:
+        current_user.academic_interests = data.academic_interests
+    if getattr(data, "teaching_hours", None) is not None:
+        current_user.teaching_hours = data.teaching_hours
+    if getattr(data, "subjects_taught", None) is not None:
+        current_user.subjects_taught = data.subjects_taught
+    if getattr(data, "student_counts", None) is not None:
+        current_user.student_counts = data.student_counts
+    if getattr(data, "status", None) is not None:
+        current_user.status = data.status
+    if getattr(data, "interface_language", None) is not None:
+        current_user.interface_language = data.interface_language
     if data.password is not None and data.password.strip():
         current_user.password_hash = get_password_hash(data.password)
+    # Admin profile fields (optional; stored on users)
+    if getattr(data, "education_level", None) is not None:
+        current_user.education_level = data.education_level
+    if getattr(data, "email_personal", None) is not None:
+        current_user.email_personal = data.email_personal
+    if getattr(data, "system_role", None) is not None:
+        current_user.system_role = data.system_role
+    if getattr(data, "permissions", None) is not None:
+        current_user.permissions = data.permissions
+    if getattr(data, "areas_of_responsibility", None) is not None:
+        current_user.areas_of_responsibility = data.areas_of_responsibility
+    if getattr(data, "can_create_users", None) is not None:
+        current_user.can_create_users = data.can_create_users
+    if getattr(data, "can_delete_users", None) is not None:
+        current_user.can_delete_users = data.can_delete_users
+    if getattr(data, "can_edit_courses", None) is not None:
+        current_user.can_edit_courses = data.can_edit_courses
+    if getattr(data, "can_view_analytics", None) is not None:
+        current_user.can_view_analytics = data.can_view_analytics
+    if getattr(data, "can_configure_system", None) is not None:
+        current_user.can_configure_system = data.can_configure_system
     db.commit()
     db.refresh(current_user)
     return current_user
+
+
+@router.patch("/me/parent-link")
+def link_parent_to_student(
+    payload: ParentLinkRequest,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """
+    Link current parent account to a student by student_id.
+    Supports multiple children per parent.
+    """
+    if current_user.role != "parent":
+        raise HTTPException(status_code=403, detail="Доступно только для родителей")
+    student_id = payload.student_id
+    student = db.query(User).filter(User.id == student_id, User.role == "student").first()
+    if not student:
+        raise HTTPException(status_code=404, detail="Студент не найден")
+
+    if student.parent_id == current_user.id:
+        return {"ok": True, "student_id": student_id, "message": "Студент уже привязан"}
+
+    if student.parent_id is not None:
+        raise HTTPException(status_code=400, detail="У этого студента уже есть привязанный родитель")
+
+    student.parent_id = current_user.id
+    db.commit()
+    return {"ok": True, "student_id": student_id}
 
 
 CERTIFICATE_IMAGE_URL = "/uploads/certificates/image.png"
@@ -128,7 +465,7 @@ def get_my_certificates(
             "course_title": course.title if course else "",
             "certificate_url": _certificate_display_url(c.certificate_url),
             "final_score": float(c.final_score) if c.final_score else None,
-            "issued_at": c.issued_at.isoformat() if c.issued_at else None,
+            "issued_at": (c.issued_at.isoformat() if hasattr(c.issued_at, "isoformat") else c.issued_at) if c.issued_at else None,
             "can_download_pdf": is_premium,  # PDF экспорт только для Premium
         })
     return out
@@ -431,6 +768,13 @@ def get_my_profile_extended(
 ):
     """Расширенный профиль с данными по роли: курсы, сертификаты, родитель, дети, преподаватель и т.д."""
     user = current_user
+    if _ensure_parent_profile_fields(db, user):
+        db.commit()
+        db.refresh(user)
+    if user.role == "teacher":
+        _ensure_curator_profile_fields(db, user)
+    if user.role in ("admin", "director"):
+        _ensure_admin_profile_fields(db, user)
     out = {
         "id": user.id,
         "email": user.email,
@@ -444,6 +788,53 @@ def get_my_profile_extended(
         "address": user.address,
         "parent_id": user.parent_id,
         "created_at": user.created_at.isoformat() if user.created_at else None,
+
+        # Teacher profile fields (present when role == "teacher")
+        "gender": getattr(user, "gender", None),
+        "identity_card": getattr(user, "identity_card", None),
+        "iin": getattr(user, "iin", None),
+        # Curator profile fields (teacher role)
+        "curated_courses": getattr(user, "curated_courses", None),
+        "consultation_schedule": getattr(user, "consultation_schedule", None),
+        "consultation_location": getattr(user, "consultation_location", None),
+        "can_view_performance": getattr(user, "can_view_performance", None),
+        "can_message_students": getattr(user, "can_message_students", None),
+        "can_view_attendance": getattr(user, "can_view_attendance", None),
+        "can_call_parent_teacher_meetings": getattr(user, "can_call_parent_teacher_meetings", None),
+        "can_create_group_announcements": getattr(user, "can_create_group_announcements", None),
+        # Parent profile fields
+        "work_place": getattr(user, "work_place", None),
+        "kinship_degree": getattr(user, "kinship_degree", None),
+        "educational_process_role": getattr(user, "educational_process_role", None),
+        "education": getattr(user, "education", None),
+        "academic_degree": getattr(user, "academic_degree", None),
+        "email_work": getattr(user, "email_work", None),
+        "phone_work": getattr(user, "phone_work", None),
+        "office": getattr(user, "office", None),
+        "reception_hours": getattr(user, "reception_hours", None),
+        "employee_number": getattr(user, "employee_number", None),
+        "position": getattr(user, "position", None),
+        "department": getattr(user, "department", None),
+        "hire_date": user.hire_date.isoformat() if getattr(user, "hire_date", None) else None,
+        "employment_status": getattr(user, "employment_status", None),
+        "academic_interests": getattr(user, "academic_interests", None),
+        "teaching_hours": getattr(user, "teaching_hours", None),
+        "subjects_taught": getattr(user, "subjects_taught", None),
+        "student_counts": getattr(user, "student_counts", None),
+        "status": getattr(user, "status", None),
+        "interface_language": getattr(user, "interface_language", None),
+
+        # Admin profile fields
+        "education_level": getattr(user, "education_level", None),
+        "email_personal": getattr(user, "email_personal", None),
+        "system_role": getattr(user, "system_role", None),
+        "permissions": getattr(user, "permissions", None),
+        "areas_of_responsibility": getattr(user, "areas_of_responsibility", None),
+        "can_create_users": getattr(user, "can_create_users", None),
+        "can_delete_users": getattr(user, "can_delete_users", None),
+        "can_edit_courses": getattr(user, "can_edit_courses", None),
+        "can_view_analytics": getattr(user, "can_view_analytics", None),
+        "can_configure_system": getattr(user, "can_configure_system", None),
     }
     if user.role == "student":
         parent = db.query(User).filter(User.id == user.parent_id).first() if user.parent_id else None
@@ -478,6 +869,13 @@ def get_my_profile_extended(
 
 def _build_profile_extended(db: Session, user: User) -> dict:
     """Строит расширенный профиль для пользователя (используется для me и для profile-public)."""
+    if _ensure_parent_profile_fields(db, user):
+        db.commit()
+        db.refresh(user)
+    if user.role == "teacher":
+        _ensure_curator_profile_fields(db, user)
+    if user.role in ("admin", "director"):
+        _ensure_admin_profile_fields(db, user)
     out = {
         "id": user.id,
         "email": user.email,
@@ -486,12 +884,59 @@ def _build_profile_extended(db: Session, user: User) -> dict:
         "photo_url": user.photo_url,
         "description": user.description,
         "phone": user.phone,
-        "birth_date": user.birth_date.isoformat() if user.birth_date else None,
+        "birth_date": (user.birth_date.isoformat() if hasattr(user.birth_date, "isoformat") else user.birth_date) if user.birth_date else None,
         "city": user.city,
         "address": user.address,
         "parent_id": user.parent_id,
-        "created_at": user.created_at.isoformat() if user.created_at else None,
+        "created_at": (user.created_at.isoformat() if hasattr(user.created_at, "isoformat") else user.created_at) if user.created_at else None,
         "points": user.points or 0,
+
+        # Teacher profile fields (present when role == "teacher")
+        "gender": getattr(user, "gender", None),
+        "identity_card": getattr(user, "identity_card", None),
+        "iin": getattr(user, "iin", None),
+        # Curator profile fields (teacher role)
+        "curated_courses": getattr(user, "curated_courses", None),
+        "consultation_schedule": getattr(user, "consultation_schedule", None),
+        "consultation_location": getattr(user, "consultation_location", None),
+        "can_view_performance": getattr(user, "can_view_performance", None),
+        "can_message_students": getattr(user, "can_message_students", None),
+        "can_view_attendance": getattr(user, "can_view_attendance", None),
+        "can_call_parent_teacher_meetings": getattr(user, "can_call_parent_teacher_meetings", None),
+        "can_create_group_announcements": getattr(user, "can_create_group_announcements", None),
+        # Parent profile fields
+        "work_place": getattr(user, "work_place", None),
+        "kinship_degree": getattr(user, "kinship_degree", None),
+        "educational_process_role": getattr(user, "educational_process_role", None),
+        "education": getattr(user, "education", None),
+        "academic_degree": getattr(user, "academic_degree", None),
+        "email_work": getattr(user, "email_work", None),
+        "phone_work": getattr(user, "phone_work", None),
+        "office": getattr(user, "office", None),
+        "reception_hours": getattr(user, "reception_hours", None),
+        "employee_number": getattr(user, "employee_number", None),
+        "position": getattr(user, "position", None),
+        "department": getattr(user, "department", None),
+        "hire_date": (user.hire_date.isoformat() if hasattr(user.hire_date, "isoformat") else getattr(user, "hire_date", None)) if getattr(user, "hire_date", None) else None,
+        "employment_status": getattr(user, "employment_status", None),
+        "academic_interests": getattr(user, "academic_interests", None),
+        "teaching_hours": getattr(user, "teaching_hours", None),
+        "subjects_taught": getattr(user, "subjects_taught", None),
+        "student_counts": getattr(user, "student_counts", None),
+        "status": getattr(user, "status", None),
+        "interface_language": getattr(user, "interface_language", None),
+
+        # Admin profile fields
+        "education_level": getattr(user, "education_level", None),
+        "email_personal": getattr(user, "email_personal", None),
+        "system_role": getattr(user, "system_role", None),
+        "permissions": getattr(user, "permissions", None),
+        "areas_of_responsibility": getattr(user, "areas_of_responsibility", None),
+        "can_create_users": getattr(user, "can_create_users", None),
+        "can_delete_users": getattr(user, "can_delete_users", None),
+        "can_edit_courses": getattr(user, "can_edit_courses", None),
+        "can_view_analytics": getattr(user, "can_view_analytics", None),
+        "can_configure_system": getattr(user, "can_configure_system", None),
     }
     if user.role == "student":
         parent = db.query(User).filter(User.id == user.parent_id).first() if user.parent_id else None
@@ -528,6 +973,9 @@ def _build_progress_detail(db: Session, user_id: int) -> dict:
     """Детальный прогресс по курсам для пользователя."""
     enrollments = db.query(CourseEnrollment).filter(CourseEnrollment.user_id == user_id).all()
     course_ids = list({e.course_id for e in enrollments})
+    if not course_ids:
+        return {"courses": []}
+
     courses = {c.id: c for c in db.query(Course).filter(Course.id.in_(course_ids)).all()}
     all_topics = db.query(CourseTopic).filter(CourseTopic.course_id.in_(course_ids)).all()
     topics_by_course: dict[int, list] = {}
@@ -565,11 +1013,124 @@ def _build_progress_detail(db: Session, user_id: int) -> dict:
             "certificate": {
                 "id": cert.id,
                 "final_score": float(cert.final_score) if cert and cert.final_score else None,
-                "issued_at": cert.issued_at.isoformat() if cert and cert.issued_at else None,
+                "issued_at": (cert.issued_at.isoformat() if hasattr(cert.issued_at, "isoformat") else cert.issued_at) if cert and cert.issued_at else None,
             } if cert else None,
             "video_watched_seconds": video_seconds,
         })
     return {"courses": courses_report}
+
+
+def _build_profile_public_summary(db: Session, user: User) -> dict:
+    """Строит безопасный публичный summary профиля без чувствительных полей."""
+    if user.role == "student":
+        sp = _ensure_student_profile(db, user)
+    else:
+        sp = None
+
+    profile = _build_profile_extended(db, user)
+    safe = {
+        "id": profile["id"],
+        "email": profile["email"],
+        "full_name": profile["full_name"],
+        "role": profile["role"],
+        "photo_url": profile.get("photo_url"),
+        "description": profile.get("description"),
+        "phone": profile.get("phone"),
+        "city": profile.get("city"),
+        "created_at": profile.get("created_at"),
+        "points": profile.get("points", 0),
+        "status": profile.get("status"),
+    }
+
+    if user.role == "student" and sp is not None:
+        safe.update(
+            {
+                "status": sp.status,
+                "specialty": sp.specialty,
+                "course": sp.course,
+                "group": sp.group,
+                "study_form": sp.study_form,
+                "admission_date": (sp.admission_date.isoformat() if hasattr(sp.admission_date, "isoformat") else sp.admission_date) if sp.admission_date else None,
+                "graduation_date_planned": (sp.graduation_date_planned.isoformat() if hasattr(sp.graduation_date_planned, "isoformat") else sp.graduation_date_planned) if sp.graduation_date_planned else None,
+                "parent": profile.get("parent"),
+                "teacher": profile.get("teacher"),
+            }
+        )
+    elif user.role == "parent":
+        safe.update(
+            {
+                "work_place": profile.get("work_place"),
+                "kinship_degree": profile.get("kinship_degree"),
+                "educational_process_role": profile.get("educational_process_role"),
+                "education": profile.get("education"),
+                "academic_degree": profile.get("academic_degree"),
+                "email_work": profile.get("email_work"),
+                "phone_work": profile.get("phone_work"),
+                "office": profile.get("office"),
+                "employee_number": profile.get("employee_number"),
+                "position": profile.get("position"),
+                "department": profile.get("department"),
+                "hire_date": profile.get("hire_date"),
+                "employment_status": profile.get("employment_status"),
+                "interface_language": profile.get("interface_language"),
+                "children": profile.get("children"),
+            }
+        )
+    elif user.role == "teacher":
+        safe.update(
+            {
+                "education": profile.get("education"),
+                "academic_degree": profile.get("academic_degree"),
+                "email_work": profile.get("email_work"),
+                "phone_work": profile.get("phone_work"),
+                "office": profile.get("office"),
+                "employee_number": profile.get("employee_number"),
+                "position": profile.get("position"),
+                "department": profile.get("department"),
+                "hire_date": profile.get("hire_date"),
+                "employment_status": profile.get("employment_status"),
+                "academic_interests": profile.get("academic_interests"),
+                "subjects_taught": profile.get("subjects_taught"),
+                "teaching_hours": profile.get("teaching_hours"),
+                "reception_hours": profile.get("reception_hours"),
+                "status": profile.get("status"),
+                "interface_language": profile.get("interface_language"),
+                "curated_courses": profile.get("curated_courses"),
+                "consultation_location": profile.get("consultation_location"),
+                "can_view_performance": profile.get("can_view_performance"),
+                "can_message_students": profile.get("can_message_students"),
+                "can_view_attendance": profile.get("can_view_attendance"),
+                "can_call_parent_teacher_meetings": profile.get("can_call_parent_teacher_meetings"),
+                "can_create_group_announcements": profile.get("can_create_group_announcements"),
+                "groups": profile.get("groups"),
+                "students_count": profile.get("students_count"),
+            }
+        )
+    elif user.role in ("admin", "director"):
+        safe.update(
+            {
+                "education_level": profile.get("education_level"),
+                "email_work": profile.get("email_work"),
+                "phone_work": profile.get("phone_work"),
+                "office": profile.get("office"),
+                "employee_number": profile.get("employee_number"),
+                "position": profile.get("position"),
+                "department": profile.get("department"),
+                "hire_date": profile.get("hire_date"),
+                "status": profile.get("status"),
+                "system_role": profile.get("system_role"),
+                "permissions": profile.get("permissions"),
+                "areas_of_responsibility": profile.get("areas_of_responsibility"),
+                "can_create_users": profile.get("can_create_users"),
+                "can_delete_users": profile.get("can_delete_users"),
+                "can_edit_courses": profile.get("can_edit_courses"),
+                "can_view_analytics": profile.get("can_view_analytics"),
+                "can_configure_system": profile.get("can_configure_system"),
+                "interface_language": profile.get("interface_language"),
+            }
+        )
+
+    return safe
 
 
 @router.get("/{user_id}/profile-public")
@@ -579,36 +1140,46 @@ def get_user_profile_public(
     current_user: Annotated[User, Depends(get_current_user)],
 ):
     """Публичный профиль пользователя (для просмотра из рейтинга). Любой авторизованный пользователь может просмотреть."""
-    target = db.query(User).filter(User.id == user_id).first()
-    if not target:
-        raise HTTPException(status_code=404, detail="Пользователь не найден")
-    profile = _build_profile_extended(db, target)
+    try:
+        target = db.query(User).filter(User.id == user_id).first()
+        if not target:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+        profile = _build_profile_public_summary(db, target)
 
-    certs = db.query(Certificate).filter(Certificate.user_id == user_id).all()
-    courses = {c.id: c for c in db.query(Course).filter(Course.id.in_([c.course_id for c in certs])).all()}
-    certificates = []
-    for c in certs:
-        course = courses.get(c.course_id)
-        certificates.append({
-            "id": c.id,
-            "course_id": c.course_id,
-            "course_title": course.title if course else "",
-            "certificate_url": _certificate_display_url(c.certificate_url),
-            "final_score": float(c.final_score) if c.final_score else None,
-            "issued_at": c.issued_at.isoformat() if c.issued_at else None,
-        })
+        certs = db.query(Certificate).filter(Certificate.user_id == user_id).all()
+        if certs:
+            course_ids = [c.course_id for c in certs]
+            courses = {c.id: c for c in db.query(Course).filter(Course.id.in_(course_ids)).all()}
+        else:
+            courses = {}
+        certificates = []
+        for c in certs:
+            course = courses.get(c.course_id)
+            certificates.append({
+                "id": c.id,
+                "course_id": c.course_id,
+                "course_title": course.title if course else "",
+                "certificate_url": _certificate_display_url(c.certificate_url),
+                "final_score": float(c.final_score) if c.final_score else None,
+                "issued_at": (c.issued_at.isoformat() if hasattr(c.issued_at, "isoformat") else c.issued_at) if c.issued_at else None,
+            })
 
-    progress_detail = _build_progress_detail(db, user_id)
+        progress_detail = _build_progress_detail(db, user_id)
 
-    enrollments = db.query(CourseEnrollment).filter(CourseEnrollment.user_id == user_id).all()
-    enrollment_list = [{"course_id": e.course_id} for e in enrollments]
+        enrollments = db.query(CourseEnrollment).filter(CourseEnrollment.user_id == user_id).all()
+        enrollment_list = [{"course_id": e.course_id} for e in enrollments]
 
-    return {
-        "profile": profile,
-        "certificates": certificates,
-        "progress_detail": progress_detail,
-        "enrollments": enrollment_list,
-    }
+        return {
+            "profile": profile,
+            "certificates": certificates,
+            "progress_detail": progress_detail,
+            "enrollments": enrollment_list,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("profile-public failed for user_id=%s", user_id)
+        raise HTTPException(status_code=500, detail="Не удалось загрузить профиль") from e
 
 
 @router.get("/me/advanced-analytics")

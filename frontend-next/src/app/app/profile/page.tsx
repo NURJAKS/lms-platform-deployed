@@ -14,7 +14,9 @@ import { useTheme } from "@/context/ThemeContext";
 import { getGlassCardStyle, getTextColors } from "@/utils/themeStyles";
 import { formatDateLocalized } from "@/lib/dateUtils";
 import type { TranslationKey } from "@/i18n/translations";
-import { getLocalizedCourseTitle, COURSE_TITLE_KEYS } from "@/lib/courseUtils";
+import { getLocalizedCourseTitle, getLocalizedTopicTitle, COURSE_TITLE_KEYS } from "@/lib/courseUtils";
+import { ProfilePreviewCard } from "@/components/profile/ProfilePreviewCard";
+import type { SafeProfilePreviewData } from "@/types/profiles";
 import {
   User as UserIcon,
   BookOpen,
@@ -31,6 +33,7 @@ import {
   Clock,
   CheckCircle,
   Crown,
+  Medal,
   Flame,
   Calendar,
   Target,
@@ -96,6 +99,47 @@ type ProfileExtended = {
   description: string | null;
   phone: string | null;
   birth_date: string | null;
+  gender: string | null;
+  identity_card: string | null;
+  curated_courses?: string[] | null;
+  consultation_schedule?: unknown | null;
+  consultation_location?: string | null;
+  can_view_performance?: boolean | null;
+  can_message_students?: boolean | null;
+  can_view_attendance?: boolean | null;
+  can_call_parent_teacher_meetings?: boolean | null;
+  can_create_group_announcements?: boolean | null;
+  work_place: string | null;
+  kinship_degree: string | null;
+  educational_process_role: string | null;
+  education: string | null;
+  academic_degree: string | null;
+  email_work: string | null;
+  phone_work: string | null;
+  office: string | null;
+  reception_hours: string | null;
+  employee_number: string | null;
+  position: string | null;
+  department: string | null;
+  hire_date: string | null;
+  employment_status: string | null;
+  academic_interests: string | null;
+  subjects_taught: string[] | null;
+  student_counts: number[] | null;
+  teaching_hours: string | null;
+  status: string | null;
+  interface_language: string | null;
+  // Admin profile fields
+  education_level?: string | null;
+  email_personal?: string | null;
+  system_role?: string | null;
+  permissions?: string[] | null;
+  areas_of_responsibility?: string[] | null;
+  can_create_users?: boolean | null;
+  can_delete_users?: boolean | null;
+  can_edit_courses?: boolean | null;
+  can_view_analytics?: boolean | null;
+  can_configure_system?: boolean | null;
   city: string | null;
   address: string | null;
   parent_id: number | null;
@@ -138,6 +182,36 @@ type CoinTx = {
   created_at: string | null;
 };
 
+type StudentProfileMerged = {
+  id: number;
+  email: string;
+  full_name: string;
+  photo_url: string | null;
+  phone: string | null;
+  birth_date: string | null;
+  address: string | null;
+  city: string | null;
+  created_at: string | null;
+  gender: string | null;
+  nationality: string | null;
+  identity_card: string | null;
+  iin: string | null;
+  phone_alternative: string | null;
+  postal_code: string | null;
+  country: string | null;
+  student_id_card_number: string | null;
+  specialty: string | null;
+  course: number | null;
+  group: string | null;
+  study_form: string | null;
+  admission_date: string | null;
+  graduation_date_planned: string | null;
+  status: string | null;
+  interface_language: string | null;
+  timezone: string | null;
+  last_login: string | null;
+};
+
 const schema = z.object({
   full_name: z.string().min(1),
   description: z.string().optional(),
@@ -146,6 +220,58 @@ const schema = z.object({
   birth_date: z.string().optional(),
   city: z.string().optional(),
   address: z.string().optional(),
+  // Teacher fields
+  gender: z.string().optional(),
+  identity_card: z.string().optional(),
+  iin_teacher: z.string().optional(),
+  curated_courses_text: z.string().optional(),
+  consultation_schedule_json: z.string().optional(),
+  consultation_location: z.string().optional(),
+  can_view_performance: z.coerce.boolean().optional(),
+  can_message_students: z.coerce.boolean().optional(),
+  can_view_attendance: z.coerce.boolean().optional(),
+  can_call_parent_teacher_meetings: z.coerce.boolean().optional(),
+  can_create_group_announcements: z.coerce.boolean().optional(),
+  // Parent fields
+  work_place: z.string().optional(),
+  kinship_degree: z.string().optional(),
+  educational_process_role: z.string().optional(),
+  student_id: z.string().optional(),
+  // Student fields
+  nationality: z.string().optional(),
+  iin: z.string().optional(),
+  phone_alternative: z.string().optional(),
+  postal_code: z.string().optional(),
+  country: z.string().optional(),
+  student_id_card_number: z.string().optional(),
+  specialty: z.string().optional(),
+  course: z.coerce.number().optional(),
+  group: z.string().optional(),
+  study_form: z.string().optional(),
+  admission_date: z.string().optional(),
+  graduation_date_planned: z.string().optional(),
+  timezone: z.string().optional(),
+  education: z.string().optional(),
+  academic_degree: z.string().optional(),
+  email_work: z.string().optional(),
+  phone_work: z.string().optional(),
+  office: z.string().optional(),
+  reception_hours: z.string().optional(),
+  employee_number: z.string().optional(),
+  position: z.string().optional(),
+  department: z.string().optional(),
+  hire_date: z.string().optional(),
+  employment_status: z.string().optional(),
+  academic_interests: z.string().optional(),
+  teaching_hours: z.string().optional(),
+  status: z.string().optional(),
+  interface_language: z.string().optional(),
+  // Admin fields
+  education_level: z.string().optional(),
+  email_personal: z.string().optional(),
+  system_role: z.string().optional(),
+  permissions_text: z.string().optional(),
+  areas_of_responsibility_text: z.string().optional(),
 });
 
 type Form = z.infer<typeof schema>;
@@ -162,6 +288,8 @@ export default function ProfilePage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveSuccessMessage, setSaveSuccessMessage] = useState<string | null>(null);
+  const saveSuccessTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [activeTab, setActiveTab] = useState<"overview" | "progress" | "edit">("overview");
   const [coinHistoryOpen, setCoinHistoryOpen] = useState(false);
   const [goalFormOpen, setGoalFormOpen] = useState(false);
@@ -171,7 +299,15 @@ export default function ProfilePage() {
   const confettiRef = useRef<ConfettiRef>(null);
   const confetti = useConfetti();
 
-  const { data: me, refetch } = useQuery({
+  useEffect(() => {
+    return () => {
+      if (saveSuccessTimeoutRef.current) {
+        clearTimeout(saveSuccessTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const meQuery = useQuery({
     queryKey: ["me"],
     queryFn: async () => {
       const { data } = await api.get<User>("/users/me");
@@ -180,7 +316,8 @@ export default function ProfilePage() {
     staleTime: 0, // Всегда получаем свежие данные
     gcTime: 0, // Не кешируем данные
   });
-  const { data: profileExt } = useQuery({
+
+  const profileExtQuery = useQuery({
     queryKey: ["profile-extended"],
     queryFn: async () => {
       const { data } = await api.get<ProfileExtended>("/users/me/profile-extended");
@@ -188,6 +325,21 @@ export default function ProfilePage() {
     },
     staleTime: 0, // Всегда получаем свежие данные
     gcTime: 0, // Не кешируем данные
+  });
+
+  const me = meQuery.data;
+  const profileExt = profileExtQuery.data;
+  const refetch = meQuery.refetch;
+
+  const { data: studentProfile, refetch: refetchStudentProfile } = useQuery({
+    queryKey: ["student-profile"],
+    queryFn: async () => {
+      const { data } = await api.get<StudentProfileMerged>("/users/me/student-profile");
+      return data;
+    },
+    enabled: profileExt?.role === "student",
+    staleTime: 0,
+    gcTime: 0,
   });
   const { data: enrollments = [] } = useQuery({
     queryKey: ["my-enrollments"],
@@ -256,6 +408,16 @@ export default function ProfilePage() {
       return data;
     },
   });
+  const { data: topHistory = [] } = useQuery({
+    queryKey: ["top-history", me?.id ?? user?.id],
+    queryFn: async () => {
+      const currentId = me?.id ?? user?.id;
+      if (!currentId) return [];
+      const { data } = await api.get<Array<{ date: string; rank: number; amount: number }>>(`/analytics/leaderboard/${currentId}/top-history`);
+      return data;
+    },
+    enabled: !!(me?.id ?? user?.id),
+  });
 
   // Admin analytics queries
   const { data: adminOverview } = useQuery({
@@ -309,26 +471,154 @@ export default function ProfilePage() {
     enabled: isAdmin,
   });
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<Form>({
+  const { register, handleSubmit, reset, setValue, getValues, formState: { errors } } = useForm<Form>({
     resolver: zodResolver(schema),
-    defaultValues: { full_name: "", description: "", photo_url: "", phone: "", birth_date: "", city: "", address: "" },
+    defaultValues: { 
+      full_name: "", 
+      description: "", 
+      photo_url: "", 
+      phone: "", 
+      birth_date: "", 
+      city: "", 
+      address: "",
+      gender: "Мужской",
+      identity_card: "",
+      iin_teacher: "",
+      curated_courses_text: "",
+      consultation_schedule_json: "",
+      consultation_location: "",
+      can_view_performance: false,
+      can_message_students: false,
+      can_view_attendance: false,
+      can_call_parent_teacher_meetings: false,
+      can_create_group_announcements: false,
+      nationality: "",
+      iin: "",
+      phone_alternative: "",
+      postal_code: "",
+      country: "",
+      student_id_card_number: "",
+      specialty: "",
+      course: 1,
+      group: "",
+      study_form: "Очная",
+      admission_date: "",
+      graduation_date_planned: "",
+      timezone: "UTC+6",
+      education: "",
+      academic_degree: "",
+      email_work: "",
+      phone_work: "",
+      office: "",
+      reception_hours: "",
+      employee_number: "",
+      position: "",
+      department: "",
+      hire_date: "",
+      employment_status: "Штатный",
+      academic_interests: "",
+      teaching_hours: "",
+      status: "Активный",
+      interface_language: "Русский",
+      work_place: "",
+      kinship_degree: "",
+      educational_process_role: "",
+      student_id: "",
+      education_level: "",
+      email_personal: "",
+      system_role: "Суперадминистратор",
+      permissions_text: "",
+      areas_of_responsibility_text: "",
+    },
   });
   useEffect(() => {
     if (me) reset({
       full_name: me.full_name,
       description: me.description ?? "",
       photo_url: me.photo_url ?? "",
-      phone: (me as { phone?: string }).phone ?? "",
-      birth_date: (me as { birth_date?: string }).birth_date ?? "",
-      city: (me as { city?: string }).city ?? "",
-      address: (me as { address?: string }).address ?? "",
+      phone: (me as any).phone ?? "",
+      birth_date: (me as any).birth_date ?? "",
+      city: (me as any).city ?? "",
+      address: (me as any).address ?? "",
+      gender: (profileExt?.role === "student" ? studentProfile?.gender : (me as any).gender) ?? "Мужской",
+      identity_card: (profileExt?.role === "student" ? studentProfile?.identity_card : (me as any).identity_card) ?? "",
+      iin_teacher: (me as any).iin ?? "",
+      curated_courses_text: Array.isArray((profileExt as any)?.curated_courses) ? ((profileExt as any).curated_courses as string[]).join("\n") : "",
+      consultation_schedule_json: (profileExt as any)?.consultation_schedule
+        ? JSON.stringify((profileExt as any).consultation_schedule, null, 2)
+        : "",
+      consultation_location: (profileExt as any)?.consultation_location ?? "",
+      can_view_performance: Boolean((profileExt as any)?.can_view_performance ?? false),
+      can_message_students: Boolean((profileExt as any)?.can_message_students ?? false),
+      can_view_attendance: Boolean((profileExt as any)?.can_view_attendance ?? false),
+      can_call_parent_teacher_meetings: Boolean((profileExt as any)?.can_call_parent_teacher_meetings ?? false),
+      can_create_group_announcements: Boolean((profileExt as any)?.can_create_group_announcements ?? false),
+      nationality: studentProfile?.nationality ?? "",
+      iin: (studentProfile as any)?.iin ?? "",
+      phone_alternative: studentProfile?.phone_alternative ?? "",
+      postal_code: studentProfile?.postal_code ?? "",
+      country: studentProfile?.country ?? "",
+      student_id_card_number: studentProfile?.student_id_card_number ?? "",
+      specialty: studentProfile?.specialty ?? "",
+      course: (studentProfile?.course ?? 1) as any,
+      group: studentProfile?.group ?? "",
+      study_form: studentProfile?.study_form ?? "Очная",
+      admission_date: studentProfile?.admission_date ?? "",
+      graduation_date_planned: studentProfile?.graduation_date_planned ?? "",
+      timezone: studentProfile?.timezone ?? "UTC+6",
+      education: (me as any).education ?? "",
+      academic_degree: (me as any).academic_degree ?? "",
+      email_work: (me as any).email_work ?? "",
+      phone_work: (me as any).phone_work ?? "",
+      office: (me as any).office ?? "",
+      reception_hours: (me as any).reception_hours ?? "",
+      employee_number: (me as any).employee_number ?? "",
+      position: (me as any).position ?? "",
+      department: (me as any).department ?? "",
+      hire_date: (me as any).hire_date ?? "",
+      employment_status: (me as any).employment_status ?? "Штатный",
+      academic_interests: (me as any).academic_interests ?? "",
+      teaching_hours: (me as any).teaching_hours ?? "",
+      status: (me as any).status ?? "Активный",
+      interface_language: (me as any).interface_language ?? "Русский",
+      work_place: (me as any).work_place ?? "",
+      kinship_degree: (me as any).kinship_degree ?? "",
+      educational_process_role: (me as any).educational_process_role ?? "",
+      student_id: profileExt?.role === "parent" ? String(profileExt.children?.[0]?.id ?? "") : "",
+      education_level: (profileExt as any)?.education_level ?? "",
+      email_personal: (profileExt as any)?.email_personal ?? "",
+      system_role: (profileExt as any)?.system_role ?? "Суперадминистратор",
+      permissions_text: Array.isArray((profileExt as any)?.permissions) ? ((profileExt as any).permissions as string[]).join("\n") : "",
+      areas_of_responsibility_text: Array.isArray((profileExt as any)?.areas_of_responsibility)
+        ? ((profileExt as any).areas_of_responsibility as string[]).join("\n")
+        : "",
     });
-  }, [me, reset]);
+  }, [me, reset, studentProfile, profileExt?.role, profileExt?.children]);
 
   const onSubmit = async (data: Form) => {
     setSaving(true);
+    setSaveSuccessMessage(null);
     try {
-      const payload: Record<string, unknown> = {
+      const parseList = (txt?: string) => {
+        const raw = (txt ?? "").trim();
+        if (!raw) return [];
+        const items = raw
+          .split(/\r?\n|,/g)
+          .map((s) => s.trim())
+          .filter(Boolean);
+        return Array.from(new Set(items));
+      };
+      const safeParseJson = (txt?: string) => {
+        const raw = (txt ?? "").trim();
+        if (!raw) return undefined;
+        try {
+          return JSON.parse(raw) as unknown;
+        } catch {
+          return undefined;
+        }
+      };
+
+      const payloadUser: Record<string, unknown> = {
         full_name: data.full_name,
         description: data.description || undefined,
         photo_url: data.photo_url || undefined,
@@ -336,12 +626,105 @@ export default function ProfilePage() {
         city: data.city || undefined,
         address: data.address || undefined,
       };
-      if (data.birth_date) payload.birth_date = data.birth_date;
-      await api.patch("/users/me", payload);
+      if (data.birth_date) payloadUser.birth_date = data.birth_date;
+
+      if (profileExt?.role === "teacher") {
+        Object.assign(payloadUser, {
+          gender: data.gender || undefined,
+          identity_card: data.identity_card || undefined,
+          iin: data.iin_teacher || undefined,
+          education: data.education || undefined,
+          academic_degree: data.academic_degree || undefined,
+          email_work: data.email_work || undefined,
+          phone_work: data.phone_work || undefined,
+          office: data.office || undefined,
+          reception_hours: data.reception_hours || undefined,
+          employee_number: data.employee_number || undefined,
+          position: data.position || undefined,
+          department: data.department || undefined,
+          hire_date: data.hire_date || undefined,
+          employment_status: data.employment_status || undefined,
+          academic_interests: data.academic_interests || undefined,
+          teaching_hours: data.teaching_hours || undefined,
+          status: data.status || undefined,
+          interface_language: data.interface_language || undefined,
+          email_personal: data.email_personal || undefined,
+          curated_courses: parseList(data.curated_courses_text),
+          consultation_schedule: safeParseJson(data.consultation_schedule_json),
+          consultation_location: data.consultation_location || undefined,
+          can_view_performance: Boolean(data.can_view_performance),
+          can_message_students: Boolean(data.can_message_students),
+          can_view_attendance: Boolean(data.can_view_attendance),
+          can_call_parent_teacher_meetings: Boolean(data.can_call_parent_teacher_meetings),
+          can_create_group_announcements: Boolean(data.can_create_group_announcements),
+        });
+      }
+      if (profileExt?.role === "admin" || profileExt?.role === "director") {
+        Object.assign(payloadUser, {
+          gender: data.gender || undefined,
+          identity_card: data.identity_card || undefined,
+          education_level: data.education_level || undefined,
+          email_work: data.email_work || undefined,
+          email_personal: data.email_personal || undefined,
+          phone_work: data.phone_work || undefined,
+          office: data.office || undefined,
+          employee_number: data.employee_number || undefined,
+          position: data.position || undefined,
+          department: data.department || undefined,
+          hire_date: data.hire_date || undefined,
+          status: data.status || undefined,
+          interface_language: data.interface_language || undefined,
+          system_role: data.system_role || undefined,
+          permissions: parseList(data.permissions_text),
+          areas_of_responsibility: parseList(data.areas_of_responsibility_text),
+        });
+      }
+      if (profileExt?.role === "parent") {
+        Object.assign(payloadUser, {
+          gender: data.gender || undefined,
+          identity_card: data.identity_card || undefined,
+          email_work: data.email_work || undefined,
+          phone_work: data.phone_work || undefined,
+          position: data.position || undefined,
+          work_place: data.work_place || undefined,
+          kinship_degree: data.kinship_degree || undefined,
+          educational_process_role: data.educational_process_role || undefined,
+        });
+      }
+
+      await api.patch("/users/me", payloadUser);
+      if (profileExt?.role === "student") {
+        const payloadStudent: Record<string, unknown> = {
+          gender: data.gender || undefined,
+          nationality: data.nationality || undefined,
+          identity_card: data.identity_card || undefined,
+          iin: data.iin || undefined,
+          phone_alternative: data.phone_alternative || undefined,
+          postal_code: data.postal_code || undefined,
+          country: data.country || undefined,
+          student_id_card_number: data.student_id_card_number || undefined,
+          specialty: data.specialty || undefined,
+          course: data.course ?? undefined,
+          group: data.group || undefined,
+          study_form: data.study_form || undefined,
+          admission_date: data.admission_date || undefined,
+          graduation_date_planned: data.graduation_date_planned || undefined,
+          status: data.status || undefined,
+          interface_language: data.interface_language || undefined,
+          timezone: data.timezone || undefined,
+        };
+        await api.patch("/users/me/student-profile", payloadStudent);
+        queryClient.invalidateQueries({ queryKey: ["student-profile"] });
+        refetchStudentProfile();
+      }
       await refetch();
       queryClient.invalidateQueries({ queryKey: ["profile-extended"] });
       if (me && token) setAuth({ ...me, ...data }, token);
-      alert(t("profileSaved"));
+      setSaveSuccessMessage(t("profileSaved"));
+      if (saveSuccessTimeoutRef.current) clearTimeout(saveSuccessTimeoutRef.current);
+      saveSuccessTimeoutRef.current = setTimeout(() => {
+        setSaveSuccessMessage(null);
+      }, 3000);
     } catch (err: unknown) {
       const msg =
         err && typeof err === "object" && "response" in err && typeof (err as { response?: { data?: { detail?: string } } }).response?.data?.detail === "string"
@@ -350,6 +733,29 @@ export default function ProfilePage() {
       alert(msg);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const linkStudentToParent = async () => {
+    if (profileExt?.role !== "parent") return;
+    const raw = (getValues("student_id") || "").trim();
+    const studentId = Number(raw);
+    if (!raw || Number.isNaN(studentId) || studentId <= 0) {
+      alert(t("profileInvalidStudentId"));
+      return;
+    }
+    try {
+      await api.patch("/users/me/parent-link", { student_id: studentId });
+      queryClient.invalidateQueries({ queryKey: ["profile-extended"] });
+      await profileExtQuery.refetch();
+      setValue("student_id", String(studentId));
+      alert(t("profileStudentLinked"));
+    } catch (err: unknown) {
+      const msg =
+        err && typeof err === "object" && "response" in err && typeof (err as { response?: { data?: { detail?: string } } }).response?.data?.detail === "string"
+          ? (err as { response: { data: { detail: string } } }).response.data.detail
+          : t("profileSaveError");
+      alert(msg);
     }
   };
 
@@ -426,6 +832,63 @@ export default function ProfilePage() {
     points: (me as { points?: number })?.points ?? (user as { points?: number })?.points ?? 0,
     is_premium: (me as { is_premium?: number })?.is_premium ?? (user as { is_premium?: number })?.is_premium ?? 0,
   } : (me ?? user);
+
+  const profilePreviewData = useMemo<SafeProfilePreviewData | null>(() => {
+    if (!profileExt) return null;
+
+    const base: SafeProfilePreviewData = {
+      id: profileExt.id,
+      email: profileExt.email,
+      full_name: profileExt.full_name,
+      role: profileExt.role,
+      photo_url: profileExt.photo_url,
+      description: profileExt.description,
+      phone: profileExt.phone,
+      city: profileExt.city,
+      created_at: profileExt.created_at,
+      points: (me as { points?: number })?.points ?? (user as { points?: number })?.points ?? 0,
+      status: (profileExt as { status?: string | null }).status ?? null,
+      email_work: (profileExt as { email_work?: string | null }).email_work ?? null,
+      phone_work: (profileExt as { phone_work?: string | null }).phone_work ?? null,
+      office: (profileExt as { office?: string | null }).office ?? null,
+      department: (profileExt as { department?: string | null }).department ?? null,
+      position: (profileExt as { position?: string | null }).position ?? null,
+      education: (profileExt as { education?: string | null }).education ?? null,
+      academic_degree: (profileExt as { academic_degree?: string | null }).academic_degree ?? null,
+      employment_status: (profileExt as { employment_status?: string | null }).employment_status ?? null,
+      reception_hours: (profileExt as { reception_hours?: string | null }).reception_hours ?? null,
+      employee_number: (profileExt as { employee_number?: string | null }).employee_number ?? null,
+      work_place: (profileExt as { work_place?: string | null }).work_place ?? null,
+      kinship_degree: (profileExt as { kinship_degree?: string | null }).kinship_degree ?? null,
+      educational_process_role: (profileExt as { educational_process_role?: string | null }).educational_process_role ?? null,
+      education_level: (profileExt as { education_level?: string | null }).education_level ?? null,
+      system_role: (profileExt as { system_role?: string | null }).system_role ?? null,
+      permissions: (profileExt as { permissions?: string[] | null }).permissions ?? null,
+      areas_of_responsibility: (profileExt as { areas_of_responsibility?: string[] | null }).areas_of_responsibility ?? null,
+      curated_courses: (profileExt as { curated_courses?: string[] | null }).curated_courses ?? null,
+      consultation_location: (profileExt as { consultation_location?: string | null }).consultation_location ?? null,
+      academic_interests: (profileExt as { academic_interests?: string | null }).academic_interests ?? null,
+      subjects_taught: (profileExt as { subjects_taught?: string[] | null }).subjects_taught ?? null,
+      teaching_hours: (profileExt as { teaching_hours?: string | null }).teaching_hours ?? null,
+      groups: (profileExt as { groups?: Array<{ id: number; name: string }> | null }).groups ?? null,
+      students_count: (profileExt as { students_count?: number | null }).students_count ?? null,
+      children: (profileExt as { children?: Array<{ id: number; full_name: string; email?: string; role?: string }> | null }).children ?? null,
+      parent: (profileExt as { parent?: { id: number; full_name: string; email?: string; role?: string } | null }).parent ?? null,
+      teacher: (profileExt as { teacher?: { id: number; full_name: string; email?: string; role?: string } | null }).teacher ?? null,
+    };
+
+    if (profileExt.role === "student" && studentProfile) {
+      base.status = studentProfile.status ?? base.status;
+      base.specialty = studentProfile.specialty;
+      base.course = studentProfile.course;
+      base.group = studentProfile.group;
+      base.study_form = studentProfile.study_form;
+      base.admission_date = studentProfile.admission_date;
+      base.graduation_date_planned = studentProfile.graduation_date_planned;
+    }
+
+    return base;
+  }, [me, profileExt, studentProfile, user]);
 
   const myRank = u ? leaderboard.find((r) => r.user_id === u.id) : undefined;
   const has100 = certificates.some((c) => c.final_score != null && c.final_score >= 100);
@@ -509,83 +972,74 @@ export default function ProfilePage() {
             </MagicCard>
           </BlurFade>
         )}
-        {profileExt?.role === "teacher" && (
-          <BlurFade delay={0.2}>
+        {profileExt?.role === "student" && (
+          <BlurFade delay={0.25}>
             <MagicCard className="bg-white dark:bg-gray-800 rounded-[20px] shadow-md border border-gray-200 dark:border-gray-700 p-5 relative overflow-hidden">
               <h2 className="font-semibold text-gray-800 dark:text-white mb-4 flex items-center gap-2 relative z-10">
-                <GraduationCap className="w-5 h-5" />
-                <AnimatedShinyText className="text-base">{t("profileTeacherInfo")}</AnimatedShinyText>
+                <Trophy className="w-5 h-5 text-amber-500" />
+                <AnimatedShinyText className="text-base">{t("profileStats")}</AnimatedShinyText>
               </h2>
-            <p className="text-gray-600 dark:text-gray-400 mb-2">{t("profileGroups")}: {profileExt.groups?.length ?? 0}</p>
-            {profileExt.students_count != null && <p className="text-gray-600 dark:text-gray-400">{t("profileStudents")}: {profileExt.students_count}</p>}
-            {profileExt.groups && profileExt.groups.length > 0 && (
-              <ul className="mt-2 space-y-1">
-                {profileExt.groups.map((g) => (
-                  <li key={g.id} className="text-sm text-gray-600 dark:text-gray-400">{g.name}</li>
-                ))}
-              </ul>
-            )}
+            <div className="space-y-3">
+              {streak > 0 && (
+                <div className="flex items-center gap-2">
+                  <Flame className="w-5 h-5 text-orange-500 shrink-0" />
+                  <span className="text-gray-600 dark:text-gray-400">{t("profileStreak")}: <strong className="text-gray-800 dark:text-white">{t("profileStreakDays").replace("{n}", String(streak))}</strong></span>
+                </div>
+              )}
+              {myRank && (
+                <Link href="/app/leaderboard" className="flex items-center gap-2 hover:opacity-80">
+                  <Trophy className="w-5 h-5 text-amber-500 shrink-0" />
+                  <span className="text-gray-600 dark:text-gray-400">{t("profileRankPlace")}: <strong className="text-gray-800 dark:text-white">{myRank.rank}</strong></span>
+                </Link>
+              )}
+              <div className="flex items-center gap-2">
+                <Image src="/icons/coin.png" alt="coins" width={20} height={20} className="shrink-0" />
+                <span className="text-gray-600 dark:text-gray-400">{t("profileCoins")}: <strong className="text-gray-800 dark:text-white">{(me as { points?: number })?.points ?? (user as { points?: number })?.points ?? 0}</strong></span>
+                <Link href="/app/shop" className="text-[var(--qit-primary)] hover:underline text-sm ml-1">{t("profileShopLink")}</Link>
+              </div>
+              {coinHistory.length > 0 && (
+                <div className="pt-2 border-t border-gray-200 dark:border-gray-600">
+                  <button
+                    type="button"
+                    onClick={() => setCoinHistoryOpen(!coinHistoryOpen)}
+                    className="flex items-center gap-2 text-sm text-[var(--qit-primary)] dark:text-[#00b0ff] hover:underline"
+                  >
+                    {coinHistoryOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    {t("profileCoinHistory")}
+                  </button>
+                  {coinHistoryOpen && (
+                    <ul className="mt-2 space-y-1.5 max-h-40 overflow-y-auto">
+                      {coinHistory.map((tx) => {
+                        const reasonKey = tx.reason || tx.label;
+                        let translatedLabel = tx.label;
+                        if (reasonKey) {
+                          if (reasonKey.startsWith("ai_challenge_")) {
+                            translatedLabel = t("coinsReason_ai_challenge");
+                          } else if (reasonKey.startsWith("daily_streak_")) {
+                            translatedLabel = t("coinsReason_daily_streak");
+                          } else {
+                            const tVal = t(`coinsReason_${reasonKey}` as TranslationKey);
+                            // If t returns the key itself because it's missing, fallback to tx.label or tx.reason
+                            translatedLabel = (tVal !== `coinsReason_${reasonKey}`) ? tVal : (tx.label || reasonKey);
+                          }
+                        }
+                        return (
+                          <li key={tx.id} className="flex items-center justify-between text-xs">
+                            <span className="text-gray-600 dark:text-gray-400 truncate">{translatedLabel}</span>
+                            <span className={tx.amount >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
+                              {tx.amount >= 0 ? "+" : ""}{tx.amount}
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </div>
             </MagicCard>
           </BlurFade>
         )}
-
-
-        <BlurFade delay={0.25}>
-          <MagicCard className="bg-white dark:bg-gray-800 rounded-[20px] shadow-md border border-gray-200 dark:border-gray-700 p-5 relative overflow-hidden">
-            <h2 className="font-semibold text-gray-800 dark:text-white mb-4 flex items-center gap-2 relative z-10">
-              <Trophy className="w-5 h-5 text-amber-500" />
-              <AnimatedShinyText className="text-base">{t("profileStats")}</AnimatedShinyText>
-            </h2>
-          <div className="space-y-3">
-            {streak > 0 && (
-              <div className="flex items-center gap-2">
-                <Flame className="w-5 h-5 text-orange-500 shrink-0" />
-                <span className="text-gray-600 dark:text-gray-400">{t("profileStreak")}: <strong className="text-gray-800 dark:text-white">{t("profileStreakDays").replace("{n}", String(streak))}</strong></span>
-              </div>
-            )}
-            {myRank && (
-              <Link href="/app/leaderboard" className="flex items-center gap-2 hover:opacity-80">
-                <Trophy className="w-5 h-5 text-amber-500 shrink-0" />
-                <span className="text-gray-600 dark:text-gray-400">{t("profileRankPlace")}: <strong className="text-gray-800 dark:text-white">{myRank.rank}</strong></span>
-              </Link>
-            )}
-            <div className="flex items-center gap-2">
-              <Image src="/icons/coin.png" alt="coins" width={20} height={20} className="shrink-0" />
-              <span className="text-gray-600 dark:text-gray-400">{t("profileCoins")}: <strong className="text-gray-800 dark:text-white">{(me as { points?: number })?.points ?? (user as { points?: number })?.points ?? 0}</strong></span>
-              <Link href="/app/shop" className="text-[var(--qit-primary)] hover:underline text-sm ml-1">{t("profileShopLink")}</Link>
-            </div>
-            {coinHistory.length > 0 && (
-              <div className="pt-2 border-t border-gray-200 dark:border-gray-600">
-                <button
-                  type="button"
-                  onClick={() => setCoinHistoryOpen(!coinHistoryOpen)}
-                  className="flex items-center gap-2 text-sm text-[var(--qit-primary)] dark:text-[#00b0ff] hover:underline"
-                >
-                  {coinHistoryOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                  {t("profileCoinHistory")}
-                </button>
-                {coinHistoryOpen && (
-                  <ul className="mt-2 space-y-1.5 max-h-40 overflow-y-auto">
-                    {coinHistory.map((tx) => {
-                      const reasonKey = tx.reason || tx.label;
-                      const translatedLabel =
-                        (reasonKey && (t(`coinsReason_${reasonKey}` as TranslationKey))) || tx.label;
-                      return (
-                        <li key={tx.id} className="flex items-center justify-between text-xs">
-                          <span className="text-gray-600 dark:text-gray-400 truncate">{translatedLabel}</span>
-                          <span className={tx.amount >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
-                            {tx.amount >= 0 ? "+" : ""}{tx.amount}
-                          </span>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-              </div>
-            )}
-          </div>
-          </MagicCard>
-        </BlurFade>
 
         {profileExt?.role === "student" && (
           <BlurFade delay={0.3}>
@@ -596,7 +1050,7 @@ export default function ProfilePage() {
               </h2>
             {goals.length === 0 ? (
               <>
-                <EmptyState variant="goals" ctaOnClick={() => setGoalFormOpen(true)} />
+                <EmptyState variant="goals" ctaOnClick={() => setGoalFormOpen(true)}/>
                 {goalFormOpen && (
                   <div className="mt-4 space-y-2 pt-4 border-t border-gray-200 dark:border-gray-600">
                     <input
@@ -691,7 +1145,7 @@ export default function ProfilePage() {
           </BlurFade>
         )}
 
-        {badges.length > 0 && (
+        {(badges.length > 0 || topHistory.length > 0) && (
           <BlurFade delay={0.35}>
             <MagicCard className="bg-white dark:bg-gray-800 rounded-[20px] shadow-md border border-gray-200 dark:border-gray-700 p-5 relative overflow-hidden">
               <BorderBeam className="absolute inset-0" />
@@ -699,15 +1153,34 @@ export default function ProfilePage() {
                 <Award className="w-5 h-5" />
                 <AnimatedShinyText className="text-base">{t("profileAchievements")}</AnimatedShinyText>
               </h2>
-              <div className="flex flex-wrap gap-2 relative z-10">
-                {badges.map((b) => (
-                  <MagicCard key={b.labelKey} className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-sm font-medium ${b.color} hover:scale-105 transition-transform cursor-default`}>
-                    <b.icon className="w-4 h-4" />
-                    <SparklesText className="text-sm font-medium">
-                      {b.labelKey === "profileStreakDays" ? t("profileStreakDays").replace("{n}", String(streak)) : t(b.labelKey)}
-                    </SparklesText>
-                  </MagicCard>
-                ))}
+              <div className="flex flex-col gap-3 relative z-10">
+                {topHistory.length > 0 && (
+                  <div className="flex flex-col gap-2">
+                    {topHistory.slice(0, 5).map((h, i) => (
+                      <MagicCard key={`hist-${i}`} className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 dark:border-gray-700 bg-gradient-to-r from-amber-50/50 to-transparent dark:from-amber-900/10 hover:shadow-md transition-all">
+                        <div className="w-10 h-10 rounded-full flex items-center justify-center bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-inner shrink-0 scale-110">
+                          <Trophy className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <SparklesText className="text-sm font-semibold" sparklesCount={3} colors={{first:"#FBBF24", second:"#F59E0B"}}>
+                            {t(`profileAchievementTop${h.rank}` as TranslationKey)}
+                          </SparklesText>
+                          <p className="text-xs text-gray-500 mt-0.5">{new Date(h.date).toLocaleDateString()}</p>
+                        </div>
+                      </MagicCard>
+                    ))}
+                  </div>
+                )}
+                <div className="flex flex-wrap gap-2">
+                  {badges.map((b) => (
+                    <MagicCard key={b.labelKey} className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-sm font-medium ${b.color} hover:scale-105 transition-transform cursor-default`}>
+                      <b.icon className="w-4 h-4" />
+                      <SparklesText className="text-sm font-medium">
+                        {b.labelKey === "profileStreakDays" ? t("profileStreakDays").replace("{n}", String(streak)) : t(b.labelKey)}
+                      </SparklesText>
+                    </MagicCard>
+                  ))}
+                </div>
               </div>
             </MagicCard>
           </BlurFade>
@@ -878,7 +1351,7 @@ export default function ProfilePage() {
           {profileExt?.photo_url ? <img src={profileExt.photo_url} alt="" className="w-full h-full object-cover" /> : <UserIcon className="w-14 h-14 text-[var(--qit-primary)] dark:text-[#00b0ff]" />}
           <Ripple className="opacity-50" />
         </div>
-        <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/gif,image/webp" className="hidden" onChange={handlePhotoChange} disabled={uploading} />
+        <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/gif,image/webp" className="hidden" onChange={handlePhotoChange} disabled={uploading}/>
         <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploading} className="absolute inset-0 rounded-2xl bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer disabled:opacity-50 z-10" title={t("profileUploadPhoto")}>
           <Camera className="w-8 h-8 text-white" />
         </button>
@@ -910,7 +1383,7 @@ export default function ProfilePage() {
 
   const kpiCards = profileExt?.role === "student" && (
     <BlurFade delay={0.05}>
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 mb-6">
         {[
           { icon: BookOpen, label: t("profileEnrolled"), value: enrollments.length, gradient: "linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%)", color: "#3B82F6" },
           { icon: CheckCircle, label: t("profileCompleted"), value: completedCount, gradient: "linear-gradient(135deg, #10B981 0%, #06B6D4 100%)", color: "#10B981", iconColor: "#10B981" },
@@ -922,7 +1395,7 @@ export default function ProfilePage() {
           return (
             <div
               key={idx}
-              className="rounded-2xl p-4 relative overflow-hidden group hover:scale-[1.02] transition-all duration-300 card-glow-hover"
+              className="rounded-2xl p-3.5 sm:p-4 relative overflow-hidden group hover:scale-[1.02] transition-all duration-300 card-glow-hover"
               style={{
                 ...glassStyle,
                 background: isDark
@@ -940,73 +1413,19 @@ export default function ProfilePage() {
                     className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 text-white shadow-md group-hover:scale-110 transition-transform duration-300"
                     style={{ background: card.gradient, boxShadow: `0 4px 12px ${card.color}40` }}
                   >
-                    <Icon className="w-5 h-5" style={{ color: card.iconColor || "white" }} />
+                    <Icon className="w-5 h-5" style={{ color: card.iconColor || "white" }}/>
                   </div>
-                  <span className="text-xs font-medium" style={{ color: textColors.secondary }}>{card.label}</span>
+                  <span className="text-[11px] sm:text-xs font-medium leading-tight" style={{ color: textColors.secondary }}>{card.label}</span>
                 </div>
                 {card.isString ? (
-                  <p className="text-2xl font-bold font-geologica" style={{ color: textColors.primary }}>{card.value}</p>
+                  <p className="text-xl sm:text-2xl font-bold font-geologica" style={{ color: textColors.primary }}>{card.value}</p>
                 ) : (
-                  <NumberTicker value={card.value as number} className="text-2xl font-bold font-geologica" style={{ color: textColors.primary }} />
+                  <NumberTicker value={card.value as number} className="text-xl sm:text-2xl font-bold font-geologica" style={{ color: textColors.primary }}/>
                 )}
               </div>
             </div>
           );
         })}
-      </div>
-    </BlurFade>
-  );
-
-  const teacherKpiCards = profileExt?.role === "teacher" && (
-    <BlurFade delay={0.08}>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        {[
-          { icon: GraduationCap, label: t("profileTeacherGroupsCount"), value: profileExt.groups?.length ?? 0, gradient: "linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%)", color: "#3B82F6" },
-          { icon: Users, label: t("profileTeacherStudentsCount"), value: profileExt.students_count ?? 0, gradient: "linear-gradient(135deg, #10B981 0%, #06B6D4 100%)", color: "#10B981" },
-        ].map((card, idx) => {
-          const Icon = card.icon;
-          return (
-            <div
-              key={idx}
-              className="rounded-2xl p-4 relative overflow-hidden group hover:scale-[1.02] transition-all duration-300 card-glow-hover"
-              style={{
-                ...glassStyle,
-                background: isDark
-                  ? `linear-gradient(135deg, rgba(26, 34, 56, 0.9) 0%, rgba(30, 41, 59, 0.8) 100%)`
-                  : `linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 255, 255, 0.95) 100%)`,
-              }}
-            >
-              <div
-                className="absolute top-0 right-0 w-20 h-20 rounded-full opacity-15 blur-2xl transition-opacity group-hover:opacity-25"
-                style={{ background: card.gradient }}
-              />
-              <div className="relative">
-                <div className="flex items-center gap-2 mb-2">
-                  <div
-                    className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 text-white shadow-md group-hover:scale-110 transition-transform duration-300"
-                    style={{ background: card.gradient, boxShadow: `0 4px 12px ${card.color}40` }}
-                  >
-                    <Icon className="w-5 h-5" />
-                  </div>
-                  <span className="text-xs font-medium" style={{ color: textColors.secondary }}>{card.label}</span>
-                </div>
-                <NumberTicker value={card.value} className="text-2xl font-bold font-geologica" style={{ color: textColors.primary }} />
-              </div>
-            </div>
-          );
-        })}
-        <Link
-          href="/app/teacher"
-          className="col-span-2 rounded-2xl p-4 flex items-center justify-center gap-2 font-medium transition-all hover:shadow-lg hover:scale-[1.02] relative overflow-hidden"
-          style={{
-            background: "linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%)",
-            color: "white",
-            boxShadow: "0 4px 12px rgba(59, 130, 246, 0.3)",
-          }}
-        >
-          <GraduationCap className="w-5 h-5" />
-          <span>{t("profileTeacherPanelLink")} →</span>
-        </Link>
       </div>
     </BlurFade>
   );
@@ -1043,9 +1462,10 @@ export default function ProfilePage() {
 
   const COLORS = ["#3B82F6", "#8B5CF6", "#10B981", "#F59E0B", "#EC4899", "#06B6D4", "#EF4444"];
 
-  // Проверяем загрузку данных ПОСЛЕ всех хуков, чтобы соблюдать Rules of Hooks
-  if (!u || !profileExt) {
-    // Показываем загрузку, если данные еще не загружены
+  const isPending = meQuery.isPending || profileExtQuery.isPending;
+  const isError = meQuery.isError || profileExtQuery.isError;
+
+  if (isPending) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="animate-spin w-10 h-10 border-2 border-[var(--qit-primary)] border-t-transparent rounded-full" />
@@ -1053,9 +1473,98 @@ export default function ProfilePage() {
     );
   }
 
+  if (isError || !profileExt || !u) {
+    const err =
+      (profileExtQuery.error as any)?.response?.data?.detail ||
+      (meQuery.error as any)?.response?.data?.detail ||
+      (profileExtQuery.error as any)?.message ||
+      (meQuery.error as any)?.message ||
+      t("profileSaveError");
+    return (
+      <div className="flex items-center justify-center min-h-[400px] px-4">
+        <div className="max-w-md w-full rounded-2xl p-5 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+          <h2 className="font-semibold text-gray-900 dark:text-white mb-2">
+            {t("profileLoadError") ?? "Не удалось загрузить профиль"}
+          </h2>
+          <p className="text-sm text-gray-600 dark:text-gray-300 mb-4 break-words">{String(err)}</p>
+          <button
+            type="button"
+            onClick={() => {
+              meQuery.refetch();
+              profileExtQuery.refetch();
+            }}
+            className="px-4 py-2 rounded-xl bg-[var(--qit-primary)] text-white font-medium hover:opacity-90 transition-opacity"
+          >
+            {t("retry") ?? "Повторить"}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const teacherKpiCards = profileExt.role === "teacher" && (
+    <BlurFade delay={0.08}>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
+        {[
+          { icon: GraduationCap, label: t("profileTeacherGroupsCount"), value: profileExt.groups?.length ?? 0, gradient: "linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%)", color: "#3B82F6" },
+          { icon: Users, label: t("profileTeacherStudentsCount"), value: profileExt.students_count ?? 0, gradient: "linear-gradient(135deg, #10B981 0%, #06B6D4 100%)", color: "#10B981" },
+        ].map((card, idx) => {
+          const Icon = card.icon;
+          return (
+            <div
+              key={idx}
+              className="rounded-2xl p-3.5 sm:p-4 relative overflow-hidden group hover:scale-[1.02] transition-all duration-300 card-glow-hover"
+              style={{
+                ...glassStyle,
+                background: isDark
+                  ? `linear-gradient(135deg, rgba(26, 34, 56, 0.9) 0%, rgba(30, 41, 59, 0.8) 100%)`
+                  : `linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 255, 255, 0.95) 100%)`,
+              }}
+            >
+              <div
+                className="absolute top-0 right-0 w-20 h-20 rounded-full opacity-15 blur-2xl transition-opacity group-hover:opacity-25"
+                style={{ background: card.gradient }}
+              />
+              <div className="relative">
+                <div className="flex items-center gap-2 mb-2">
+                  <div
+                    className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 text-white shadow-md group-hover:scale-110 transition-transform duration-300"
+                    style={{ background: card.gradient, boxShadow: `0 4px 12px ${card.color}40` }}
+                  >
+                    <Icon className="w-5 h-5" />
+                  </div>
+                  <span className="text-xs font-medium" style={{ color: textColors.secondary }}>{card.label}</span>
+                </div>
+                <NumberTicker value={card.value} className="text-xl sm:text-2xl font-bold font-geologica" style={{ color: textColors.primary }}/>
+              </div>
+            </div>
+          );
+        })}
+        <Link
+          href="/app/teacher"
+          className="col-span-2 rounded-2xl p-4 flex items-center justify-center gap-2 font-medium transition-all hover:shadow-lg hover:scale-[1.02] relative overflow-hidden min-h-[2.75rem]"
+          style={{
+            background: "linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%)",
+            color: "white",
+            boxShadow: "0 4px 12px rgba(59, 130, 246, 0.3)",
+          }}
+        >
+          <GraduationCap className="w-5 h-5" />
+          <span>{t("profileTeacherPanelLink")} →</span>
+        </Link>
+      </div>
+    </BlurFade>
+  );
+
+  const safePreviewBlock = profilePreviewData && (
+    <BlurFade delay={0.09}>
+      <ProfilePreviewCard profile={profilePreviewData} className="mb-6" />
+    </BlurFade>
+  );
+
   const adminKpiCards = isAdmin && adminOverview && (
     <BlurFade delay={0.1}>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
         {[
           { icon: Users, label: t("adminTotalUsers"), value: Number(adminOverview?.users_count ?? 0), gradient: "linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%)", color: "#3B82F6" },
           { icon: BookOpen, label: t("adminActiveCourses"), value: Number(adminOverview?.courses_count ?? 0), gradient: "linear-gradient(135deg, #10B981 0%, #06B6D4 100%)", color: "#10B981" },
@@ -1088,7 +1597,7 @@ export default function ProfilePage() {
                   </div>
                 </div>
                 <p className="text-3xl font-bold font-geologica tracking-tight mb-1" style={{ color: textColors.primary }}>
-                  <NumberTicker value={card.value} />
+                  <NumberTicker value={card.value}/>
                 </p>
                 <p className="text-sm font-medium" style={{ color: textColors.secondary }}>
                   {card.label}
@@ -1101,10 +1610,9 @@ export default function ProfilePage() {
     </BlurFade>
   );
 
-  const adminCharts = isAdmin && (
+  const adminCharts = isAdmin ? (
     <BlurFade delay={0.15}>
       <div className="space-y-6 mb-6">
-        {/* Completions Over Time */}
         {completionsChartData.length > 0 && (
           <div className="rounded-2xl p-6 relative overflow-hidden" style={glassStyle}>
             <div className="flex items-center gap-2 mb-5">
@@ -1120,12 +1628,12 @@ export default function ProfilePage() {
                 <AreaChart data={completionsChartData}>
                   <defs>
                     <linearGradient id="colorCompletions" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.8} />
-                      <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0.1} />
+                      <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.8}/>
+                      <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0.1}/>
                     </linearGradient>
                   </defs>
-                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: textColors.secondary }} />
-                  <YAxis tick={{ fontSize: 11, fill: textColors.secondary }} />
+                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: textColors.secondary }}/>
+                  <YAxis tick={{ fontSize: 11, fill: textColors.secondary }}/>
                   <Tooltip
                     contentStyle={{
                       background: isDark ? "rgba(26, 34, 56, 0.95)" : "rgba(255, 255, 255, 0.95)",
@@ -1140,7 +1648,6 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {/* Course Stats Pie Chart */}
         {courseStatsForPie.length > 0 && (
           <div className="space-y-6">
             <div className="rounded-2xl p-6 relative overflow-hidden" style={glassStyle}>
@@ -1165,7 +1672,7 @@ export default function ProfilePage() {
                       dataKey="value"
                     >
                       {courseStatsForPie.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]}/>
                       ))}
                     </Pie>
                     <Tooltip
@@ -1203,7 +1710,6 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            {/* Course Stats Bar Chart */}
             <div className="rounded-2xl p-6 relative overflow-hidden" style={glassStyle}>
               <div className="flex items-center gap-2 mb-5">
                 <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white">
@@ -1227,16 +1733,21 @@ export default function ProfilePage() {
                         return value.length > 18 ? `${value.slice(0, 18)}...` : value;
                       }}
                     />
-                    <YAxis tick={{ fontSize: 11, fill: textColors.secondary }} />
+                    <YAxis tick={{ fontSize: 11, fill: textColors.secondary }}/>
                     <Tooltip
                       contentStyle={{
                         background: isDark ? "rgba(26, 34, 56, 0.95)" : "rgba(255, 255, 255, 0.95)",
                         border: `1px solid ${isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"}`,
                         borderRadius: "12px",
                       }}
+                      formatter={(value: any, name: any) => {
+                        if (name === "enrollments") return [value ?? 0, t("adminEnrollments")];
+                        if (name === "completed_topics" || name === "completed") return [value ?? 0, t("adminCompletedTopics")];
+                        return [value ?? 0, String(name)];
+                      }}
                     />
-                    <Bar dataKey="enrollments" fill="#3B82F6" radius={[8, 8, 0, 0]} />
-                    <Bar dataKey="completed_topics" fill="#10B981" radius={[8, 8, 0, 0]} />
+                    <Bar name={t("adminEnrollments")} dataKey="enrollments" fill="#3B82F6" radius={[8, 8, 0, 0]}/>
+                    <Bar name={t("adminCompletedTopics")} dataKey="completed_topics" fill="#10B981" radius={[8, 8, 0, 0]}/>
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -1245,7 +1756,9 @@ export default function ProfilePage() {
         )}
       </div>
     </BlurFade>
-  );
+  ) : null;
+
+
 
   const parentMainBlock = profileExt?.role === "parent" && (
     <div className="bg-gray-50 dark:bg-gray-700/50 rounded-[20px] border border-gray-200 dark:border-gray-600 p-6 mb-6">
@@ -1280,7 +1793,7 @@ export default function ProfilePage() {
           <AnimatedGradientText className="font-semibold text-base">
             {t("profileContinueCourse")
               .replace("{course}", getLocalizedCourseTitle({ title: continueCourse.course_title } as any, t))
-              .replace("{topic}", continueCourse.next_topic_title ?? "")}
+              .replace("{topic}", continueCourse.next_topic_title ? getLocalizedTopicTitle(continueCourse.next_topic_title, t) : "")}
           </AnimatedGradientText>
         </Link>
       </MagicCard>
@@ -1301,7 +1814,7 @@ export default function ProfilePage() {
             {upcomingTasks.map((s) => (
               <MagicCard key={s.id} className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-gray-800">
                 <span className="text-sm text-gray-800 dark:text-white truncate">
-                  {s.course_title ? getLocalizedCourseTitle({ title: s.course_title } as any, t) : s.topic_title || s.notes || "—"}
+                  {s.course_title ? getLocalizedCourseTitle({ title: s.course_title } as any, t) : (s.topic_title ? getLocalizedTopicTitle(s.topic_title, t) : s.notes) || "—"}
                 </span>
                 <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0 ml-2">{s.scheduled_date}</span>
               </MagicCard>
@@ -1359,10 +1872,10 @@ export default function ProfilePage() {
       <div className="h-48">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={chartData}>
-            <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-            <YAxis tick={{ fontSize: 10 }} />
+            <XAxis dataKey="name" tick={{ fontSize: 10 }}/>
+            <YAxis tick={{ fontSize: 10 }}/>
             <Tooltip />
-            <Bar dataKey="minutes" fill="var(--qit-primary)" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="minutes" fill="var(--qit-primary)" radius={[4, 4, 0, 0]}/>
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -1411,7 +1924,7 @@ export default function ProfilePage() {
                         {c.certificate && ` • ✓`}
                       </p>
                       <div className="mt-1 h-1.5 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden">
-                        <div className="h-full rounded-full transition-all bg-gradient-to-r from-[var(--qit-primary)] to-[#00b0ff]" style={{ width: `${c.progress_percent}%` }} />
+                        <div className="h-full rounded-full transition-all bg-gradient-to-r from-[var(--qit-primary)] to-[#00b0ff]" style={{ width: `${c.progress_percent}%` }}/>
                       </div>
                     </div>
                     <AnimatedGradientText className="text-sm font-semibold shrink-0 w-12 text-right">
@@ -1439,6 +1952,12 @@ export default function ProfilePage() {
       <MagicCard className="relative overflow-hidden">
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 relative z-10">
           <AnimatedShinyText className="text-xl font-semibold mb-4 block">{t("profileEdit")}</AnimatedShinyText>
+          {saveSuccessMessage && (
+            <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-900/20 dark:text-emerald-300">
+              <CheckCircle className="h-4 w-4 shrink-0" />
+              <span>{saveSuccessMessage}</span>
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileFullName")}</label>
             <input {...register("full_name")} className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-[var(--qit-primary)] focus:border-[var(--qit-primary)] transition-all" />
@@ -1460,17 +1979,506 @@ export default function ProfilePage() {
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileAddress")}</label>
             <input {...register("address")} placeholder={t("profilePlaceholderAddress")} className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all" />
           </div>
+
+          {profileExt?.role === "teacher" && (
+            <div className="space-y-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <h3 className="font-semibold text-gray-800 dark:text-white">{t("profileTeacherPersonalData")}</h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileGender")}</label>
+                  <select {...register("gender")} className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-[var(--qit-primary)] transition-all">
+                    <option value="Мужской">{t("genderMale")}</option>
+                    <option value="Женский">{t("genderFemale")}</option>
+                    <option value="Другое">{t("genderOther")}</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileIdentityCard")}</label>
+                  <input {...register("identity_card")} className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileIin")}</label>
+                  <input {...register("iin_teacher")} className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileEducation")}</label>
+                  <input {...register("education")} className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileAcademicDegree")}</label>
+                  <input {...register("academic_degree")} className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileWorkEmail")}</label>
+                  <input {...register("email_work")} type="email" className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profilePersonalEmail")}</label>
+                  <input {...register("email_personal")} type="email" className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileWorkPhone")}</label>
+                  <input {...register("phone_work")} className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileOffice")}</label>
+                  <input {...register("office")} className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileReceptionHours")}</label>
+                  <input {...register("reception_hours")} placeholder={t("profileReceptionHoursPlaceholder")}  className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileEmployeeNumber")}</label>
+                  <input {...register("employee_number")} className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profilePosition")}</label>
+                  <select {...register("position")} className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all">
+                    <option value="">—</option>
+                    <option value="Куратор">{t("profileTeacherPositionCurator")}</option>
+                    <option value="Классный руководитель">{t("profileTeacherPositionClassLeader")}</option>
+                    <option value="Наставник">{t("profileTeacherPositionMentor")}</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileDepartment")}</label>
+                  <input {...register("department")} className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileHireDate")}</label>
+                  <input {...register("hire_date")} type="date" className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all" />
+                </div>
+              </div>
+
+              <div className="space-y-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">{t("profileTeacherActivityInfo")}</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileCuratedCourses")}</label>
+                    <textarea
+                      {...register("curated_courses_text")}
+                      rows={3}
+                      placeholder={t("profileCuratedCoursesHint")} 
+                      className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileConsultationLocation")}</label>
+                    <input {...register("consultation_location")} className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileEmploymentStatus")}</label>
+                  <select {...register("employment_status")} className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all">
+                    <option value="Штатный">{t("profileEmploymentFullTime")}</option>
+                    <option value="Совместитель">{t("profileEmploymentPartTime")}</option>
+                    <option value="Почасовой">{t("profileEmploymentHourly")}</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileTeachingHours")}</label>
+                  <input {...register("teaching_hours")} placeholder={t("profileTeachingHoursPlaceholder")} className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all" />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileAcademicInterests")}</label>
+                <textarea {...register("academic_interests")} rows={3} className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all" />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileStatus")}</label>
+                  <select {...register("status")} className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all">
+                    <option value="Активный">{t("profileStatusActive")}</option>
+                    <option value="В отпуске">{t("profileStatusVacation")}</option>
+                    <option value="Неактивный">{t("profileStatusInactive")}</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileInterfaceLanguage")}</label>
+                  <select {...register("interface_language")} className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all">
+                    <option value="Русский">{t("profileLanguageRussian")}</option>
+                    <option value="Казахский">{t("profileLanguageKazakh")}</option>
+                    <option value="Английский">{t("profileLanguageEnglish")}</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          )}
+          {profileExt?.role === "parent" && (
+            <div className="space-y-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <h3 className="font-semibold text-gray-800 dark:text-white">{t("profileParentPersonalData")}</h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileGender")}</label>
+                  <select {...register("gender")} className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-[var(--qit-primary)] transition-all">
+                    <option value="Мужской">{t("genderMale")}</option>
+                    <option value="Женский">{t("genderFemale")}</option>
+                    <option value="Другое">{t("genderOther")}</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileIdentityCard")}</label>
+                  <input {...register("identity_card")} className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileWorkPlace")}</label>
+                  <input {...register("work_place")} className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profilePosition")}</label>
+                  <input {...register("position")} className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileWorkEmail")}</label>
+                  <input {...register("email_work")} type="email" className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileWorkPhone")}</label>
+                  <input {...register("phone_work")} className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileKinshipDegree")}</label>
+                  <select {...register("kinship_degree")} className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all">
+                    <option value="Отец">{t("kinshipFather")}</option>
+                    <option value="Мать">{t("kinshipMother")}</option>
+                    <option value="Опекун">{t("kinshipGuardian")}</option>
+                    <option value="Другое">{t("kinshipOther")}</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileEducationalProcessRole")}</label>
+                  <select {...register("educational_process_role")} className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all">
+                    <option value="Законный представитель">{t("eduRoleLegalRepresentative")}</option>
+                    <option value="Опекун">{t("eduRoleGuardian")}</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
+                <h4 className="font-medium text-gray-800 dark:text-white mb-2">{t("profileStudentRelation")}</h4>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
+                  {profileExt.children?.[0]
+                    ? `${t("profileLinkedStudent")}: ${profileExt.children[0].full_name} (ID: ${profileExt.children[0].id})`
+                    : t("parentNoChildren")}
+                </p>
+                <div className="flex flex-col md:flex-row gap-3">
+                  <input
+                    {...register("student_id")}
+                    inputMode="numeric"
+                    placeholder={t("profileStudentIdPlaceholder")}
+                    className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all"
+                  />
+                  <RippleButton
+                    type="button"
+                    onClick={linkStudentToParent}
+                    className="px-4 py-2 rounded-lg text-white text-sm"
+                    style={{ background: "var(--qit-primary)" }}
+                  >
+                    {t("profileLinkStudent")}
+                  </RippleButton>
+                </div>
+              </div>
+            </div>
+          )}
+          {(profileExt?.role === "admin" || profileExt?.role === "director") && (
+            <div className="space-y-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <h3 className="font-semibold text-gray-800 dark:text-white">{t("profileAdminPersonalData")}</h3>
+
+              <div className="space-y-3">
+                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">{t("profileBasicInfoSection")}</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileGender")}</label>
+                    <select {...register("gender")} className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-[var(--qit-primary)] transition-all">
+                      <option value="Мужской">{t("genderMale")}</option>
+                      <option value="Женский">{t("genderFemale")}</option>
+                      <option value="Другое">{t("genderOther")}</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileIdentityCard")}</label>
+                    <input {...register("identity_card")} className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileEducationLevel")}</label>
+                    <select {...register("education_level")} className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all">
+                      <option value="">—</option>
+                      <option value="Высшее (бакалавр)">{t("educationLevelBachelor")}</option>
+                      <option value="Высшее (магистр)">{t("educationLevelMaster")}</option>
+                      <option value="Высшее (специалист)">{t("educationLevelSpecialist")}</option>
+                      <option value="Среднее специальное">{t("educationLevelSecondarySpecial")}</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">{t("profileContactsSection")}</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileWorkEmail")}</label>
+                    <input {...register("email_work")} type="email" className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profilePersonalEmail")}</label>
+                    <input {...register("email_personal")} type="email" className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileWorkPhone")}</label>
+                    <input {...register("phone_work")} className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileOffice")}</label>
+                    <input {...register("office")} className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">{t("profileWorkInfo")}</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileEmployeeNumber")}</label>
+                    <input {...register("employee_number")} className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profilePosition")}</label>
+                    <input {...register("position")} className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileDepartment")}</label>
+                    <input {...register("department")} className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileHireDate")}</label>
+                    <input {...register("hire_date")} type="date" className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileStatus")}</label>
+                    <select {...register("status")} className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all">
+                      <option value="Активный">{t("profileStatusActive")}</option>
+                      <option value="В отпуске">{t("profileStatusVacation")}</option>
+                      <option value="Неактивный">{t("profileStatusInactive")}</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileInterfaceLanguage")}</label>
+                    <select {...register("interface_language")} className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all">
+                      <option value="Русский">{t("profileLanguageRussian")}</option>
+                      <option value="Казахский">{t("profileLanguageKazakh")}</option>
+                      <option value="Английский">{t("profileLanguageEnglish")}</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">{t("profileAccessInfo")}</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileSystemRole")}</label>
+                    <select {...register("system_role")} className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all">
+                      <option value="Суперадминистратор">{t("profileSystemRoleSuperAdmin")}</option>
+                      <option value="Администратор факультета">{t("profileSystemRoleFacultyAdmin")}</option>
+                      <option value="Администратор кафедры">{t("profileSystemRoleDepartmentAdmin")}</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileAccessRightsLines")}</label>
+                    <textarea {...register("permissions_text")} rows={4} placeholder="Управление пользователями&#10;Управление курсами&#10;Просмотр отчетов" className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileResponsibilityAreasLines")}</label>
+                    <textarea {...register("areas_of_responsibility_text")} rows={4} placeholder={t("profileResponsibilityAreasPlaceholder")} className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          {profileExt?.role === "student" && (
+            <div className="space-y-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <h3 className="font-semibold text-gray-800 dark:text-white">{t("profileStudentPersonalData")}</h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileGender")}</label>
+                  <select {...register("gender")} className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-[var(--qit-primary)] transition-all">
+                    <option value="Мужской">{t("genderMale")}</option>
+                    <option value="Женский">{t("genderFemale")}</option>
+                    <option value="Другое">{t("genderOther")}</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileNationality")}</label>
+                  <input {...register("nationality")} className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileIdentityCard")}</label>
+                  <input {...register("identity_card")} className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileIin")}</label>
+                  <input {...register("iin")} className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileAlternativePhone")}</label>
+                  <input {...register("phone_alternative")} className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profilePostalCode")}</label>
+                  <input {...register("postal_code")} className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileCountry")}</label>
+                  <input {...register("country")} className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileStudentCardNumber")}</label>
+                  <input {...register("student_id_card_number")} className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileSpecialty")}</label>
+                  <input {...register("specialty")} className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileCourse")}</label>
+                  <input {...register("course")} type="number" min={1} className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileGroups")}</label>
+                  <input {...register("group")} className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileStudyForm")}</label>
+                  <select {...register("study_form")} className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all">
+                    <option value="Очная">{t("profileStudyFullTime")}</option>
+                    <option value="Заочная">{t("profileStudyPartTime")}</option>
+                    <option value="Очно-заочная">{t("profileStudyMixed")}</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileAdmissionDate")}</label>
+                  <input {...register("admission_date")} type="date" className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileGraduationDate")}</label>
+                  <input {...register("graduation_date_planned")} type="date" className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileStatus")}</label>
+                  <select {...register("status")} className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all">
+                    <option value="Активный">{t("profileStatusActive")}</option>
+                    <option value="Неактивный">{t("profileStatusInactive")}</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileInterfaceLanguage")}</label>
+                  <select {...register("interface_language")} className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all">
+                    <option value="Русский">{t("profileLanguageRussian")}</option>
+                    <option value="Казахский">{t("profileLanguageKazakh")}</option>
+                    <option value="Английский">{t("profileLanguageEnglish")}</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileTimezone")}</label>
+                  <input {...register("timezone")} placeholder={t("profileTimezonePlaceholder")} className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all" />
+                </div>
+                <div className="flex flex-col justify-end">
+                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                    {t("profileCreatedAt")}: <span className="font-medium">{studentProfile?.created_at ? formatDateLocalized(studentProfile.created_at, lang) : "—"}</span>
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    {t("profileLastLogin")}: <span className="font-medium">{studentProfile?.last_login ? formatDateLocalized(studentProfile.last_login, lang) : "—"}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profilePhotoUrl")}</label>
-            <input {...register("photo_url")} placeholder="https://..." className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all" />
+            <input {...register("photo_url")} placeholder={t("profilePhotoUrlPlaceholder")} className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all" />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("profileDescription")}</label>
             <textarea {...register("description")} rows={4} placeholder={t("profileDescriptionPlaceholder")} className="w-full border dark:border-gray-600 rounded-lg px-3 py-2 dark:bg-gray-700 dark:text-white transition-all" />
           </div>
-          <ShimmerButton type="submit" disabled={saving} className="py-2.5 px-5 rounded-lg text-white font-medium disabled:opacity-70 disabled:cursor-not-allowed" style={{ background: "var(--qit-primary)" }}>
-            {saving ? t("loading") : t("save")}
-          </ShimmerButton>
+          <div className="flex flex-wrap gap-4 pt-2">
+            <ShimmerButton type="submit" disabled={saving} className="py-2.5 px-5 rounded-lg text-white font-medium disabled:opacity-70 disabled:cursor-not-allowed" style={{ background: "var(--qit-primary)" }}>
+              {saving ? t("loading") : t("save")}
+            </ShimmerButton>
+          </div>
         </form>
       </MagicCard>
     </BlurFade>
@@ -1502,8 +2510,8 @@ export default function ProfilePage() {
           
           {/* Светящиеся шары */}
           <div className="absolute top-20 right-20 w-96 h-96 rounded-full bg-white/10 blur-3xl animate-pulse" />
-          <div className="absolute bottom-32 left-32 w-64 h-64 rounded-full bg-white/8 blur-2xl animate-pulse" style={{ animationDelay: "1s" }} />
-          <div className="absolute top-1/2 left-1/4 w-80 h-80 rounded-full bg-white/5 blur-3xl animate-pulse" style={{ animationDelay: "2s" }} />
+          <div className="absolute bottom-32 left-32 w-64 h-64 rounded-full bg-white/8 blur-2xl animate-pulse" style={{ animationDelay: "1s" }}/>
+          <div className="absolute top-1/2 left-1/4 w-80 h-80 rounded-full bg-white/5 blur-3xl animate-pulse" style={{ animationDelay: "2s" }}/>
           
           {/* Декоративные иконки */}
           <div className="absolute top-24 left-24 opacity-20">
@@ -1532,6 +2540,7 @@ export default function ProfilePage() {
             {activeTab === "overview" && (
               <BlurFade delay={0.1}>
                 <>
+                  {safePreviewBlock}
                   {kpiCards}
                   {teacherKpiCards}
                   {adminKpiCards}

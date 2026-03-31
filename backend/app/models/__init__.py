@@ -34,7 +34,10 @@ from app.models.add_student_task import AddStudentTask
 from app.models.teacher_material import TeacherMaterial
 from app.models.teacher_question import TeacherQuestion, TeacherQuestionAnswer
 from app.models.course_review import CourseReview
+from app.models.community_post import CommunityPost
+from app.models.community_post_like import CommunityPostLike
 from app.models.topic_note import TopicNote
+from app.models.student_profile import StudentProfile
 
 __all__ = [
     "Base",
@@ -74,5 +77,8 @@ __all__ = [
     "TeacherQuestion",
     "TeacherQuestionAnswer",
     "CourseReview",
+    "CommunityPost",
+    "CommunityPostLike",
     "TopicNote",
+    "StudentProfile",
 ]

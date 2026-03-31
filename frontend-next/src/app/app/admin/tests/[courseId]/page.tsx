@@ -26,7 +26,7 @@ export default function AdminTestsCoursePage() {
   });
 
   if (isNaN(courseId) || courseId <= 0) {
-    router.replace("/app/admin/tests");
+    router.replace("/app/admin/courses/tests");
     return null;
   }
 
@@ -42,7 +42,7 @@ export default function AdminTestsCoursePage() {
     return (
       <div>
         <p className="text-red-600">{t("courseNotFound")}</p>
-        <Link href="/app/admin/tests" className="text-qit-primary hover:underline mt-2 inline-block">
+        <Link href="/app/admin/courses/tests" className="text-qit-primary hover:underline mt-2 inline-block">
           ← {t("backToTests")}
         </Link>
       </div>
@@ -52,7 +52,7 @@ export default function AdminTestsCoursePage() {
   return (
     <div>
       <Link
-        href="/app/admin/tests"
+        href="/app/admin/courses/tests"
         className="inline-flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-qit-primary mb-4"
       >
         <ArrowLeft className="w-4 h-4" /> {t("backToTestsList")}

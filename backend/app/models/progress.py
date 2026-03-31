@@ -18,6 +18,7 @@ class StudentProgress(Base):
     video_watched_seconds = Column(Integer, default=0)
     completed_at = Column(DateTime(timezone=True))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
 
     user = relationship("User", back_populates="progress")
     course = relationship("Course", back_populates="progress")

@@ -16,6 +16,7 @@ from app.models.group_student import GroupStudent
 from app.models.teacher_assignment import TeacherAssignment
 from app.models.assignment_submission import AssignmentSubmission
 from app.services.coins import add_coins
+from app.services.export_service import generate_csv_response, generate_xlsx_response
 from app.models.progress import StudentProgress
 from app.models.notification import Notification
 from app.models.enrollment import CourseEnrollment
@@ -42,9 +43,29 @@ def _can_manage_group(user: User, group: TeacherGroup) -> bool:
     return group.teacher_id == user.id
 
 
+def _is_assignment_closed(a: TeacherAssignment) -> bool:
+    """Assignment is closed if teacher set closed_at or deadline has passed."""
+    from datetime import datetime, timezone
+    closed_at = getattr(a, "closed_at", None)
+    if closed_at is not None:
+        return True
+    deadline = getattr(a, "deadline", None)
+    if deadline is None:
+        return False
+    now = datetime.now(timezone.utc)
+    if deadline.tzinfo is None:
+        deadline = deadline.replace(tzinfo=timezone.utc)
+    return deadline < now
+
+
 class GroupCreate(BaseModel):
     course_id: int
     group_name: str
+
+
+class GroupUpdate(BaseModel):
+    course_id: int | None = None
+    group_name: str | None = None
 
 
 class AddStudent(BaseModel):
@@ -80,6 +101,19 @@ class AssignmentCreate(BaseModel):
     test_questions: list[TestQuestionCreate] | None = None  # for assignment with test
 
 
+class AssignmentUpdate(BaseModel):
+    """All fields optional for PATCH."""
+    title: str | None = None
+    description: str | None = None
+    deadline: str | None = None
+    max_points: int | None = None
+    topic_id: int | None = None
+    attachment_urls: list[str] | None = None
+    attachment_links: list[str] | None = None
+    video_urls: list[str] | None = None
+    rubric: list[RubricCriterionCreate] | None = None
+
+
 class MaterialCreate(BaseModel):
     group_id: int
     course_id: int
@@ -88,6 +122,8 @@ class MaterialCreate(BaseModel):
     description: str | None = None
     video_urls: list[str] | None = None
     image_urls: list[str] | None = None
+    attachment_urls: list[str] | None = None
+    attachment_links: list[str] | None = None
 
 
 class QuestionCreate(BaseModel):
@@ -95,6 +131,23 @@ class QuestionCreate(BaseModel):
     course_id: int
     question_text: str
     question_type: str = "single_choice"  # single_choice, open
+    options: list[str] | None = None
+    correct_option: str | None = None
+
+
+class MaterialUpdate(BaseModel):
+    title: str | None = None
+    description: str | None = None
+    topic_id: int | None = None
+    video_urls: list[str] | None = None
+    image_urls: list[str] | None = None
+    attachment_urls: list[str] | None = None
+    attachment_links: list[str] | None = None
+
+
+class QuestionUpdate(BaseModel):
+    question_text: str | None = None
+    question_type: str | None = None
     options: list[str] | None = None
     correct_option: str | None = None
 
@@ -142,7 +195,9 @@ def teacher_stats(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_teacher_user)],
 ):
-    """Статистика для дашборда учителя: группы, работы на проверку, студенты."""
+    """Статистика для дашборда учителя: группы, работы на проверку, студенты и тренды за последние 7 дней."""
+    from datetime import datetime, timedelta, timezone
+
     is_admin = current_user.role in ("admin", "director", "curator")
     q_groups = db.query(TeacherGroup)
     if not is_admin:
@@ -172,11 +227,126 @@ def teacher_stats(
             )
             .count()
         )
+
+    # Тренды за последние 7 дней (по сравнению с предыдущими 7)
+    # Используем дату создания групп и связей студент-группа как прокси для динамики.
+    now = datetime.now(timezone.utc)
+    today = datetime(year=now.year, month=now.month, day=now.day, tzinfo=timezone.utc)
+    start_prev = today - timedelta(days=14)
+
+    # Собираем группы текущего учителя/админа в выбранном интервале
+    groups_in_window = (
+        db.query(TeacherGroup)
+        .filter(TeacherGroup.created_at >= start_prev)
+    )
+    if not is_admin:
+        groups_in_window = groups_in_window.filter(TeacherGroup.teacher_id == current_user.id)
+    groups_in_window = groups_in_window.all()
+
+    def build_daily_counts(items, get_created_at):
+        """Возвращает список из максимум 14 значений по дням, начиная с start_prev."""
+        buckets = [0] * 14
+        for item in items:
+            created_at = get_created_at(item)
+            if not created_at:
+                continue
+            if created_at.tzinfo is None:
+                created_at = created_at.replace(tzinfo=timezone.utc)
+            delta_days = (created_at.date() - start_prev.date()).days
+            if 0 <= delta_days < 14:
+                buckets[delta_days] += 1
+        # Преобразуем в кумулятивную сумму, чтобы отражать общий рост
+        cumulative = []
+        total = 0
+        for value in buckets:
+            total += value
+            cumulative.append(total)
+        return cumulative
+
+    groups_trend_full = build_daily_counts(groups_in_window, lambda g: g.created_at)
+
+    # Для студентов используем связи GroupStudent, дата добавления которых отражает добавление студента
+    student_links_in_window = (
+        db.query(GroupStudent)
+        .filter(GroupStudent.added_at >= start_prev)
+    )
+    if group_ids:
+        student_links_in_window = student_links_in_window.filter(GroupStudent.group_id.in_(group_ids))
+    student_links_in_window = student_links_in_window.all()
+    students_trend_full = build_daily_counts(student_links_in_window, lambda gs: gs.added_at)
+
+    # Разбиваем кумулятивный массив на предыдущие 7 и текущие 7 дней
+    def split_trend(full):
+        if len(full) < 14:
+            full = [0] * (14 - len(full)) + full
+        prev = full[:7]
+        current = full[7:14]
+        return prev, current
+
+    groups_trend_prev, groups_trend_current = split_trend(groups_trend_full)
+    students_trend_prev, students_trend_current = split_trend(students_trend_full)
+
+    def calc_change_percent(prev, current):
+        prev_sum = sum(prev)
+        curr_sum = sum(current)
+        if prev_sum <= 0:
+            return 100 if curr_sum > 0 else 0
+        return round((curr_sum - prev_sum) / prev_sum * 100)
+
+    groups_change_percent = calc_change_percent(groups_trend_prev, groups_trend_current)
+    students_change_percent = calc_change_percent(students_trend_prev, students_trend_current)
+
     return {
         "groups_count": groups_count,
         "pending_submissions_count": pending_submissions_count,
         "students_count": students_count,
+        "groups_trend_prev": groups_trend_prev,
+        "groups_trend_current": groups_trend_current,
+        "students_trend_prev": students_trend_prev,
+        "students_trend_current": students_trend_current,
+        "groups_change_percent": groups_change_percent,
+        "students_change_percent": students_change_percent,
     }
+
+
+@router.get("/recent-submissions")
+def get_recent_submissions(
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_teacher_user)],
+    limit: int = 10,
+):
+    """Последние сдачи заданий студентами для групп текущего учителя."""
+    is_admin = current_user.role in ("admin", "director", "curator")
+    q_groups = db.query(TeacherGroup)
+    if not is_admin:
+        q_groups = q_groups.filter(TeacherGroup.teacher_id == current_user.id)
+    group_ids = [g.id for g in q_groups.all()]
+    
+    if not group_ids:
+        return []
+        
+    submissions = (
+        db.query(AssignmentSubmission)
+        .join(TeacherAssignment)
+        .filter(TeacherAssignment.group_id.in_(group_ids))
+        .order_by(AssignmentSubmission.submitted_at.desc())
+        .limit(limit)
+        .all()
+    )
+    
+    return [
+        {
+            "id": s.id,
+            "student_id": s.student_id,
+            "student_name": s.student.full_name or s.student.email,
+            "assignment_id": s.assignment_id,
+            "assignment_title": s.assignment.title,
+            "group_name": s.assignment.group.group_name,
+            "submitted_at": s.submitted_at.isoformat() if s.submitted_at else None,
+            "grade": float(s.grade) if s.grade else None,
+        }
+        for s in submissions
+    ]
 
 
 @router.get("/groups")
@@ -203,17 +373,66 @@ def list_groups(
     ]
 
 
-@router.post("/groups", response_model=dict)
+@router.post("/groups")
 def create_group(
     body: GroupCreate,
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_teacher_user)],
 ):
-    g = TeacherGroup(teacher_id=current_user.id, course_id=body.course_id, group_name=body.group_name)
+    """Создать новую учебную группу (только для админов и директоров)."""
+    if current_user.role not in ("admin", "director"):
+        raise HTTPException(status_code=403, detail="У вас нет прав для создания групп. Это действие доступно только администраторам.")
+    g = TeacherGroup(
+        teacher_id=current_user.id,
+        course_id=body.course_id,
+        group_name=body.group_name,
+    )
     db.add(g)
     db.commit()
     db.refresh(g)
     return {"id": g.id, "group_name": g.group_name}
+
+
+@router.patch("/groups/{group_id}")
+def update_group(
+    group_id: int,
+    body: GroupUpdate,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_teacher_user)],
+):
+    """Обновить данные группы (название или курс)."""
+    g = db.query(TeacherGroup).filter(TeacherGroup.id == group_id).first()
+    if not g:
+        raise HTTPException(status_code=404, detail="Группа не найдена")
+    if current_user.role not in ("admin", "director"):
+        raise HTTPException(status_code=403, detail="У вас нет прав для редактирования групп. Это действие доступно только администраторам.")
+    
+    if body.group_name is not None:
+        g.group_name = body.group_name
+    if body.course_id is not None:
+        g.course_id = body.course_id
+        
+    db.commit()
+    db.refresh(g)
+    return {"id": g.id, "group_name": g.group_name}
+
+
+@router.delete("/groups/{group_id}")
+def delete_group(
+    group_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_teacher_user)],
+):
+    """Удалить группу полностью."""
+    g = db.query(TeacherGroup).filter(TeacherGroup.id == group_id).first()
+    if not g:
+        raise HTTPException(status_code=404, detail="Группа не найдена")
+    if current_user.role not in ("admin", "director"):
+        raise HTTPException(status_code=403, detail="У вас нет прав для удаления групп. Это действие доступно только администраторам.")
+        
+    db.delete(g)
+    db.commit()
+    return {"ok": True, "message": "Группа удалена"}
 
 
 @router.post("/groups/{group_id}/students")
@@ -419,23 +638,82 @@ def list_assignments(
     group_ids = [g.id for g in q_groups.all()]
     if not group_ids:
         return []
-    q = db.query(TeacherAssignment).filter(TeacherAssignment.group_id.in_(group_ids))
+
+    # Get Assignments
+    q_a = db.query(TeacherAssignment).filter(TeacherAssignment.group_id.in_(group_ids))
     if group_id:
-        q = q.filter(TeacherAssignment.group_id == group_id)
-    rows = q.order_by(TeacherAssignment.id.desc()).all()
-    return [
-        {
+        q_a = q_a.filter(TeacherAssignment.group_id == group_id)
+    assignments = q_a.all()
+
+    # Get Materials
+    q_m = db.query(TeacherMaterial).filter(TeacherMaterial.group_id.in_(group_ids))
+    if group_id:
+        q_m = q_m.filter(TeacherMaterial.group_id == group_id)
+    materials = q_m.all()
+
+    # Get Questions
+    q_q = db.query(TeacherQuestion).filter(TeacherQuestion.group_id.in_(group_ids))
+    if group_id:
+        q_q = q_q.filter(TeacherQuestion.group_id == group_id)
+    questions = q_q.all()
+
+    out = []
+    
+    for r in assignments:
+        closed_at = getattr(r, "closed_at", None)
+        out.append({
             "id": r.id,
+            "type": "assignment",
             "group_id": r.group_id,
             "group_name": r.group.group_name if r.group else "",
             "course_id": r.course_id,
             "course_title": r.course.title if r.course else "",
+            "topic_id": r.topic_id,
             "title": r.title,
             "description": r.description,
             "deadline": r.deadline.isoformat() if r.deadline else None,
-        }
-        for r in rows
-    ]
+            "closed_at": closed_at.isoformat() if closed_at else None,
+            "is_closed": _is_assignment_closed(r),
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        })
+
+    for r in materials:
+        out.append({
+            "id": r.id,
+            "type": "material",
+            "group_id": r.group_id,
+            "group_name": r.group.group_name if r.group else "",
+            "course_id": r.course_id,
+            "course_title": r.course.title if r.course else "",
+            "topic_id": r.topic_id,
+            "title": r.title,
+            "description": r.description,
+            "deadline": None,
+            "closed_at": None,
+            "is_closed": False,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        })
+
+    for r in questions:
+        out.append({
+            "id": r.id,
+            "type": "question",
+            "group_id": r.group_id,
+            "group_name": r.group.group_name if r.group else "",
+            "course_id": r.course_id,
+            "course_title": r.course.title if r.course else "",
+            "topic_id": None, # Question doesn't have topic_id currently
+            "title": r.question_text,
+            "description": f"Type: {r.question_type}",
+            "deadline": None,
+            "closed_at": None,
+            "is_closed": False,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        })
+
+    # Sort by created_at desc
+    out.sort(key=lambda x: x["created_at"] or "", reverse=True)
+    return out
 
 
 @router.post("/assignments")
@@ -521,6 +799,77 @@ def create_assignment(
     return {"id": a.id, "title": a.title}
 
 
+@router.get("/assignments/{assignment_id}")
+def get_assignment(
+    assignment_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_teacher_user)],
+):
+    """Полные данные задания для формы редактирования."""
+    a = db.query(TeacherAssignment).filter(TeacherAssignment.id == assignment_id).first()
+    if not a:
+        raise HTTPException(status_code=404, detail="Задание не найдено")
+    g = db.query(TeacherGroup).filter(TeacherGroup.id == a.group_id).first()
+    if not g or not _can_manage_group(current_user, g):
+        raise HTTPException(status_code=403, detail="Нет доступа")
+    rubric = [{"name": c.name, "max_points": float(c.max_points)} for c in a.rubric_criteria]
+    return {
+        "id": a.id,
+        "group_id": a.group_id,
+        "course_id": a.course_id,
+        "topic_id": a.topic_id,
+        "title": a.title,
+        "description": a.description or "",
+        "deadline": a.deadline.isoformat() if a.deadline else None,
+        "closed_at": a.closed_at.isoformat() if a.closed_at else None,
+        "is_closed": _is_assignment_closed(a),
+        "max_points": a.max_points,
+        "attachment_urls": json.loads(a.attachment_urls) if a.attachment_urls else [],
+        "attachment_links": json.loads(a.attachment_links) if a.attachment_links else [],
+        "video_urls": json.loads(a.video_urls) if a.video_urls else [],
+        "rubric": rubric,
+    }
+
+
+@router.patch("/assignments/{assignment_id}/close")
+def close_assignment(
+    assignment_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_teacher_user)],
+):
+    """Закрыть задание вручную (запрет сдачи)."""
+    from datetime import datetime, timezone
+    a = db.query(TeacherAssignment).filter(TeacherAssignment.id == assignment_id).first()
+    if not a:
+        raise HTTPException(status_code=404, detail="Задание не найдено")
+    g = db.query(TeacherGroup).filter(TeacherGroup.id == a.group_id).first()
+    if not g or not _can_manage_group(current_user, g):
+        raise HTTPException(status_code=403, detail="Нет доступа")
+    a.closed_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(a)
+    return {"id": a.id, "closed_at": a.closed_at.isoformat()}
+
+
+@router.patch("/assignments/{assignment_id}/reopen")
+def reopen_assignment(
+    assignment_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_teacher_user)],
+):
+    """Открыть задание снова (снять ручное закрытие)."""
+    a = db.query(TeacherAssignment).filter(TeacherAssignment.id == assignment_id).first()
+    if not a:
+        raise HTTPException(status_code=404, detail="Задание не найдено")
+    g = db.query(TeacherGroup).filter(TeacherGroup.id == a.group_id).first()
+    if not g or not _can_manage_group(current_user, g):
+        raise HTTPException(status_code=403, detail="Нет доступа")
+    a.closed_at = None
+    db.commit()
+    db.refresh(a)
+    return {"id": a.id, "closed_at": None}
+
+
 @router.patch("/assignments/{assignment_id}/deadline")
 def update_assignment_deadline(
     assignment_id: int,
@@ -529,7 +878,7 @@ def update_assignment_deadline(
     current_user: Annotated[User, Depends(get_current_teacher_user)],
 ):
     """Обновить дедлайн задания."""
-    from datetime import datetime
+    from datetime import datetime, timezone
     a = db.query(TeacherAssignment).filter(TeacherAssignment.id == assignment_id).first()
     if not a:
         raise HTTPException(status_code=404, detail="Задание не найдено")
@@ -539,8 +888,13 @@ def update_assignment_deadline(
     
     deadline = None
     if body.get("deadline"):
+        raw = body["deadline"].strip()
         try:
-            deadline = datetime.fromisoformat(body["deadline"].replace("Z", "+00:00"))
+            if "Z" not in raw and "+" not in raw and raw.count("-") >= 2:
+                raw = raw + "Z"
+            deadline = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+            if deadline.tzinfo is None:
+                deadline = deadline.replace(tzinfo=timezone.utc)
         except Exception:
             raise HTTPException(status_code=400, detail="Неверный формат даты")
     
@@ -551,6 +905,63 @@ def update_assignment_deadline(
         "id": a.id,
         "deadline": a.deadline.isoformat() if a.deadline else None,
     }
+
+
+@router.patch("/assignments/{assignment_id}")
+def update_assignment(
+    assignment_id: int,
+    body: AssignmentUpdate,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_teacher_user)],
+):
+    """Обновить задание (название, описание, дедлайн, рубрика и т.д.). Группу и курс не меняем."""
+    from datetime import datetime
+    a = db.query(TeacherAssignment).filter(TeacherAssignment.id == assignment_id).first()
+    if not a:
+        raise HTTPException(status_code=404, detail="Задание не найдено")
+    g = db.query(TeacherGroup).filter(TeacherGroup.id == a.group_id).first()
+    if not g or not _can_manage_group(current_user, g):
+        raise HTTPException(status_code=403, detail="Нет доступа")
+
+    if body.title is not None:
+        a.title = body.title
+    if body.description is not None:
+        a.description = body.description
+    if body.max_points is not None:
+        a.max_points = body.max_points
+    if body.topic_id is not None:
+        topic = db.query(CourseTopic).filter(
+            CourseTopic.id == body.topic_id, CourseTopic.course_id == a.course_id
+        ).first()
+        if not topic:
+            raise HTTPException(status_code=400, detail="Тема не найдена или не принадлежит курсу")
+        a.topic_id = body.topic_id
+    if body.deadline is not None:
+        deadline = None
+        if body.deadline:
+            try:
+                deadline = datetime.fromisoformat(body.deadline.replace("Z", "+00:00"))
+            except Exception:
+                raise HTTPException(status_code=400, detail="Неверный формат даты")
+        a.deadline = deadline
+    if body.attachment_urls is not None:
+        a.attachment_urls = json.dumps(body.attachment_urls) if body.attachment_urls else None
+    if body.attachment_links is not None:
+        a.attachment_links = json.dumps(body.attachment_links) if body.attachment_links else None
+    if body.video_urls is not None:
+        a.video_urls = json.dumps(body.video_urls) if body.video_urls else None
+
+    if body.rubric is not None:
+        db.query(TeacherAssignmentRubric).filter(
+            TeacherAssignmentRubric.assignment_id == assignment_id
+        ).delete()
+        for c in body.rubric:
+            r = TeacherAssignmentRubric(assignment_id=a.id, name=c.name, max_points=c.max_points)
+            db.add(r)
+
+    db.commit()
+    db.refresh(a)
+    return {"id": a.id, "title": a.title}
 
 
 @router.get("/assignments/{assignment_id}/submissions")
@@ -567,8 +978,12 @@ def list_submissions(
         raise HTTPException(status_code=403, detail="Нет доступа")
     import json
     rows = db.query(AssignmentSubmission).filter(AssignmentSubmission.assignment_id == assignment_id).all()
-    student_ids = [r.student_id for r in rows]
+    submissions_by_student = {r.student_id: r for r in rows}
+
+    group_students = g.students
+    student_ids = [gs.student_id for gs in group_students]
     users = {u.id: u for u in db.query(User).filter(User.id.in_(student_ids)).all()} if student_ids else {}
+
     rubric_rows = db.query(TeacherAssignmentRubric).filter(TeacherAssignmentRubric.assignment_id == assignment_id).all()
     rubric = [{"id": c.id, "name": c.name, "max_points": float(c.max_points)} for c in rubric_rows]
     submission_grades = {}
@@ -576,22 +991,51 @@ def list_submissions(
         AssignmentSubmissionGrade.submission_id.in_([r.id for r in rows])
     ).all():
         submission_grades.setdefault(sg.submission_id, []).append({"criterion_id": sg.criterion_id, "points": float(sg.points)})
-    submissions = [
-        {
-            "id": r.id,
-            "student_id": r.student_id,
-            "student_name": (u.full_name or "") if (u := users.get(r.student_id)) else "",
-            "submission_text": r.submission_text,
-            "file_url": r.file_url,
-            "file_urls": json.loads(r.file_urls) if r.file_urls else [],
-            "grade": float(r.grade) if r.grade else None,
-            "teacher_comment": r.teacher_comment,
-            "submitted_at": r.submitted_at.isoformat() if r.submitted_at else None,
-            "rubric_grades": submission_grades.get(r.id, []),
-        }
-        for r in rows
-    ]
-    return {"submissions": submissions, "rubric": rubric}
+
+    submissions = []
+    for sid in student_ids:
+        u = users.get(sid)
+        if not u:
+            continue
+        r = submissions_by_student.get(sid)
+        if r:
+            submissions.append({
+                "id": r.id,
+                "student_id": sid,
+                "student_name": u.full_name or "",
+                "submission_text": r.submission_text,
+                "file_url": r.file_url,
+                "file_urls": json.loads(r.file_urls) if r.file_urls else [],
+                "grade": float(r.grade) if r.grade is not None else None,
+                "teacher_comment": r.teacher_comment,
+                "submitted_at": r.submitted_at.isoformat() if r.submitted_at else None,
+                "rubric_grades": submission_grades.get(r.id, []),
+                "status": "graded" if r.grade is not None else "pending"
+            })
+        else:
+            submissions.append({
+                "id": None,
+                "student_id": sid,
+                "student_name": u.full_name or "",
+                "submission_text": None,
+                "file_url": None,
+                "file_urls": [],
+                "grade": None,
+                "teacher_comment": None,
+                "submitted_at": None,
+                "rubric_grades": [],
+                "status": "not_submitted"
+            })
+
+    assignment_details = {
+        "title": a.title,
+        "description": a.description,
+        "max_points": a.max_points,
+        "deadline": a.deadline.isoformat() if a.deadline else None,
+        "group_name": g.group_name
+    }
+
+    return {"submissions": submissions, "rubric": rubric, "assignment": assignment_details}
 
 
 @router.get("/groups/{group_id}/progress/csv")
@@ -601,34 +1045,53 @@ def export_group_progress_csv(
     current_user: Annotated[User, Depends(get_current_teacher_user)],
     course_id: int | None = Query(None),
 ):
-    import csv
-    import io
     g = db.query(TeacherGroup).filter(TeacherGroup.id == group_id).first()
     if not g or not _can_manage_group(current_user, g):
         raise HTTPException(status_code=404, detail="Группа не найдена")
     student_ids = [gs.student_id for gs in g.students]
     
-    output = io.StringIO()
-    writer = csv.writer(output)
-    writer.writerow(["User ID", "Full Name", "Email", "Topic ID", "Completed", "Score"])
+    rows = []
+    headers = ["User ID", "Full Name", "Email", "Topic ID", "Completed", "Score"]
     
     if student_ids:
         users = {u.id: u for u in db.query(User).filter(User.id.in_(student_ids)).all()}
         q = db.query(StudentProgress).filter(StudentProgress.user_id.in_(student_ids))
         if course_id:
             q = q.filter(StudentProgress.course_id == course_id)
-        rows = q.all()
-        for r in rows:
+        prog_rows = q.all()
+        for r in prog_rows:
             u = users.get(r.user_id)
-            writer.writerow([r.user_id, u.full_name if u else "", u.email if u else "", r.topic_id, r.is_completed, r.test_score])
+            rows.append([r.user_id, u.full_name if u else "", u.email if u else "", r.topic_id, r.is_completed, r.test_score])
     
-    output.seek(0)
-    csv_content = "\ufeff" + output.getvalue()  # UTF-8 BOM для корректного отображения в Excel
-    return StreamingResponse(
-        iter([csv_content]),
-        media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": "attachment; filename=group_progress.csv"},
-    )
+    return generate_csv_response(rows, "group_progress", headers)
+
+
+@router.get("/groups/{group_id}/progress/excel")
+def export_group_progress_excel(
+    group_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_teacher_user)],
+    course_id: int | None = Query(None),
+):
+    g = db.query(TeacherGroup).filter(TeacherGroup.id == group_id).first()
+    if not g or not _can_manage_group(current_user, g):
+        raise HTTPException(status_code=404, detail="Группа не найдена")
+    student_ids = [gs.student_id for gs in g.students]
+    
+    rows = []
+    headers = ["User ID", "Full Name", "Email", "Topic ID", "Completed", "Score"]
+    
+    if student_ids:
+        users = {u.id: u for u in db.query(User).filter(User.id.in_(student_ids)).all()}
+        q = db.query(StudentProgress).filter(StudentProgress.user_id.in_(student_ids))
+        if course_id:
+            q = q.filter(StudentProgress.course_id == course_id)
+        prog_rows = q.all()
+        for r in prog_rows:
+            u = users.get(r.user_id)
+            rows.append([r.user_id, u.full_name if u else "", u.email if u else "", r.topic_id, r.is_completed, r.test_score])
+    
+    return generate_xlsx_response(rows, "group_progress", headers, sheet_name="Progress")
 
 
 @router.put("/submissions/{submission_id}")
@@ -720,6 +1183,8 @@ def list_materials(
             "description": r.description,
             "video_urls": json.loads(r.video_urls) if r.video_urls else [],
             "image_urls": json.loads(r.image_urls) if r.image_urls else [],
+            "attachment_urls": json.loads(r.attachment_urls) if r.attachment_urls else [],
+            "attachment_links": json.loads(r.attachment_links) if r.attachment_links else [],
             "created_at": r.created_at.isoformat() if r.created_at else None,
         }
         for r in rows
@@ -746,6 +1211,8 @@ def create_material(
         description=body.description,
         video_urls=json.dumps(body.video_urls) if body.video_urls else None,
         image_urls=json.dumps(body.image_urls) if body.image_urls else None,
+        attachment_urls=json.dumps(body.attachment_urls) if body.attachment_urls else None,
+        attachment_links=json.dumps(body.attachment_links) if body.attachment_links else None,
     )
     db.add(m)
     for gs in g.students:
@@ -795,6 +1262,148 @@ def list_questions(
         }
         for r in rows
     ]
+
+
+@router.get("/materials/{material_id}")
+def get_material(
+    material_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_teacher_user)],
+):
+    m = db.query(TeacherMaterial).filter(TeacherMaterial.id == material_id).first()
+    if not m:
+        raise HTTPException(status_code=404, detail="Материал не найден")
+    g = db.query(TeacherGroup).filter(TeacherGroup.id == m.group_id).first()
+    if not g or not _can_manage_group(current_user, g):
+        raise HTTPException(status_code=403, detail="Нет доступа")
+    return {
+        "id": m.id,
+        "group_id": m.group_id,
+        "course_id": m.course_id,
+        "topic_id": m.topic_id,
+        "title": m.title,
+        "description": m.description,
+        "video_urls": json.loads(m.video_urls) if m.video_urls else [],
+        "image_urls": json.loads(m.image_urls) if m.image_urls else [],
+        "attachment_urls": json.loads(m.attachment_urls) if m.attachment_urls else [],
+        "attachment_links": json.loads(m.attachment_links) if m.attachment_links else [],
+    }
+
+
+@router.patch("/materials/{material_id}")
+def update_material(
+    material_id: int,
+    body: MaterialUpdate,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_teacher_user)],
+):
+    m = db.query(TeacherMaterial).filter(TeacherMaterial.id == material_id).first()
+    if not m:
+        raise HTTPException(status_code=404, detail="Материал не найден")
+    g = db.query(TeacherGroup).filter(TeacherGroup.id == m.group_id).first()
+    if not g or not _can_manage_group(current_user, g):
+        raise HTTPException(status_code=403, detail="Нет доступа")
+    
+    if body.title is not None: m.title = body.title
+    if body.description is not None: m.description = body.description
+    if body.topic_id is not None: m.topic_id = body.topic_id
+    if body.video_urls is not None: m.video_urls = json.dumps(body.video_urls)
+    if body.image_urls is not None: m.image_urls = json.dumps(body.image_urls)
+    if body.attachment_urls is not None: m.attachment_urls = json.dumps(body.attachment_urls)
+    if body.attachment_links is not None: m.attachment_links = json.dumps(body.attachment_links)
+    
+    db.commit()
+    return {"ok": True}
+
+
+@router.get("/questions/{question_id}")
+def get_question(
+    question_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_teacher_user)],
+):
+    q = db.query(TeacherQuestion).filter(TeacherQuestion.id == question_id).first()
+    if not q:
+        raise HTTPException(status_code=404, detail="Вопрос не найден")
+    g = db.query(TeacherGroup).filter(TeacherGroup.id == q.group_id).first()
+    if not g or not _can_manage_group(current_user, g):
+        raise HTTPException(status_code=403, detail="Нет доступа")
+    return {
+        "id": q.id,
+        "group_id": q.group_id,
+        "course_id": q.course_id,
+        "question_text": q.question_text,
+        "question_type": q.question_type,
+        "options": json.loads(q.options) if q.options else [],
+    }
+
+
+@router.get("/questions/{question_id}/answers")
+def list_question_answers(
+    question_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_teacher_user)],
+):
+    q = db.query(TeacherQuestion).filter(TeacherQuestion.id == question_id).first()
+    if not q:
+        raise HTTPException(status_code=404, detail="Вопрос не найден")
+    g = db.query(TeacherGroup).filter(TeacherGroup.id == q.group_id).first()
+    if not g or not _can_manage_group(current_user, g):
+        raise HTTPException(status_code=403, detail="Нет доступа")
+    
+    rows = db.query(TeacherQuestionAnswer).filter(TeacherQuestionAnswer.question_id == question_id).all()
+    answers_by_student = {r.student_id: r for r in rows}
+
+    group_students = g.students
+    student_ids = [gs.student_id for gs in group_students]
+    users = {u.id: u for u in db.query(User).filter(User.id.in_(student_ids)).all()} if student_ids else {}
+
+    results = []
+    for sid in student_ids:
+        u = users.get(sid)
+        if not u: continue
+        r = answers_by_student.get(sid)
+        results.append({
+            "id": r.id if r else None,
+            "student_id": sid,
+            "student_name": u.full_name or u.email,
+            "answer_text": r.answer_text if r else None,
+            "submitted_at": r.created_at.isoformat() if r and r.created_at else None,
+            "status": "submitted" if r else "not_submitted"
+        })
+
+    return {
+        "answers": results,
+        "question": {
+            "text": q.question_text,
+            "type": q.question_type,
+            "options": json.loads(q.options) if q.options else [],
+            "group_name": g.group_name
+        }
+    }
+
+
+@router.patch("/questions/{question_id}")
+def update_question(
+    question_id: int,
+    body: QuestionUpdate,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_teacher_user)],
+):
+    q = db.query(TeacherQuestion).filter(TeacherQuestion.id == question_id).first()
+    if not q:
+        raise HTTPException(status_code=404, detail="Вопрос не найден")
+    g = db.query(TeacherGroup).filter(TeacherGroup.id == q.group_id).first()
+    if not g or not _can_manage_group(current_user, g):
+        raise HTTPException(status_code=403, detail="Нет доступа")
+    
+    if body.question_text is not None: q.question_text = body.question_text
+    if body.question_type is not None: q.question_type = body.question_type
+    if body.options is not None: q.options = json.dumps(body.options)
+    if body.correct_option is not None: q.correct_option = body.correct_option
+    
+    db.commit()
+    return {"ok": True}
 
 
 @router.post("/questions")

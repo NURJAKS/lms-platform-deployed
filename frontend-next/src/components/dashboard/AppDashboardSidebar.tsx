@@ -32,6 +32,7 @@ import {
   ShieldCheck,
   ArrowRight,
   Zap,
+  X,
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import { useTheme } from "@/context/ThemeContext";
@@ -48,12 +49,11 @@ export function AppDashboardSidebar() {
   const pathname = usePathname();
   const { t, lang, setLang } = useLanguage();
   const { theme, toggleTheme } = useTheme();
-  const { collapsed, toggle, width } = useSidebar();
+  const { collapsed, toggle, width, mobileOpen, setMobileOpen } = useSidebar();
   const { data: notifications = [], refetch } = useNotifications();
   const [notifOpen, setNotifOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const langRef = useRef<HTMLDivElement>(null);
@@ -144,7 +144,7 @@ export function AppDashboardSidebar() {
             { href: "/courses", icon: Library, label: t("courseCatalog") },
             { href: "/app/materials", icon: FileText, label: t("studentMaterials") },
           ]),
-          { href: "/app/ai-challenge", icon: Zap, label: t("aiVsStudent") },
+          { href: "/app/ai-challenge/1", icon: Zap, label: t("aiVsStudent") },
           { href: "/app/tasks-calendar", icon: Calendar, label: t("tasksCalendar") },
           { href: "/app/shop", icon: ShoppingBag, label: t("shop") },
           { href: "/app/leaderboard", icon: Trophy, label: t("rating") },
@@ -156,24 +156,22 @@ export function AppDashboardSidebar() {
     ? isStudentWithoutGroup
       ? [
         { href: "/app/premium", icon: Sparkles, label: t("premiumTab"), isPremium: true },
-        { href: "/app/profile", icon: Settings, label: t("settings") },
       ]
       : [
         // Premium показывается только для студентов (не для учителей, директора, админа, куратора, родителя)
         ...(user?.role === "student" ? [{ href: "/app/premium", icon: Sparkles, label: t("premiumTab"), isPremium: true }] : []),
-        { href: "/app/profile", icon: Settings, label: t("settings") },
         ...(isTeacher() ? [{ href: "/app/teacher", icon: Users, label: t("teacher") }] : []),
         ...(isParent ? [] : isAdmin() ? [{ href: "/app/parent-dashboard", icon: Baby, label: t("parent") }] : []),
         ...(isAdmin() || isTeacher() || user?.role === "curator" ? [{ href: "/app/people", icon: Users, label: t("peopleList") }] : []),
+        ...(user?.role === "curator" ? [
+          { href: "/app/admin/courses", icon: BookOpen, label: t("adminNavCourses") },
+          { href: "/app/admin/analytics", icon: BarChart3, label: t("adminNavAnalytics") },
+        ] : []),
       ]
-    : [{ href: "/app/profile", icon: Settings, label: t("settings") }];
+    : [];
 
-  // Меню для куратора (ограниченный доступ)
-  const curatorLinks = user?.role === "curator" ? [
-    { href: "/app/admin/courses", icon: BookOpen, label: t("adminNavCourses") },
-    { href: "/app/admin/courses/moderation", icon: ShieldCheck, label: t("adminNavModeration") },
-    { href: "/app/admin/analytics", icon: BarChart3, label: t("adminNavAnalytics") },
-  ] : [];
+  // Curator links are now merged into extraLinksBeforeManager
+  const curatorLinks: any[] = [];
 
   // Меню для администраторов и директоров (полный доступ)
   const managerLinks = canManageUsers() ? [
@@ -190,33 +188,37 @@ export function AppDashboardSidebar() {
     
     return (
       <>
-        <nav className="flex-1 overflow-y-auto py-4 px-2 space-y-1 min-h-0">
+        <nav className="flex-1 overflow-y-auto py-4 px-2 space-y-1 min-h-0 custom-scrollbar">
+          {/* User Profile Section for Mobile Drawer removed per request */}
+
           {mainLinks.map(({ href, icon: Icon, label }) => (
             <Link
               key={href}
               href={href}
               onClick={() => setMobileOpen(false)}
-              className={`${navLinkClass(href)} ${compact ? "justify-center px-2" : ""}`}
+              className={`${navLinkClass(href)} ${compact ? "justify-center px-2" : "px-4"}`}
               style={navLinkStyle(href)}
               title={compact ? label : undefined}
             >
               <Icon className="w-5 h-5 shrink-0" />
-              {!compact && <span>{label}</span>}
+              {!compact && <span className="text-sm font-semibold">{label}</span>}
             </Link>
           ))}
+          
           {extraLinksBeforeManager.length > 0 && (
-            <div className={`pt-4 mt-4 border-t ${theme === "dark" ? "border-white/20" : "border-gray-200"}`}>
+            <div className={`pt-4 mt-4 border-t ${theme === "dark" ? "border-white/10" : "border-gray-100"}`}>
+               {!compact && <p className="px-4 text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">{t("more")}</p>}
               {extraLinksBeforeManager.map(({ href, icon: Icon, label, isPremium }) => (
                 <Link
                   key={href}
                   href={href}
                   onClick={() => setMobileOpen(false)}
-                  className={`${navLinkClass(href)} ${compact ? "justify-center px-2" : ""}`}
+                  className={`${navLinkClass(href)} ${compact ? "justify-center px-2" : "px-4"}`}
                   style={navLinkStyle(href, isPremium)}
                   title={compact ? label : undefined}
                 >
                   <Icon className="w-5 h-5 shrink-0" />
-                  {!compact && <span>{label}</span>}
+                  {!compact && <span className="text-sm font-semibold">{label}</span>}
                 </Link>
               ))}
             </div>
@@ -293,47 +295,60 @@ export function AppDashboardSidebar() {
           )}
         </nav>
         
-        {/* Subscription Advertisement - только для студентов без премиум подписки */}
-        {!compact && user?.role === "student" && user?.is_premium !== 1 && (
-          <div className="px-3 pb-4 mt-auto">
-            <Link
-              href="/app/premium"
-              className="group relative block rounded-xl overflow-hidden transition-all duration-300 hover:shadow-lg"
-              style={{
-                background: "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)",
-                border: "1px solid rgba(255, 255, 255, 0.2)",
-              }}
-            >
-              {/* Decorative background pattern */}
-              <div className="absolute inset-0 opacity-10">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-white rounded-full blur-3xl" />
-                <div className="absolute bottom-0 left-0 w-24 h-24 bg-white rounded-full blur-2xl" />
-              </div>
-              
-              {/* Content */}
-              <div className="relative p-5">
-                {/* Icon */}
-                <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center mb-3">
-                  <Sparkles className="w-5 h-5 text-yellow-300" />
+        {/* Mobile Utility Sections */}
+        {(!compact || mobileOpen) && (
+          <div className="lg:hidden px-3 pb-6 space-y-4">
+            <div className={`pt-4 border-t ${theme === "dark" ? "border-white/10" : "border-gray-100"}`}>
+               <p className="px-4 text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">
+                 {t("language")}
+               </p>
+               <div className="grid grid-cols-3 gap-1 px-2">
+                 {(["ru", "kk", "en"] as const).map((l) => (
+                   <button
+                     key={l}
+                     type="button"
+                     onClick={() => setLang(l)}
+                     className={`py-2 rounded-lg text-xs font-bold transition-all ${
+                       lang === l
+                         ? "bg-[var(--qit-primary)] text-white shadow-md shadow-[var(--qit-primary)]/20"
+                         : "bg-gray-50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-400"
+                     }`}
+                   >
+                     {l.toUpperCase()}
+                   </button>
+                 ))}
+               </div>
+            </div>
+
+            <div className="px-2">
+              <button
+                type="button"
+                onClick={toggleTheme}
+                className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-800/50 text-gray-700 dark:text-gray-200 transition-all font-medium active-tap"
+              >
+                <div className="flex items-center gap-3">
+                  {theme === "light" ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
+                  <span className="text-sm">{theme === "light" ? t("darkTheme") : t("lightTheme")}</span>
                 </div>
-                
-                {/* Text */}
-                <h4 className="text-white font-bold text-base mb-1.5">
-                  {t("unlockFullVersion")}
-                </h4>
-                <p className="text-white/90 text-xs mb-4">
-                  {t("moreMetrics")}
-                </p>
-                
-                {/* CTA Button */}
-                <button
-                  className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-black/20 hover:bg-black/30 backdrop-blur-sm text-white font-semibold text-xs transition-all duration-200 group-hover:gap-3"
-                >
-                  <span>{t("freeTrial")}</span>
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                </button>
-              </div>
-            </Link>
+                <div className={`w-8 h-4 rounded-full relative transition-colors ${theme === "dark" ? "bg-[var(--qit-secondary)]" : "bg-gray-300"}`}>
+                  <div className={`absolute top-1 w-2 h-2 rounded-full bg-white transition-all ${theme === "dark" ? "right-1" : "left-1"}`} />
+                </div>
+              </button>
+            </div>
+
+            <div className="px-2">
+              <button
+                type="button"
+                onClick={() => {
+                  logout();
+                  router.push("/");
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/10 font-bold text-sm active-tap"
+              >
+                <LogOut className="w-5 h-5" />
+                <span>{t("logout")}</span>
+              </button>
+            </div>
           </div>
         )}
       </>
@@ -364,7 +379,7 @@ export function AppDashboardSidebar() {
             >
               Q
             </div>
-            {!collapsed && <span className="truncate">{t("platformName")}</span>}
+            {!collapsed && <span className="whitespace-nowrap">{t("platformName")}</span>}
           </button>
           {!collapsed && (
             <button
@@ -387,76 +402,62 @@ export function AppDashboardSidebar() {
         </div>
       </aside>
 
-      {/* Mobile header */}
-      <header className="lg:hidden fixed top-0 left-0 right-0 z-50 h-16 flex items-center justify-between px-4 backdrop-blur-md" style={{ background: theme === "dark" ? "rgba(11, 15, 25, 0.95)" : "rgba(248, 250, 252, 0.95)", borderBottom: theme === "dark" ? "1px solid rgba(255, 255, 255, 0.1)" : "1px solid rgba(0, 0, 0, 0.08)" }}>
+      {/* Mobile header - Simplified */}
+      <header className="lg:hidden fixed top-0 left-0 right-0 z-50 h-16 flex items-center justify-between px-4 glass-nav">
         <button
           type="button"
           onClick={() => setMobileOpen(!mobileOpen)}
-          className="p-2 rounded-lg hover:opacity-80"
-          style={{ color: theme === "dark" ? "#FFFFFF" : "#0F172A" }}
+          className="p-2 -ml-2 rounded-xl active-tap text-gray-700 dark:text-white bg-white/50 dark:bg-white/10"
           aria-label="Menu"
         >
           <Menu className="w-6 h-6" />
         </button>
-        <Link href="/app" className="flex items-center gap-2">
+        
+        <Link href="/app" className="flex items-center gap-2 group">
           <div
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-xs animate-[spin_3s_linear_infinite]"
+            className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-sm shadow-lg group-active:scale-95 transition-transform"
             style={{ background: "var(--qit-gradient-3)" }}
           >
             Q
           </div>
-          <span className="font-semibold text-gray-800 dark:text-white">{t("platformName")}</span>
+          <span className="font-bold text-gray-900 dark:text-white tracking-tight">
+            {t("platformName")}
+          </span>
         </Link>
-        <div className="flex items-center gap-1">
-          <div className="relative" ref={langRef}>
-            <button
-              type="button"
-              onClick={() => setLangOpen(!langOpen)}
-              className="flex items-center gap-1 px-2 py-1.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-xs font-medium"
-              title={t("language")}
-            >
-              <Globe className="w-4 h-4" />
-              <span>{lang.toUpperCase()}</span>
-            </button>
-            {langOpen && (
-              <div className="absolute right-0 top-full mt-1 py-1 w-36 rounded-xl shadow-xl z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600">
-                {(["ru", "kk", "en"] as const).map((l) => (
-                  <button
-                    key={l}
-                    type="button"
-                    onClick={() => { setLang(l); setLangOpen(false); }}
-                    className={`w-full px-3 py-2 text-left text-sm ${lang === l ? "font-medium text-[var(--qit-accent)] dark:text-[var(--qit-accent)]" : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"}`}
-                  >
-                    {t(l === "ru" ? "russian" : l === "kk" ? "kazakh" : "english")}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          <button type="button" onClick={toggleTheme} className="p-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800" title={theme === "light" ? t("darkTheme") : t("lightTheme")}>
-            {theme === "light" ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
-          </button>
+        
+        <div className="flex items-center">
           <div className="relative" ref={notifRef}>
             <button
               type="button"
               onClick={() => setNotifOpen(!notifOpen)}
-              className="p-2 rounded-lg text-gray-600 dark:text-gray-300"
+              className="p-2 -mr-2 rounded-xl active-tap text-gray-700 dark:text-white"
             >
               <div className="relative">
-                <Bell className="w-5 h-5" />
+                <Bell className="w-6 h-6" />
                 {unread.length > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 text-xs bg-red-500 text-white rounded-full flex items-center justify-center">
+                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 text-[10px] bg-red-500 text-white rounded-full flex items-center justify-center border-2 border-white dark:border-gray-900">
                     {unread.length > 9 ? "9+" : unread.length}
                   </span>
                 )}
               </div>
             </button>
             {notifOpen && (
-              <div className="absolute right-0 top-full mt-1 w-72 rounded-xl shadow-xl z-50 max-h-64 overflow-auto bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600">
+              <div className="absolute right-0 top-full mt-2 w-72 max-w-[calc(100vw-2rem)] rounded-2xl shadow-2xl z-50 max-h-96 overflow-auto bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                <div className="p-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between sticky top-0 bg-inherit z-10">
+                  <h3 className="font-bold text-sm">{t("notifications")}</h3>
+                  {unread.length > 0 && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 font-bold uppercase">
+                      New
+                    </span>
+                  )}
+                </div>
                 {notifications.length === 0 ? (
-                  <p className="p-4 text-sm text-gray-500 dark:text-gray-400">
-                    {t("noNotifications")}
-                  </p>
+                  <div className="p-8 text-center">
+                    <Bell className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {t("noNotifications")}
+                    </p>
+                  </div>
                 ) : (
                   notifications.slice(0, 15).map((n) => {
                     const { title, message } = getLocalizedNotificationText(n, t);
@@ -465,48 +466,16 @@ export function AppDashboardSidebar() {
                         key={n.id}
                         type="button"
                         onClick={() => markRead(n.id, n.link)}
-                        className={`w-full text-left px-4 py-3 border-b border-gray-200 dark:border-gray-600 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${!n.is_read ? "bg-[#ff4081]/5 dark:bg-[#ff4081]/10" : ""}`}
+                        className={`w-full text-left px-4 py-3 border-b border-gray-100 dark:border-gray-700 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${!n.is_read ? "bg-[var(--qit-primary)]/5 dark:bg-[var(--qit-primary)]/10" : ""}`}
                       >
-                        <p className="font-medium text-sm text-gray-800 dark:text-gray-200">{title}</p>
-                        <p className="text-xs truncate text-gray-600 dark:text-gray-400">
+                        <p className="font-bold text-xs text-gray-900 dark:text-gray-200 mb-0.5">{title}</p>
+                        <p className="text-[11px] text-gray-600 dark:text-gray-400 line-clamp-2 leading-relaxed">
                           {message}
                         </p>
                       </button>
                     );
                   })
                 )}
-              </div>
-            )}
-          </div>
-          <div className="relative" ref={userMenuRef}>
-            <button
-              type="button"
-              onClick={() => setUserMenuOpen(!userMenuOpen)}
-              className="flex items-center gap-2 p-2 rounded-lg"
-            >
-              <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-semibold" style={{ background: "var(--qit-gradient-3)" }}>
-                {(user?.full_name || "U")[0].toUpperCase()}
-              </div>
-              <ChevronDown className={`w-4 h-4 transition-transform ${userMenuOpen ? "rotate-180" : ""}`} />
-            </button>
-            {userMenuOpen && (
-              <div className="absolute right-0 top-full mt-1 py-1 w-48 rounded-xl shadow-xl z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600">
-                <Link href="/app/profile" onClick={() => setUserMenuOpen(false)} className="flex items-center gap-2 px-4 py-2.5 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-t-xl transition-colors">
-                  <User className="w-4 h-4" />
-                  {t("profile")}
-                </Link>
-                <button
-                  type="button"
-                  onClick={() => {
-                    logout();
-                    router.push("/");
-                    setUserMenuOpen(false);
-                  }}
-                  className="w-full flex items-center gap-2 px-4 py-2.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-b-xl transition-colors"
-                >
-                  <LogOut className="w-4 h-4" />
-                  {t("logout")}
-                </button>
               </div>
             )}
           </div>
@@ -522,20 +491,23 @@ export function AppDashboardSidebar() {
         />
       )}
       <aside
-        className={`lg:hidden fixed top-0 left-0 z-50 h-full w-72 flex flex-col transition-transform duration-300 shadow-xl ${mobileOpen ? "translate-x-0" : "-translate-x-full"
+        className={`lg:hidden fixed top-0 left-0 z-50 h-full w-[min(18rem,85vw)] flex flex-col transition-transform duration-300 shadow-xl ${mobileOpen ? "translate-x-0" : "-translate-x-full"
           }`}
         style={{ 
           background: theme === "dark" ? "#0B0F19" : "#FFFFFF",
           borderRight: theme === "dark" ? "1px solid rgba(255, 255, 255, 0.08)" : "1px solid rgba(0, 0, 0, 0.08)"
         }}
       >
-        <div className="flex items-center justify-between h-16 px-4" style={{ borderBottom: theme === "dark" ? "1px solid rgba(255, 255, 255, 0.1)" : "1px solid rgba(0, 0, 0, 0.08)" }}>
-          <span className="font-semibold" style={{ color: theme === "dark" ? "#FFFFFF" : "#0F172A" }}>{t("platformName")}</span>
-          <button type="button" onClick={() => setMobileOpen(false)} className="p-2 hover:opacity-80" style={{ color: theme === "dark" ? "rgba(255, 255, 255, 0.7)" : "rgba(0, 0, 0, 0.6)" }}>
-            ×
+        <div className="flex items-center justify-between h-16 px-5 border-b border-gray-100 dark:border-gray-800 min-w-0">
+           <div className="flex items-center gap-2 min-w-0">
+              <div className="w-8 h-8 shrink-0 rounded-lg flex items-center justify-center text-white font-bold text-xs" style={{ background: "var(--qit-gradient-3)" }}>Q</div>
+              <span className="font-bold text-sm truncate">{t("platformName")}</span>
+           </div>
+          <button type="button" onClick={() => setMobileOpen(false)} className="p-2.5 -mr-2 rounded-xl active-tap text-gray-400 bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 shadow-sm">
+            <X className="w-5 h-5" />
           </button>
         </div>
-        <NavContent />
+        <NavContent compact={false} />
       </aside>
     </>
   );

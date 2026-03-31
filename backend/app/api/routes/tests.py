@@ -281,21 +281,30 @@ def submit_test(
 
     if passed and test.is_final:
         from datetime import datetime, timezone
-        cert = Certificate(
-            user_id=current_user.id,
-            course_id=test.course_id,
-            certificate_url=CERTIFICATE_SAMPLE_URL,
-            final_score=score,
-        )
-        db.add(cert)
-        n_cert = Notification(
-            user_id=current_user.id,
-            type="certificate_issued",
-            title="Сертификат берілді!",
-            message=f"Сіз курсты сәтті аяқтадыңыз. Сертификатты жүктеп алыңыз.",
-            link="/app/profile",
-        )
-        db.add(n_cert)
+        existing_cert = db.query(Certificate).filter(
+            Certificate.user_id == current_user.id,
+            Certificate.course_id == test.course_id,
+        ).first()
+        if existing_cert:
+            # Обновляем оценку если пересдал лучше
+            if score > (float(existing_cert.final_score) if existing_cert.final_score else 0):
+                existing_cert.final_score = score
+        else:
+            cert = Certificate(
+                user_id=current_user.id,
+                course_id=test.course_id,
+                certificate_url=CERTIFICATE_SAMPLE_URL,
+                final_score=score,
+            )
+            db.add(cert)
+            n_cert = Notification(
+                user_id=current_user.id,
+                type="certificate_issued",
+                title="Сертификат берілді!",
+                message=f"Сіз курсты сәтті аяқтадыңыз. Сертификатты жүктеп алыңыз.",
+                link="/app/profile",
+            )
+            db.add(n_cert)
 
     # Coins за пройденный тест (шкала: 100%→500, 90%→400, 80%→300, 70%→200), один раз за тест
     if passed:

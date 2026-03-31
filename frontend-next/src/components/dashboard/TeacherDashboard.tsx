@@ -7,22 +7,10 @@ import { api } from "@/api/client";
 import { Users, BookOpen, UserPlus, ArrowUpRight, ArrowDownRight, TrendingUp } from "lucide-react";
 import { SparklineChart } from "./SparklineChart";
 import { WelcomeWidget } from "./WelcomeWidget";
-import { CalendarWidget } from "./CalendarWidget";
 import { ActivityFeedWidget } from "./ActivityFeedWidget";
+import { UpcomingDeadlinesWidget } from "./UpcomingDeadlinesWidget";
 import { useTheme } from "@/context/ThemeContext";
 import { getGlassCardStyle, getTextColors } from "@/utils/themeStyles";
-
-// Mock sparkline data generator - в реальности это будет из API
-const generateSparklineData = (baseValue: number, trend: "up" | "down" | "neutral" = "neutral"): number[] => {
-  const data: number[] = [];
-  let current = baseValue;
-  const direction = trend === "up" ? 1 : trend === "down" ? -1 : 0;
-  for (let i = 0; i < 7; i++) {
-    current += (Math.random() * 2 - 1) + direction * 0.5;
-    data.push(Math.max(0, Math.round(current)));
-  }
-  return data;
-};
 
 export function TeacherDashboard() {
   const { t } = useLanguage();
@@ -38,6 +26,12 @@ export function TeacherDashboard() {
         groups_count: number;
         pending_submissions_count: number;
         students_count: number;
+        groups_trend_prev: number[];
+        groups_trend_current: number[];
+        students_trend_prev: number[];
+        students_trend_current: number[];
+        groups_change_percent: number;
+        students_change_percent: number;
       }>("/teacher/stats");
       return data;
     },
@@ -47,11 +41,10 @@ export function TeacherDashboard() {
   const pendingCount = stats?.pending_submissions_count ?? 0;
   const studentsCount = stats?.students_count ?? 0;
 
-  // Mock trend data - в реальности это будет из API
-  const groupsTrend = generateSparklineData(groupsCount, "up");
-  const studentsTrend = generateSparklineData(studentsCount, "up");
-  const groupsChange = groupsTrend[groupsTrend.length - 1] - groupsTrend[0];
-  const studentsChange = studentsTrend[studentsTrend.length - 1] - studentsTrend[0];
+  const groupsTrend = stats?.groups_trend_current ?? [];
+  const studentsTrend = stats?.students_trend_current ?? [];
+  const groupsChangePercent = stats?.groups_change_percent ?? 0;
+  const studentsChangePercent = stats?.students_change_percent ?? 0;
 
   const statCards = [
     {
@@ -60,8 +53,8 @@ export function TeacherDashboard() {
       label: t("teacherStatsGroups"),
       gradient: "linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%)",
       sparklineData: groupsTrend,
-      change: groupsChange,
-      changePercent: groupsChange > 0 ? Math.round((groupsChange / groupsCount) * 100) : 0,
+      change: groupsChangePercent,
+      changePercent: groupsChangePercent,
       color: "#3B82F6",
       bgGlow: isDark ? "rgba(59, 130, 246, 0.15)" : "rgba(59, 130, 246, 0.08)",
     },
@@ -70,7 +63,7 @@ export function TeacherDashboard() {
       value: pendingCount,
       label: t("teacherStatsPending"),
       gradient: "linear-gradient(135deg, #F59E0B 0%, #EF4444 100%)",
-      sparklineData: generateSparklineData(pendingCount, "neutral"),
+      sparklineData: [], // тренд для проверок пока не считаем
       change: 0,
       changePercent: 0,
       color: "#F59E0B",
@@ -83,8 +76,8 @@ export function TeacherDashboard() {
       label: t("teacherStatsStudents"),
       gradient: "linear-gradient(135deg, #10B981 0%, #06B6D4 100%)",
       sparklineData: studentsTrend,
-      change: studentsChange,
-      changePercent: studentsChange > 0 ? Math.round((studentsChange / studentsCount) * 100) : 0,
+      change: studentsChangePercent,
+      changePercent: studentsChangePercent,
       color: "#10B981",
       bgGlow: isDark ? "rgba(16, 185, 129, 0.15)" : "rgba(16, 185, 129, 0.08)",
     },
@@ -110,7 +103,7 @@ export function TeacherDashboard() {
   ];
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] xl:grid-cols-[1fr_380px] gap-6 lg:gap-8">
+    <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] xl:grid-cols-[1fr_380px] gap-6 lg:gap-8 items-start">
       {/* Main content */}
       <div className="min-w-0 space-y-6">
         {/* Welcome Widget */}
@@ -270,12 +263,14 @@ export function TeacherDashboard() {
             );
           })}
         </div>
+        
+        {/* Upcoming Deadlines - moved from sidebar to bottom with grid layout */}
+        <UpcomingDeadlinesWidget layout="grid" />
       </div>
 
       {/* Right Sidebar */}
       <aside className="lg:order-none order-last">
         <div className="lg:sticky lg:top-24 space-y-6">
-          <CalendarWidget />
           <ActivityFeedWidget />
         </div>
       </aside>

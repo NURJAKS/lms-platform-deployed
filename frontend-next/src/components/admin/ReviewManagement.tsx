@@ -10,6 +10,7 @@ import { Star, Check, X, MessageCircle, Sparkles, Trash2, Filter } from "lucide-
 import { AnimatedNumber } from "./AnimatedNumber";
 import { StaggeredAnimation } from "./StaggeredAnimation";
 import { GlareEffect } from "./GlareEffect";
+import { DeleteConfirmButton } from "@/components/ui/DeleteConfirmButton";
 
 interface Review {
     id: number;
@@ -90,7 +91,6 @@ export default function ReviewManagement() {
     };
 
     const handleDelete = async (id: number) => {
-        if (!confirm(t("reviewDeleteConfirm"))) return;
         await apiClient.delete(`/admin/reviews/${id}`);
         fetchReviews();
         fetchStats();
@@ -281,13 +281,15 @@ export default function ReviewManagement() {
                                         >
                                             <MessageCircle className="w-4 h-4" />
                                         </button>
-                                        <button
-                                            onClick={() => handleDelete(r.id)}
-                                            className="p-2.5 rounded-xl bg-red-100 dark:bg-red-600/20 text-red-700 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-600/30 border border-red-300 dark:border-red-500/30 transition-colors"
-                                            title={t("reviewDelete")}
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </button>
+                                        <DeleteConfirmButton
+                                            onDelete={() => handleDelete(r.id)}
+                                            hideText={true}
+                                            title={t("reviewDeleteConfirm")}
+                                            description={t("confirmDelete")}
+                                            variant="ghost"
+                                            size="sm"
+                                            className="p-0 border-0 shadow-none bg-red-100 dark:bg-red-600/20 rounded-xl"
+                                        />
                                     </div>
                                 </div>
                                 {replyId === r.id && (

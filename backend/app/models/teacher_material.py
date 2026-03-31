@@ -17,6 +17,8 @@ class TeacherMaterial(Base):
     description = Column(Text)  # HTML
     video_urls = Column(Text)  # JSON array
     image_urls = Column(Text)  # JSON array
+    attachment_urls = Column(Text)  # JSON array of file URLs
+    attachment_links = Column(Text)  # JSON array of external links
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     teacher = relationship("User", foreign_keys=[teacher_id])

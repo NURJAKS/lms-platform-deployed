@@ -19,6 +19,7 @@ from app.models.assignment_submission import AssignmentSubmission
 from app.models.group_student import GroupStudent
 from app.models.teacher_assignment import TeacherAssignment
 from app.services.coins import add_coins, has_received_coins_for_reason
+from app.models.coin_transaction_log import CoinTransactionLog
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -171,7 +172,6 @@ def _topics_completed_today(db: Session, user_id: int) -> int:
         .count()
     )
 
-
 def _tests_passed_today(db: Session, user_id: int) -> int:
     """Темы/тесты сданные сегодня (is_completed + test_score)."""
     today = date.today()
@@ -187,12 +187,26 @@ def _tests_passed_today(db: Session, user_id: int) -> int:
     )
 
 
+def _theory_coins_earned_today(db: Session, user_id: int) -> int:
+    """Количество наград за теорию (просмотр 90%+ видео) за сегодня."""
+    today = date.today()
+    return (
+        db.query(CoinTransactionLog)
+        .filter(
+            CoinTransactionLog.user_id == user_id,
+            CoinTransactionLog.reason.like("theory_%"),
+            func.date(CoinTransactionLog.created_at) == today,
+            CoinTransactionLog.amount > 0,
+        )
+        .count()
+    )
+
+
 QUEST_DEFS = [
-    {"id": "login", "title_key": "dailyQuestLogin", "target": 5, "points": 5},
-    {"id": "quiz", "title_key": "dailyQuestQuiz", "target": 3, "points": 15},
+    {"id": "login", "title_key": "dailyQuestLogin", "target": 1, "points": 5},
+    {"id": "quiz", "title_key": "dailyQuestQuiz", "target": 1, "points": 15},
     {"id": "watch", "title_key": "dailyQuestWatch", "target": 1, "points": 10},
-    {"id": "topics5", "title_key": "dailyQuestTopics5", "target": 5, "points": 25},
-    {"id": "final_test", "title_key": "dailyQuestFinalTest", "target": 1, "points": 50},
+    {"id": "topics2", "title_key": "dailyQuestTopics2", "target": 2, "points": 25},
 ]
 
 
@@ -206,21 +220,22 @@ def get_daily_quests(
     login_streak = _login_streak_days(db, current_user.id)
     topics_today = _topics_completed_today(db, current_user.id)
     tests_today = _tests_passed_today(db, current_user.id)
+    theory_today = _theory_coins_earned_today(db, current_user.id)
 
     result = []
     for q in QUEST_DEFS:
         qid = q["id"]
         target = q["target"]
         if qid == "login":
-            progress = min(login_streak, target)
-            completed = login_streak >= target
+            progress = min(login_streak >= 1, 1) if login_streak >= 1 else 0
+            completed = login_streak >= 1
         elif qid == "quiz":
             progress = min(tests_today, target)
             completed = tests_today >= target
         elif qid == "watch":
-            progress = 1 if topics_today >= 1 else 0
-            completed = topics_today >= 1
-        elif qid == "topics5":
+            progress = 1 if (theory_today >= 1 or topics_today >= 1) else 0
+            completed = (theory_today >= 1 or topics_today >= 1)
+        elif qid == "topics2":
             progress = min(topics_today, target)
             completed = topics_today >= target
         elif qid == "final_test":
@@ -274,15 +289,16 @@ def claim_daily_quest(
     login_streak = _login_streak_days(db, current_user.id)
     topics_today = _topics_completed_today(db, current_user.id)
     tests_today = _tests_passed_today(db, current_user.id)
+    theory_today = _theory_coins_earned_today(db, current_user.id)
 
     completed = False
     if quest_id == "login":
-        completed = login_streak >= qdef["target"]
+        completed = login_streak >= 1
     elif quest_id == "quiz":
         completed = tests_today >= qdef["target"]
     elif quest_id == "watch":
-        completed = topics_today >= 1
-    elif quest_id == "topics5":
+        completed = (theory_today >= 1 or topics_today >= 1)
+    elif quest_id == "topics2":
         completed = topics_today >= qdef["target"]
     elif quest_id == "final_test":
         today = date.today()
@@ -322,10 +338,10 @@ def get_learning_activity_sources(
     period_start = today - timedelta(days=days)
     previous_period_start = period_start - timedelta(days=days)
     
-    # Преобразуем в datetime для сравнения с timezone-aware полями
-    period_start_dt = datetime.combine(period_start, datetime.min.time(), tzinfo=timezone.utc)
-    period_end_dt = datetime.combine(today + timedelta(days=1), datetime.min.time(), tzinfo=timezone.utc)
-    previous_period_start_dt = datetime.combine(previous_period_start, datetime.min.time(), tzinfo=timezone.utc)
+    # Преобразуем в datetime для сравнения с полями базы (наивные в SQLite)
+    period_start_dt = datetime.combine(period_start, datetime.min.time())
+    period_end_dt = datetime.combine(today + timedelta(days=1), datetime.min.time())
+    previous_period_start_dt = datetime.combine(previous_period_start, datetime.min.time())
     
     user_id = current_user.id
     
@@ -500,8 +516,8 @@ def get_weekly_activity(
         day_activity[d] = {"courses": 0, "assignments": 0, "tests": 0}
     
     # Курсы (завершенные темы)
-    start_dt = datetime.combine(start_date, datetime.min.time(), tzinfo=timezone.utc)
-    end_dt = datetime.combine(today + timedelta(days=1), datetime.min.time(), tzinfo=timezone.utc)
+    start_dt = datetime.combine(start_date, datetime.min.time())
+    end_dt = datetime.combine(today + timedelta(days=1), datetime.min.time())
     
     progress_rows = db.query(StudentProgress).filter(
         StudentProgress.user_id == user_id,
@@ -727,14 +743,15 @@ def get_upcoming_deadlines(
     if not group_ids:
         return []
     
-    # Получаем задания с дедлайнами, которые еще не прошли
-    now = datetime.now(timezone.utc)
+    # Получаем задания с дедлайнами, которые еще не прошли и не закрыты вручную
+    now = datetime.now() # Naive comparison for SQLite
     assignments = (
         db.query(TeacherAssignment)
         .filter(
             TeacherAssignment.group_id.in_(group_ids),
             TeacherAssignment.deadline.isnot(None),
             TeacherAssignment.deadline >= now,
+            TeacherAssignment.closed_at.is_(None),
         )
         .order_by(TeacherAssignment.deadline.asc())
         .limit(limit)

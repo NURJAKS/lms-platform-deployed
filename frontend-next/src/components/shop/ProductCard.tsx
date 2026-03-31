@@ -17,9 +17,11 @@ type ShopItem = {
   title: string;
   description: string | null;
   price_coins: number;
+  original_price?: number;
   category: string;
   icon_name: string | null;
   image_url: string | null;
+  has_premium_discount?: boolean;
 };
 
 interface ProductCardProps {
@@ -47,7 +49,7 @@ export function ProductCard({
   IconComponent,
   index = 0,
 }: ProductCardProps) {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const { theme } = useTheme();
   const textColors = getTextColors(theme);
   const [isHovered, setIsHovered] = useState(false);
@@ -71,7 +73,7 @@ export function ProductCard({
         onMouseLeave={() => setIsHovered(false)}
       >
         <motion.div
-          className="rounded-xl p-5 flex flex-col cursor-pointer backdrop-blur-sm relative z-10 h-full"
+          className="rounded-xl p-4 sm:p-5 flex flex-col cursor-pointer backdrop-blur-sm relative z-10 h-full"
           onClick={() => onSelect(item)}
           role="button"
           tabIndex={0}
@@ -135,12 +137,12 @@ export function ProductCard({
               </motion.div>
               <div className="min-w-0 flex-1">
                 <motion.h3
-                  className="font-semibold truncate text-base mb-1"
+                  className="font-semibold line-clamp-2 sm:line-clamp-1 text-base mb-1 mobile-safe-text"
                   style={{ color: textColors.primary }}
                   whileHover={{ x: 2 }}
                   transition={{ duration: 0.2 }}
                 >
-                  {getLocalizedShopItemTitle(item as any, t)}
+                  {getLocalizedShopItemTitle(item as any, lang, t)}
                 </motion.h3>
                 <motion.div
                   className="flex items-center gap-1.5"
@@ -154,14 +156,28 @@ export function ProductCard({
                   >
                     <Image src="/icons/coin.png" alt="" width={18} height={18} />
                   </motion.div>
-                  <motion.span
-                    className="font-bold text-lg"
-                    style={{ color: "#FBBF24" }}
-                    animate={isHovered ? { scale: [1, 1.1, 1] } : {}}
-                    transition={{ duration: 0.4 }}
-                  >
-                    {item.price_coins}
-                  </motion.span>
+                  <div className="flex flex-col">
+                    <div className="flex items-center gap-1.5">
+                      <motion.span
+                        className="font-bold text-lg leading-none"
+                        style={{ color: "#FBBF24" }}
+                        animate={isHovered ? { scale: [1, 1.1, 1] } : {}}
+                        transition={{ duration: 0.4 }}
+                      >
+                        {item.price_coins}
+                      </motion.span>
+                      {item.has_premium_discount && item.original_price && (
+                        <span className="text-xs line-through opacity-50 font-medium" style={{ color: textColors.secondary }}>
+                          {item.original_price}
+                        </span>
+                      )}
+                    </div>
+                    {item.has_premium_discount && (
+                      <span className="text-[10px] font-bold text-pink-500 uppercase tracking-wider leading-none mt-1">
+                        Premium -15%
+                      </span>
+                    )}
+                  </div>
                 </motion.div>
               </div>
             </motion.div>
@@ -172,7 +188,7 @@ export function ProductCard({
                 onToggleFavorite(item);
               }}
               className={cn(
-                "p-2 rounded-xl shrink-0 relative overflow-hidden",
+                "p-2.5 rounded-xl shrink-0 relative overflow-hidden min-h-[2.5rem] min-w-[2.5rem]",
                 isFavorite
                   ? "bg-gradient-to-br from-red-500/20 to-pink-500/20 text-red-500"
                   : "bg-transparent text-gray-400 hover:text-red-500"
@@ -217,13 +233,13 @@ export function ProductCard({
           {/* Description */}
           {item.description && (
             <motion.p
-              className="text-sm mb-4 flex-1 line-clamp-2 leading-relaxed"
+              className="text-sm mb-4 flex-1 line-clamp-2 leading-relaxed mobile-safe-text"
               style={{ color: textColors.secondary }}
               initial={false}
               animate={{ opacity: isHovered ? 1 : 0.8 }}
               transition={{ duration: 0.2 }}
             >
-              {getLocalizedShopItemDesc(item as any, t)}
+              {getLocalizedShopItemDesc(item as any, lang, t)}
             </motion.p>
           )}
 
@@ -239,7 +255,7 @@ export function ProductCard({
               }}
               disabled={!canBuy || isPurchasing}
               className={cn(
-                "flex-1 py-2.5 rounded-xl font-semibold text-sm relative overflow-hidden",
+                "flex-1 py-2.5 rounded-xl font-semibold text-sm relative overflow-hidden min-h-[2.75rem]",
                 canBuy
                   ? "text-white shadow-lg shadow-pink-500/30"
                   : "cursor-not-allowed",
@@ -304,7 +320,7 @@ export function ProductCard({
               }}
               disabled={!canBuy}
               className={cn(
-                "px-4 py-2.5 rounded-xl relative overflow-hidden",
+                "px-4 py-2.5 rounded-xl relative overflow-hidden min-h-[2.75rem]",
                 canBuy
                   ? "bg-gradient-to-br from-blue-500/10 to-cyan-500/10 text-blue-500 hover:from-blue-500/20 hover:to-cyan-500/20 shadow-md shadow-blue-500/10"
                   : "bg-[rgba(0,0,0,0.05)] text-gray-400 cursor-not-allowed"

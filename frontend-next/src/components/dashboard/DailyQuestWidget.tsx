@@ -59,14 +59,14 @@ export function DailyQuestWidget() {
   return (
     <div className="h-full flex flex-col rounded-xl border-0 shadow-sm overflow-hidden" style={glassStyle}>
       <div
-        className="p-3 text-white flex items-center justify-between"
+        className="p-3.5 text-white flex items-center justify-between"
         style={{ background: "linear-gradient(135deg, #14b8a6 0%, #3b82f6 100%)" }}
       >
-        <h3 className="font-bold text-sm">{t("dailyQuest")}</h3>
+        <h3 className="font-bold text-sm sm:text-base">{t("dailyQuest")}</h3>
       </div>
-      <div className="flex-1 p-2.5 space-y-2">
-        {quests.slice(0, 3).map((q) => (
-          <div key={q.id} className="p-2.5 rounded-lg" style={{ background: theme === "dark" ? "rgba(30, 41, 59, 0.4)" : "rgba(0, 0, 0, 0.02)" }}>
+      <div className="flex-1 p-3 space-y-2.5 overflow-y-auto custom-scrollbar">
+        {quests.map((q) => (
+          <div key={q.id} className="p-3 rounded-lg" style={{ background: theme === "dark" ? "rgba(30, 41, 59, 0.4)" : "rgba(0, 0, 0, 0.02)" }}>
             <div className="flex items-start gap-2.5">
               {q.completed || q.claimed ? (
                 <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" style={{ color: "#10b981" }} />
@@ -74,10 +74,10 @@ export function DailyQuestWidget() {
                 <Circle className="w-4 h-4 shrink-0 mt-0.5" style={{ color: textColors.secondary }} />
               )}
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-medium line-clamp-1" style={{ color: textColors.primary }}>
+                <p className="text-sm font-medium line-clamp-2 sm:line-clamp-1 leading-snug" style={{ color: textColors.primary }}>
                   {t(q.title_key as "dailyQuestLogin") || q.title}
                 </p>
-                <p className="text-xs mt-0.5" style={{ color: textColors.secondary }}>
+                <p className="text-xs mt-1" style={{ color: textColors.secondary }}>
                   {q.progress}/{q.target} · +{q.points} {t("points")}
                 </p>
                 <div className="mt-1.5 h-1 rounded-full overflow-hidden" style={{ background: theme === "dark" ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)" }}>
@@ -97,7 +97,7 @@ export function DailyQuestWidget() {
                   <button
                     type="button"
                     disabled
-                    className="mt-2 text-xs font-medium py-1 px-2 rounded-lg cursor-not-allowed"
+                    className="mt-2 inline-flex items-center justify-center min-h-[2.25rem] text-xs font-medium py-1.5 px-3 rounded-lg cursor-not-allowed"
                     style={{ border: theme === "dark" ? "1px solid rgba(255, 255, 255, 0.08)" : "1px solid rgba(0, 0, 0, 0.1)", color: textColors.secondary }}
                   >
                     {t("claimReward")}
@@ -107,7 +107,7 @@ export function DailyQuestWidget() {
                     type="button"
                     onClick={() => handleClaim(q.id)}
                     disabled={claiming === q.id}
-                    className="mt-2 text-xs font-medium py-1 px-2 rounded-lg text-white hover:opacity-90 disabled:opacity-50"
+                    className="mt-2 inline-flex items-center justify-center min-h-[2.25rem] text-xs font-medium py-1.5 px-3 rounded-lg text-white hover:opacity-90 disabled:opacity-50"
                     style={{ background: "linear-gradient(135deg, #14b8a6 0%, #3b82f6 100%)" }}
                   >
                     {claiming === q.id ? "..." : t("claimReward")}

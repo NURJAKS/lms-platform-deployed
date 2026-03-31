@@ -1,20 +1,35 @@
 services:
+  db:
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres_password_123
+      POSTGRES_DB: education_platform
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
   backend:
     build: ./backend
+    restart: always
     ports:
       - "8000:8000"
     environment:
-      DATABASE_URL: sqlite:///./data/education.db
+      DATABASE_URL: postgresql://postgres:postgres_password_123@db:5432/education_platform
       SECRET_KEY: change-me-in-production-secret-key-123
+      DEBUG: "False"
+    depends_on:
+      - db
     volumes:
-      # Host uploads so course videos (e.g. course1/intro.mp4) are visible when using Docker
       - ./backend/uploads:/app/uploads
-      - backend_db:/app/data
 
   frontend:
     build:
       context: ./frontend-next
       dockerfile: Dockerfile
+    restart: always
     ports:
       - "3000:3000"
     environment:
@@ -23,4 +38,5 @@ services:
       - backend
 
 volumes:
-  backend_db:
+  postgres_data:
+

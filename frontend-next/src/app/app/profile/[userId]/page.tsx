@@ -5,12 +5,15 @@ import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
+import axios from "axios";
 import { api } from "@/api/client";
 import { useAuthStore } from "@/store/authStore";
 import { useLanguage } from "@/context/LanguageContext";
 import type { TranslationKey } from "@/i18n/translations";
 import { getLocalizedCourseTitle } from "@/lib/courseUtils";
-import { User as UserIcon, BookOpen, Award, Trophy, Star, ChevronRight, Phone, Mail, MapPin, Users, GraduationCap, Clock, CheckCircle, ArrowLeft } from "lucide-react";
+import { BookOpen, Award, Trophy, Star, ChevronRight, Users, GraduationCap, Clock, CheckCircle, ArrowLeft, Crown, Medal } from "lucide-react";
+import { ProfilePreviewCard } from "@/components/profile/ProfilePreviewCard";
+import type { SafeProfilePreviewData } from "@/types/profiles";
 
 type CourseProgress = {
   course_id: number;
@@ -26,25 +29,7 @@ type CourseProgress = {
 };
 
 type ProfilePublic = {
-  profile: {
-    id: number;
-    email: string;
-    full_name: string;
-    role: string;
-    photo_url: string | null;
-    description: string | null;
-    phone: string | null;
-    birth_date: string | null;
-    city: string | null;
-    address: string | null;
-    points?: number;
-    parent?: { id: number; full_name: string; email: string };
-    enrollments?: Array<{ course_id: number; course_title: string }>;
-    teacher?: { id: number; full_name: string; email: string };
-    children?: Array<{ id: number; full_name: string; email: string; role: string }>;
-    groups?: Array<{ id: number; name: string }>;
-    students_count?: number;
-  };
+  profile: SafeProfilePreviewData;
   certificates: Array<{ id: number; course_title: string; certificate_url: string; final_score: number | null }>;
   progress_detail: { courses: CourseProgress[] };
   enrollments: Array<{ course_id: number }>;
@@ -54,17 +39,26 @@ export default function UserProfilePage() {
   const { t } = useLanguage();
   const params = useParams();
   const router = useRouter();
-  const userId = Number(params.userId);
-  const { user } = useAuthStore();
+  const rawUserId = params.userId;
+  const userId = typeof rawUserId === "string" ? parseInt(rawUserId, 10) : Number.NaN;
+  const isUserIdValid = Number.isInteger(userId) && userId > 0;
+  const user = useAuthStore((s) => s.user);
+  const token = useAuthStore((s) => s.token);
   const canManageUsers = useAuthStore((s) => s.canManageUsers());
 
-  const { data, isLoading, error } = useQuery({
+  const {
+    data,
+    isPending,
+    isError,
+    error,
+  } = useQuery({
     queryKey: ["profile-public", userId],
     queryFn: async () => {
       const { data: res } = await api.get<ProfilePublic>(`/users/${userId}/profile-public`);
       return res;
     },
-    enabled: !!userId && !Number.isNaN(userId) && user?.id !== userId,
+    enabled: isUserIdValid && !!token && user?.id !== userId,
+    retry: 1,
   });
 
   const { data: leaderboard = [] } = useQuery({
@@ -73,8 +67,18 @@ export default function UserProfilePage() {
       const { data: lb } = await api.get<Array<{ rank: number; user_id: number }>>("/analytics/leaderboard?limit=100");
       return lb;
     },
-    enabled: !!userId && !!data,
+    enabled: isUserIdValid && !!data,
   });
+
+  const { data: topHistory = [] } = useQuery({
+    queryKey: ["top-history", userId],
+    queryFn: async () => {
+      const { data: th } = await api.get<Array<{ date: string; rank: number; amount: number }>>(`/analytics/leaderboard/${userId}/top-history`);
+      return th;
+    },
+    enabled: isUserIdValid,
+  });
+
 
   useEffect(() => {
     if (user && userId === user.id) {
@@ -84,21 +88,42 @@ export default function UserProfilePage() {
 
   if (user && userId === user.id) return null;
 
-  if (isLoading || !data) {
+  if (!isUserIdValid) {
     return (
-      <div className="flex items-center justify-center min-h-[200px]">
-        <div className="animate-spin w-10 h-10 border-2 border-[var(--qit-primary)] border-t-transparent rounded-full" />
+      <div className="text-center py-12">
+        <p className="text-gray-600 dark:text-gray-400 mb-4">{t("error")}</p>
+        <Link href="/app/community" className="text-[var(--qit-primary)] hover:underline">
+          ← {t("communityTitle")}
+        </Link>
       </div>
     );
   }
 
-  if (error) {
+  if (isError) {
+    const isTimeout =
+      axios.isAxiosError(error) &&
+      (error.code === "ECONNABORTED" ||
+        (typeof error.message === "string" && error.message.toLowerCase().includes("timeout")));
+
     return (
       <div className="text-center py-12">
         <p className="text-gray-600 dark:text-gray-400 mb-4">{t("error")}</p>
+        {isTimeout && (
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+            Запрос занял слишком много времени. Попробуйте ещё раз.
+          </p>
+        )}
         <Link href="/app/leaderboard" className="text-[var(--qit-primary)] hover:underline">
           ← {t("leaderboardTitle")}
         </Link>
+      </div>
+    );
+  }
+
+  if (!token || isPending || !data) {
+    return (
+      <div className="flex items-center justify-center min-h-[200px]">
+        <div className="animate-spin w-10 h-10 border-2 border-[var(--qit-primary)] border-t-transparent rounded-full" />
       </div>
     );
   }
@@ -152,34 +177,55 @@ export default function UserProfilePage() {
             </div>
           </div>
         )}
-        <div className="bg-white dark:bg-gray-800 rounded-[20px] shadow-md border border-gray-200 dark:border-gray-700 p-5">
-          <h2 className="font-semibold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
-            <Trophy className="w-5 h-5 text-amber-500" /> {t("profileStats")}
-          </h2>
-          <div className="space-y-3">
-            {userRank && (
+        {u.role === "student" && (
+          <div className="bg-white dark:bg-gray-800 rounded-[20px] shadow-md border border-gray-200 dark:border-gray-700 p-5">
+            <h2 className="font-semibold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
+              <Trophy className="w-5 h-5 text-amber-500" /> {t("profileStats")}
+            </h2>
+            <div className="space-y-3">
+              {userRank && (
+                <div className="flex items-center gap-2">
+                  <Trophy className="w-5 h-5 text-amber-500 shrink-0" />
+                  <span className="text-gray-600 dark:text-gray-400">{t("profileRankPlace")}: <strong className="text-gray-800 dark:text-white">{userRank.rank}</strong></span>
+                </div>
+              )}
               <div className="flex items-center gap-2">
-                <Trophy className="w-5 h-5 text-amber-500 shrink-0" />
-                <span className="text-gray-600 dark:text-gray-400">{t("profileRankPlace")}: <strong className="text-gray-800 dark:text-white">{userRank.rank}</strong></span>
+                <Image src="/icons/coin.png" alt="coins" width={20} height={20} className="shrink-0" />
+                <span className="text-gray-600 dark:text-gray-400">{t("profileCoins")}: <strong className="text-gray-800 dark:text-white">{u.points ?? 0}</strong></span>
               </div>
-            )}
-            <div className="flex items-center gap-2">
-              <Image src="/icons/coin.png" alt="coins" width={20} height={20} className="shrink-0" />
-              <span className="text-gray-600 dark:text-gray-400">{t("profileCoins")}: <strong className="text-gray-800 dark:text-white">{u.points ?? 0}</strong></span>
             </div>
           </div>
-        </div>
-        {badges.length > 0 && (
+        )}
+        {(badges.length > 0 || topHistory.length > 0) && (
           <div className="bg-white dark:bg-gray-800 rounded-[20px] shadow-md border border-gray-200 dark:border-gray-700 p-5">
             <h2 className="font-semibold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
               <Award className="w-5 h-5" /> {t("profileAchievements")}
             </h2>
-            <div className="flex flex-wrap gap-2">
-              {badges.map((b) => (
-                <span key={b.labelKey} className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-sm font-medium ${b.color}`}>
-                  <b.icon className="w-4 h-4" /> {t(b.labelKey)}
-                </span>
-              ))}
+            <div className="flex flex-col gap-3">
+              {topHistory.length > 0 && (
+                <div className="flex flex-col gap-2">
+                  {topHistory.slice(0, 5).map((h, i) => (
+                    <div key={`hist-${i}`} className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 dark:border-gray-700 bg-gradient-to-r from-amber-50/50 to-transparent dark:from-amber-900/10 hover:shadow-md transition-all">
+                      <div className="w-10 h-10 rounded-full flex items-center justify-center bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-inner shrink-0 scale-110">
+                        <Trophy className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-800 dark:text-white">
+                          {t(`profileAchievementTop${h.rank}` as TranslationKey)}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-0.5">{new Date(h.date).toLocaleDateString()}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="flex flex-wrap gap-2">
+                {badges.map((b) => (
+                  <span key={b.labelKey} className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-sm font-medium ${b.color}`}>
+                    <b.icon className="w-4 h-4" /> {t(b.labelKey)}
+                  </span>
+                ))}
+              </div>
             </div>
           </div>
         )}
@@ -212,7 +258,7 @@ export default function UserProfilePage() {
   );
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 lg:gap-8">
+    <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4 sm:gap-6 lg:gap-8">
       <div className="min-w-0">
         <div className="flex flex-wrap gap-4 mb-6">
           {canManageUsers && (
@@ -224,59 +270,39 @@ export default function UserProfilePage() {
             <ArrowLeft className="w-4 h-4" /> {t("leaderboardTitle")}
           </Link>
         </div>
-        <h1 className="text-2xl font-bold text-gray-800 dark:text-white mb-6">{t("profile")}</h1>
-        <div className="bg-white dark:bg-gray-800 rounded-[20px] shadow-lg p-6 mb-6 border border-gray-200 dark:border-gray-700">
-          <div className="flex flex-col items-center text-center mb-8">
-            <div className="w-28 h-28 rounded-2xl bg-[var(--qit-primary)]/10 flex items-center justify-center overflow-hidden shrink-0">
-              {u.photo_url ? <img src={u.photo_url} alt="" className="w-full h-full object-cover" /> : <UserIcon className="w-14 h-14 text-[var(--qit-primary)] dark:text-[#00b0ff]" />}
-            </div>
-            <p className="font-semibold text-gray-800 dark:text-white text-xl mt-2">{u.full_name}</p>
-            <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-1 mt-2 text-gray-500 dark:text-gray-400">
-              <span className="flex items-center gap-1.5 text-sm">
-                <Mail className="w-4 h-4 shrink-0" /> {u.email}
-              </span>
-              {u.phone && (
-                <span className="flex items-center gap-1.5 text-sm">
-                  <Phone className="w-4 h-4 shrink-0" /> {u.phone}
-                </span>
-              )}
-              {(u as { city?: string }).city && (
-                <span className="flex items-center gap-1.5 text-sm">
-                  <MapPin className="w-4 h-4 shrink-0" /> {(u as { city?: string }).city}
-                </span>
-              )}
-              <span className="text-sm capitalize">{u.role}</span>
-            </div>
-          </div>
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-white mb-4 sm:mb-6">{t("profile")}</h1>
+        <div className="mb-6">
+          <ProfilePreviewCard profile={u} />
+        </div>
 
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
             <div className="bg-gray-50 dark:bg-gray-700/50 rounded-[20px] border border-gray-200 dark:border-gray-600 p-4 shadow-sm">
               <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 mb-1">
                 <BookOpen className="w-5 h-5" />
                 <span className="text-sm font-medium">{t("profileEnrolled")}</span>
               </div>
-              <p className="text-2xl font-bold text-gray-800 dark:text-white">{enrollments.length}</p>
+              <p className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-white">{enrollments.length}</p>
             </div>
             <div className="bg-gray-50 dark:bg-gray-700/50 rounded-[20px] border border-gray-200 dark:border-gray-600 p-4 shadow-sm">
               <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 mb-1">
                 <CheckCircle className="w-5 h-5 text-green-500" />
                 <span className="text-sm font-medium">{t("profileCompleted")}</span>
               </div>
-              <p className="text-2xl font-bold text-gray-800 dark:text-white">{completedCount}</p>
+              <p className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-white">{completedCount}</p>
             </div>
             <div className="bg-gray-50 dark:bg-gray-700/50 rounded-[20px] border border-gray-200 dark:border-gray-600 p-4 shadow-sm">
               <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 mb-1">
                 <Clock className="w-5 h-5" />
                 <span className="text-sm font-medium">{t("profileStudyHours")}</span>
               </div>
-              <p className="text-2xl font-bold text-gray-800 dark:text-white">{studyHoursStr}</p>
+              <p className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-white">{studyHoursStr}</p>
             </div>
             <div className="bg-gray-50 dark:bg-gray-700/50 rounded-[20px] border border-gray-200 dark:border-gray-600 p-4 shadow-sm">
               <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 mb-1">
                 <Award className="w-5 h-5 text-amber-500" />
                 <span className="text-sm font-medium">{t("profileCertificates")}</span>
               </div>
-              <p className="text-2xl font-bold text-gray-800 dark:text-white">{certificates.length}</p>
+              <p className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-white">{certificates.length}</p>
             </div>
           </div>
 
@@ -344,7 +370,6 @@ export default function UserProfilePage() {
             </div>
           )}
         </div>
-      </div>
       {rightSidebar}
     </div>
   );

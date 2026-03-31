@@ -3,7 +3,7 @@
 import { motion } from "motion/react";
 import Image from "next/image";
 import Link from "next/link";
-import { Trophy, Medal, Award, Baby } from "lucide-react";
+import { Trophy, Medal, Award, Baby, Crown } from "lucide-react";
 import { SparklesText } from "@/components/ui/sparkles-text";
 import { BorderBeam } from "@/components/ui/border-beam";
 import { useLanguage } from "@/context/LanguageContext";
@@ -176,23 +176,28 @@ export function LeaderboardRow({
             <span title={t("yourChild")}><Baby className="w-4 h-4 text-purple-500 dark:text-purple-400 shrink-0" /></span>
           )}
           {isTopThree && config ? (
-            <SparklesText
-              className={cn("text-base font-semibold", config.colors.text)}
-              colors={config.colors.sparkles}
-              sparklesCount={5}
-            >
-              <Link
-                href={`/app/profile/${row.user_id}`}
-                className="hover:underline"
+            <div className="flex flex-col items-start relative group">
+              {row.rank === 1 && <Crown className="w-4 h-4 text-yellow-500 mb-0.5 absolute -top-3.5 -left-1 rotate-[-15deg] drop-shadow-md z-10 animate-bounce" />}
+              {row.rank === 2 && <Crown className="w-3.5 h-3.5 text-gray-400 mb-0.5 absolute -top-3 -left-1 rotate-[-10deg] drop-shadow-sm z-10" />}
+              {row.rank === 3 && <Crown className="w-3.5 h-3.5 text-orange-400 mb-0.5 absolute -top-3 -left-1 rotate-[-10deg] drop-shadow-sm z-10" />}
+              <SparklesText
+                className={cn("text-base font-semibold relative z-0", config.colors.text)}
+                colors={config.colors.sparkles}
+                sparklesCount={5}
               >
-                {row.full_name}
-              </Link>
-            </SparklesText>
+                <Link
+                  href={`/app/profile/${row.user_id}`}
+                  className="hover:underline"
+                >
+                  {row.full_name}
+                </Link>
+              </SparklesText>
+            </div>
           ) : (
             <Link
               href={`/app/profile/${row.user_id}`}
               className={cn(
-                "hover:underline font-medium",
+                "hover:underline font-medium relative",
                 isChild 
                   ? "text-purple-600 dark:text-purple-400" 
                   : "text-[var(--qit-primary)] dark:text-[#00b0ff]"

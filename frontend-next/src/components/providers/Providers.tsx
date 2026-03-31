@@ -2,23 +2,9 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
-import { GoogleOAuthProvider } from "@react-oauth/google";
-import { LanguageProvider, useLanguage } from "@/context/LanguageContext";
+import { LanguageProvider } from "@/context/LanguageContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { SidebarProvider } from "@/context/SidebarContext";
-
-function GoogleOAuthProviderWithLocale({ children }: { children: React.ReactNode }) {
-  const { lang } = useLanguage();
-  const locale = lang === "kk" ? "kk" : lang === "en" ? "en" : "ru";
-  return (
-    <GoogleOAuthProvider
-      clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ""}
-      locale={locale}
-    >
-      {children}
-    </GoogleOAuthProvider>
-  );
-}
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -41,9 +27,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <LanguageProvider>
-          <GoogleOAuthProviderWithLocale>
-            <SidebarProvider>{children}</SidebarProvider>
-          </GoogleOAuthProviderWithLocale>
+          <SidebarProvider>{children}</SidebarProvider>
         </LanguageProvider>
       </ThemeProvider>
     </QueryClientProvider>

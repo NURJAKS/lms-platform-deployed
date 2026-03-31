@@ -16,6 +16,7 @@ from app.models.enrollment import CourseEnrollment
 from app.models.daily_leaderboard_reward import DailyLeaderboardReward
 from app.models.teacher_assignment import TeacherAssignment
 from app.models.assignment_submission import AssignmentSubmission
+from app.services.export_service import generate_csv_response, generate_xlsx_response
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
@@ -65,14 +66,7 @@ def _leaderboard_data(db: Session, course_id: int | None, limit: int):
     # Формируем список студентов с прогрессом
     ranked_students = []
     for r in rows_with_progress:
-        score = (
-            (float(r.avg_score) if r.avg_score else 0) * 0.5
-            + (float(r.avg_assignment) if r.avg_assignment else 0) * 0.2
-            + (r.courses_done or 0) * 10 * 0.15
-            + (r.activity or 0) * 0.15
-        )
         ranked_students.append({
-            "score": score,
             "user_id": r.id,
             "full_name": r.full_name,
             "email": r.email,
@@ -86,7 +80,6 @@ def _leaderboard_data(db: Session, course_id: int | None, limit: int):
     # Добавляем студентов без прогресса с нулевыми значениями
     for s in students_without_progress:
         ranked_students.append({
-            "score": 0,
             "user_id": s.id,
             "full_name": s.full_name,
             "email": s.email,
@@ -97,8 +90,17 @@ def _leaderboard_data(db: Session, course_id: int | None, limit: int):
             "activity": 0,
         })
     
-    # Сортируем по score (студенты с нулевыми значениями будут в конце)
-    ranked_students.sort(key=lambda x: x["score"], reverse=True)
+    # Сортируем по avg_score (основной критерий) и другим параметрам (разрушение ничьих)
+    ranked_students.sort(
+        key=lambda x: (
+            x["avg_score"],
+            x["avg_assignment"],
+            x["points"],
+            x["courses_done"],
+            x["activity"]
+        ),
+        reverse=True
+    )
     
     # Ограничиваем лимитом и добавляем ранги
     result = []
@@ -135,21 +137,30 @@ def leaderboard_csv(
     course_id: int | None = Query(None),
     limit: int = 100,
 ):
-    import csv
-    import io
     data = _leaderboard_data(db, course_id, limit)
-    output = io.StringIO()
-    writer = csv.writer(output)
-    writer.writerow(["Rank", "User ID", "Full Name", "Email", "Avg Score", "Courses Done", "Activity", "Points"])
-    for r in data:
-        writer.writerow([r["rank"], r["user_id"], r["full_name"], r["email"], r["avg_score"], r["courses_done"], r["activity"], r.get("points", 0)])
-    output.seek(0)
-    csv_content = "\ufeff" + output.getvalue()  # UTF-8 BOM для корректного отображения в Excel
-    return StreamingResponse(
-        iter([csv_content]),
-        media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": "attachment; filename=leaderboard.csv"},
-    )
+    headers = ["Rank", "Full Name", "Email", "Avg Score", "Courses Done", "Activity", "Points"]
+    rows = [
+        [r["rank"], r["full_name"], r["email"], r["avg_score"], r["courses_done"], r["activity"], r.get("points", 0)] 
+        for r in data
+    ]
+    return generate_csv_response(rows, "leaderboard", headers)
+
+
+@router.get("/leaderboard/excel")
+def leaderboard_excel(
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+    course_id: int | None = Query(None),
+    limit: int = 100,
+):
+    data = _leaderboard_data(db, course_id, limit)
+    # Используем более дружелюбные заголовки для Excel
+    headers = ["Rank", "Full Name", "Email", "Avg Score", "Courses Done", "Activity", "Points"]
+    rows = [
+        [r["rank"], r["full_name"], r["email"], r["avg_score"], r["courses_done"], r["activity"], r.get("points", 0)] 
+        for r in data
+    ]
+    return generate_xlsx_response(rows, "leaderboard", headers, sheet_name="Leaderboard")
 
 
 @router.get("/leaderboard/my-last-reward")
@@ -167,6 +178,26 @@ def leaderboard_my_last_reward(
     if not r:
         return None
     return {"date": r.date.isoformat(), "rank": r.rank, "amount": r.amount}
+
+
+@router.get("/leaderboard/{user_id}/top-history")
+def leaderboard_user_top_history(
+    user_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """История попадания юзера в топ-3 лидерборда."""
+    history = (
+        db.query(DailyLeaderboardReward)
+        .filter(DailyLeaderboardReward.user_id == user_id, DailyLeaderboardReward.rank <= 3)
+        .order_by(DailyLeaderboardReward.date.desc())
+        .all()
+    )
+    return [
+        {"date": h.date.isoformat(), "rank": h.rank, "amount": h.amount}
+        for h in history
+    ]
+
 
 
 @router.get("/leaderboard/{user_id}/courses")

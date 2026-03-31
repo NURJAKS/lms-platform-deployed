@@ -21,6 +21,7 @@ class TeacherAssignment(Base):
     attachment_links = Column(Text)  # JSON array of external links
     video_urls = Column(Text)  # JSON array of video URLs (uploaded or YouTube/Vimeo)
     test_id = Column(Integer, ForeignKey("tests.id", ondelete="SET NULL"), nullable=True)
+    closed_at = Column(DateTime(timezone=True), nullable=True)  # manual close by teacher
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     teacher = relationship("User", back_populates="assignments_created")

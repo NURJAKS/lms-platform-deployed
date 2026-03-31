@@ -6,6 +6,7 @@ import { FileText, Save, Trash2, Loader2 } from "lucide-react";
 import { api } from "@/api/client";
 import { useLanguage } from "@/context/LanguageContext";
 import { useAuthStore } from "@/store/authStore";
+import { DeleteConfirmButton } from "@/components/ui/DeleteConfirmButton";
 
 interface TopicNotesProps {
   topicId: number;
@@ -70,11 +71,6 @@ export function TopicNotes({ topicId }: TopicNotesProps) {
     }
   };
 
-  const handleDelete = () => {
-    if (confirm(t("topicNotesDeleteConfirm"))) {
-      deleteMutation.mutate();
-    }
-  };
 
   const handleTextChange = (value: string) => {
     setNoteText(value);
@@ -124,15 +120,15 @@ export function TopicNotes({ topicId }: TopicNotesProps) {
         </div>
         <div className="flex items-center gap-2">
           {noteData?.exists && (
-            <button
-              type="button"
-              onClick={handleDelete}
-              disabled={deleteMutation.isPending}
-              className="px-3 py-1.5 rounded-lg text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50 flex items-center gap-1.5"
-            >
-              <Trash2 className="w-4 h-4" />
-              {t("topicNotesDelete")}
-            </button>
+            <DeleteConfirmButton
+              onDelete={() => deleteMutation.mutate()}
+              isLoading={deleteMutation.isPending}
+              text={t("topicNotesDelete")}
+              title={`${t("topicNotesDelete")}?`}
+              description={t("confirmDelete")}
+              variant="ghost"
+              size="sm"
+            />
           )}
           {hasChanges && (
             <button

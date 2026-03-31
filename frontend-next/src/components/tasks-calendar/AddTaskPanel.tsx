@@ -1,6 +1,7 @@
 "use client";
 
 import { useLanguage } from "@/context/LanguageContext";
+import { getLocalizedCourseTitle, getLocalizedTopicTitle } from "@/lib/courseUtils";
 import { cn } from "@/lib/utils";
 
 type Topic = { id: number; title: string };
@@ -65,7 +66,7 @@ export function AddTaskPanel({
             <option value="">{t("scheduleSelectCourse")}</option>
             {courses.map((c) => (
               <option key={c.id} value={c.id}>
-                {c.title}
+                {getLocalizedCourseTitle(c as any, t)}
               </option>
             ))}
           </select>
@@ -86,7 +87,7 @@ export function AddTaskPanel({
               <option value="">{t("scheduleSelectTopic")}</option>
               {topics.map((topic) => (
                 <option key={topic.id} value={topic.id}>
-                  {topic.title}
+                  {getLocalizedTopicTitle(topic.title, t)}
                 </option>
               ))}
             </select>

@@ -11,6 +11,7 @@ import { useTheme } from "@/context/ThemeContext";
 import { useAuthStore } from "@/store/authStore";
 import { Loader2, Check, X, Copy, UserPlus, ExternalLink, ClipboardList } from "lucide-react";
 import { getLocalizedCourseTitle } from "@/lib/courseUtils";
+import { DeleteConfirmButton } from "@/components/ui/DeleteConfirmButton";
 
 type TeacherGroupOption = {
   id: number;
@@ -145,7 +146,6 @@ export default function AdminApplicationsPage() {
   };
 
   const handleReject = async (appId: number) => {
-    if (!confirm(t("confirmReject"))) return;
     setRejectingId(appId);
     try {
       await api.post(`/admin/applications/${appId}/reject`);
@@ -315,15 +315,14 @@ export default function AdminApplicationsPage() {
                               {approvingId === app.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
                               {t("approve")}
                             </button>
-                            <button
-                              type="button"
-                              onClick={() => handleReject(app.id)}
-                              disabled={rejectingId !== null}
-                              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 text-sm font-medium transition-all shadow-lg shadow-red-500/30 hover:shadow-red-500/40"
-                            >
-                              {rejectingId === app.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <X className="w-4 h-4" />}
-                              {t("reject")}
-                            </button>
+                            <DeleteConfirmButton
+                              onDelete={() => handleReject(app.id)}
+                              isLoading={rejectingId === app.id}
+                              text={t("reject")}
+                              title={`${t("reject")} ${app.full_name}?`}
+                              description={t("confirmReject")}
+                              className="shadow-red-500/30 hover:shadow-red-500/40"
+                            />
                           </div>
                         </td>
                       )}

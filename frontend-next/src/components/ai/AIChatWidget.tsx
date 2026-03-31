@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { useAuthStore } from "@/store/authStore";
 import { useLanguage } from "@/context/LanguageContext";
+import { useSidebar } from "@/context/SidebarContext";
 import Link from "next/link";
 
 export function AIChatWidget() {
@@ -19,6 +20,7 @@ export function AIChatWidget() {
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const isPremium = user?.is_premium === 1;
+  const { mobileOpen } = useSidebar();
 
   const { data: dailyLimit } = useQuery({
     queryKey: ["ai-daily-limit"],
@@ -76,17 +78,17 @@ export function AIChatWidget() {
   if (!token) return null;
 
   return (
-    <>
+    <div className={`transition-opacity duration-300 ${mobileOpen ? "opacity-0 pointer-events-none" : "opacity-100"}`}>
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="fixed bottom-6 right-6 w-14 h-14 rounded-full text-white shadow-lg flex items-center justify-center z-40"
+        className="fixed bottom-[96px] right-4 md:bottom-6 md:right-6 w-12 h-12 md:w-14 md:h-14 rounded-full text-white shadow-lg flex items-center justify-center z-[50] transition-all active:scale-95 hover:scale-105"
         style={{ background: "var(--qit-primary)" }}
       >
-        <MessageCircle className="w-6 h-6" />
+        <MessageCircle className="w-5 h-5 md:w-6 md:h-6" />
       </button>
       {open && (
-        <div className="fixed bottom-24 right-6 w-96 max-h-[28rem] bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 flex flex-col z-50">
+        <div className="fixed bottom-[150px] right-4 md:bottom-24 md:right-6 w-[calc(100vw-2rem)] md:w-96 max-h-[60vh] md:max-h-[28rem] bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 flex flex-col z-[50]">
           <div className="flex items-center justify-between p-3 border-b dark:border-gray-700 text-white" style={{ background: "var(--qit-gradient-1)" }}>
             <div className="flex items-center gap-2">
               <span className="font-semibold">🤖 {t("aiAssistant")}</span>
@@ -156,6 +158,6 @@ export function AIChatWidget() {
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 }

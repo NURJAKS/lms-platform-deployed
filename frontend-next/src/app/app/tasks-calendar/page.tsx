@@ -32,7 +32,7 @@ import { EventDetailsModal } from "@/components/tasks-calendar/EventDetailsModal
 import { CalendarFilters } from "@/components/tasks-calendar/CalendarFilters";
 import { cn } from "@/lib/utils";
 import { BlurFade } from "@/components/ui/blur-fade";
-import { getLocalizedCourseTitle } from "@/lib/courseUtils";
+import { getLocalizedCourseTitle, getLocalizedTopicTitle } from "@/lib/courseUtils";
 
 type Topic = { id: number; title: string };
 
@@ -102,8 +102,13 @@ export default function TasksCalendarPage() {
 
   useEffect(() => {
     const tab = searchParams.get("tab");
-    if (tab === "all-assignments") setActiveTab("all-assignments");
-  }, [searchParams]);
+    if (tab === "all-assignments" && user?.role !== "teacher") setActiveTab("all-assignments");
+  }, [searchParams, user?.role]);
+
+  // Учителю вкладка «Все задания» не показывается — оставляем только «По дате»
+  useEffect(() => {
+    if (user?.role === "teacher" && activeTab === "all-assignments") setActiveTab("by-date");
+  }, [user?.role, activeTab]);
 
   const { data: schedule = [] } = useQuery({
     queryKey: ["schedule", date.getFullYear(), date.getMonth()],
@@ -226,7 +231,12 @@ export default function TasksCalendarPage() {
     mutationFn: async ({ id, is_completed }: { id: number; is_completed: boolean }) => {
       await api.patch(`/schedule/${id}`, { is_completed } as { is_completed: boolean });
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
+      queryClient.setQueryData<ScheduleItem[]>(
+        ["schedule", date.getFullYear(), date.getMonth()],
+        (old) =>
+          old?.map((s) => (s.id === variables.id ? { ...s, is_completed: variables.is_completed } : s)) ?? old
+      );
       queryClient.invalidateQueries({ queryKey: ["schedule"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-events"] });
     },
@@ -239,6 +249,11 @@ export default function TasksCalendarPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["schedule"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-events"] });
+      setSelectedEvent(null);
+      alert(t("scheduleDeleted") || "Удалено");
+    },
+    onError: (err) => {
+      alert(t("scheduleDeleteError") || "Ошибка удаления");
     },
   });
 
@@ -246,7 +261,12 @@ export default function TasksCalendarPage() {
     mutationFn: async ({ id, data }: { id: number; data: { course_id?: number | null; topic_id?: number | null; scheduled_date?: string; notes?: string | null } }) => {
       await api.patch(`/schedule/${id}`, data);
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
+      queryClient.setQueryData<ScheduleItem[]>(
+        ["schedule", date.getFullYear(), date.getMonth()],
+        (old) =>
+          old?.map((s) => (s.id === variables.id ? { ...s, ...variables.data } : s)) ?? old
+      );
       queryClient.invalidateQueries({ queryKey: ["schedule"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-events"] });
     },
@@ -343,51 +363,56 @@ export default function TasksCalendarPage() {
   const getItemLabel = (item: ScheduleItem) => {
     const parts: string[] = [];
     if (item.course_title) parts.push(getLocalizedCourseTitle({ title: item.course_title } as any, t));
-    if (item.topic_title) parts.push(`— ${item.topic_title}`);
+    if (item.topic_title) parts.push(`— ${getLocalizedTopicTitle(item.topic_title, t)}`);
     if (item.notes && item.notes.trim()) parts.push(`— ${item.notes.trim()}`);
     return parts.length ? parts.join(" ") : item.notes?.trim() || `#${item.id}`;
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4">
+    <div className="max-w-7xl mx-auto px-2 sm:px-4">
       {/* Header */}
       <BlurFade delay={0.1}>
         <div
-          className="relative rounded-[20px] overflow-hidden mb-6 p-6 text-white"
+          className="relative rounded-[32px] overflow-hidden mb-8 p-8 sm:p-12 text-white shadow-2xl group"
           style={{
-            background: "var(--qit-gradient-banner)",
-            boxShadow: "0 10px 40px rgba(26,35,126,0.25)",
+            background: "linear-gradient(135deg, #4F46E5 0%, #7C3AED 40%, #C026D3 100%)",
           }}
         >
-        <div className="absolute inset-0 opacity-10">
-          <svg className="absolute bottom-0 left-0 w-full h-24" viewBox="0 0 1200 120" preserveAspectRatio="none">
-            <path fill="currentColor" d="M0,60 C300,120 600,0 900,60 C1050,90 1200,30 1200,60 L1200,120 L0,120 Z" />
-          </svg>
+          {/* Decorative Background elements */}
+          <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-white/10 rounded-full blur-3xl group-hover:bg-white/20 transition-colors duration-700" />
+          <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-48 h-48 bg-purple-400/20 rounded-full blur-2xl group-hover:bg-purple-400/30 transition-colors duration-700" />
+          
+          <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
+            <div className="space-y-2">
+              <h1 className="text-3xl sm:text-4xl font-extrabold flex items-center gap-3 tracking-tight">
+                <div className="p-2.5 bg-white/20 backdrop-blur-md rounded-2xl shadow-inner">
+                  <ListTodo className="w-8 h-8 text-white" />
+                </div>
+                {t("tasksCalendar")}
+              </h1>
+              <p className="text-white/80 text-lg font-medium max-w-md">
+                {t("tasksCalendarSubtitle") || "Управляйте своими задачами и расписанием в интерактивном режиме"}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={goToToday}
+              className="self-start sm:self-auto px-6 py-3 rounded-2xl text-sm font-bold bg-white text-[#7C3AED] hover:bg-opacity-90 hover:scale-105 active:scale-95 transition-all shadow-xl shadow-indigo-500/20"
+            >
+              {t("scheduleToday")}
+            </button>
+          </div>
         </div>
-        <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <ListTodo className="w-7 h-7" />
-            {t("tasksCalendar")}
-          </h1>
-          <button
-            type="button"
-            onClick={goToToday}
-            className="self-start sm:self-auto px-4 py-2 rounded-xl text-sm font-medium bg-white/20 hover:bg-white/30 transition-colors"
-          >
-            {t("scheduleToday")}
-          </button>
-        </div>
-      </div>
       </BlurFade>
 
       {/* Tabs */}
       <BlurFade delay={0.15}>
-        <div className="flex gap-2 mb-6">
+        <div className="flex flex-wrap gap-2 mb-4 sm:mb-6">
         <button
           type="button"
           onClick={() => setActiveTab("by-date")}
           className={cn(
-            "flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-all",
+            "flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-xl font-medium transition-all min-h-[2.5rem]",
             activeTab === "by-date"
               ? "text-white shadow-md"
               : "bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
@@ -397,27 +422,29 @@ export default function TasksCalendarPage() {
           <Calendar className="w-5 h-5" />
           {t("tasksCalendarByDate")}
         </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab("all-assignments")}
-          className={cn(
-            "flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-all",
-            activeTab === "all-assignments"
-              ? "text-white shadow-md"
-              : "bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
-          )}
-          style={activeTab === "all-assignments" ? { background: "var(--qit-primary)" } : undefined}
-        >
-          <FileText className="w-5 h-5" />
-          {t("tasksCalendarAllAssignments")}
-        </button>
+        {user?.role !== "teacher" && (
+          <button
+            type="button"
+            onClick={() => setActiveTab("all-assignments")}
+            className={cn(
+              "flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-xl font-medium transition-all min-h-[2.5rem]",
+              activeTab === "all-assignments"
+                ? "text-white shadow-md"
+                : "bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+            )}
+            style={activeTab === "all-assignments" ? { background: "var(--qit-primary)" } : undefined}
+          >
+            <FileText className="w-5 h-5" />
+            {t("tasksCalendarAllAssignments")}
+          </button>
+        )}
       </div>
       </BlurFade>
 
       {/* Tab: By Date - Calendar and Add Panel Side by Side */}
       {activeTab === "by-date" && (
         <BlurFade delay={0.2}>
-        <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-4 sm:gap-6">
           {/* Календарь слева */}
           <div className="lg:col-span-1">
             <TasksCalendar
@@ -478,10 +505,14 @@ export default function TasksCalendarPage() {
         </BlurFade>
       )}
 
-      {/* Event Details Modal */}
+      {/* Event Details Modal: pass live event from schedule so modal updates after toggle/edit */}
       {selectedEvent && (
         <EventDetailsModal
-          event={selectedEvent.event}
+          event={
+            selectedEvent.type === "schedule"
+              ? (schedule.find((s) => s.id === (selectedEvent.event as ScheduleItem).id) ?? selectedEvent.event)
+              : selectedEvent.event
+          }
           type={selectedEvent.type}
           onClose={() => setSelectedEvent(null)}
           onToggleComplete={
@@ -507,7 +538,7 @@ export default function TasksCalendarPage() {
           }
           courses={coursesForSelect}
           topics={topicsForSelect}
-          isUpdating={updateMutation.isPending}
+          isUpdating={updateMutation.isPending || deleteMutation.isPending || toggleMutation.isPending}
         />
       )}
 
@@ -522,10 +553,10 @@ export default function TasksCalendarPage() {
                 {pending.map((a) => (
                   <div
                     key={a.id}
-                    className="bg-white dark:bg-gray-800 rounded-[20px] border border-gray-200 dark:border-gray-700 p-5 shadow-md hover:shadow-lg transition-all"
+                    className="bg-white dark:bg-gray-800 rounded-[20px] border border-gray-200 dark:border-gray-700 p-4 sm:p-5 shadow-md hover:shadow-lg transition-all"
                   >
-                    <div className="flex justify-between items-start gap-4">
-                      <div className="flex gap-4 min-w-0 flex-1">
+                    <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-4">
+                      <div className="flex gap-3 sm:gap-4 min-w-0 flex-1">
                         <div
                           className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 text-white"
                           style={{ background: "var(--qit-gradient-3)" }}
@@ -584,7 +615,7 @@ export default function TasksCalendarPage() {
                         </div>
                       </div>
                       {submittingId === a.id ? (
-                        <div className="w-full max-w-md space-y-3">
+                        <div className="w-full lg:max-w-md space-y-3">
                           <textarea
                             value={submitText}
                             onChange={(e) => setSubmitText(e.target.value)}
@@ -628,7 +659,7 @@ export default function TasksCalendarPage() {
                               </ul>
                             )}
                           </div>
-                          <div className="flex gap-2">
+                          <div className="flex flex-wrap gap-2">
                             <button
                               type="button"
                               onClick={() =>
@@ -639,7 +670,7 @@ export default function TasksCalendarPage() {
                                 })
                               }
                               disabled={submitMutation.isPending}
-                              className="flex items-center gap-1 py-1.5 px-3 rounded-lg bg-[var(--qit-primary)] text-white text-sm hover:opacity-90"
+                              className="flex items-center gap-1 py-2 px-3 rounded-lg bg-[var(--qit-primary)] text-white text-sm hover:opacity-90 min-h-[2.5rem]"
                             >
                               <Send className="w-4 h-4" /> {t("assignmentSubmit")}
                             </button>
@@ -650,7 +681,7 @@ export default function TasksCalendarPage() {
                                 setSubmitText("");
                                 setSubmitFileUrls([]);
                               }}
-                              className="py-1.5 px-3 rounded-lg border dark:border-gray-600 text-sm"
+                              className="py-2 px-3 rounded-lg border dark:border-gray-600 text-sm min-h-[2.5rem]"
                             >
                               {t("cancel")}
                             </button>
@@ -664,7 +695,7 @@ export default function TasksCalendarPage() {
                             setSubmitText("");
                             setSubmitFileUrls([]);
                           }}
-                          className="py-2 px-4 rounded-lg bg-[var(--qit-primary)] text-white text-sm hover:opacity-90"
+                          className="py-2.5 px-4 rounded-lg bg-[var(--qit-primary)] text-white text-sm hover:opacity-90 min-h-[2.5rem] w-full sm:w-auto"
                         >
                           {t("assignmentSubmit")}
                         </button>

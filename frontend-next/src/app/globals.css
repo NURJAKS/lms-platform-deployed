@@ -180,6 +180,13 @@ html.dark {
   }
 }
 
+/* Desktop UI Scaling (simulate 125% zoom) */
+@media (min-width: 1024px) {
+  html {
+    font-size: 125%;
+  }
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
@@ -441,4 +448,56 @@ html.dark .glass-card-enhanced {
     margin-left: -70px;
     margin-top: -44px;
   }
+}
+
+/* Rich text editor: ensure lists are visible */
+.rich-text-editor ul { list-style-type: disc; padding-left: 1.5rem; margin: 0.5em 0; }
+.rich-text-editor ol { list-style-type: decimal; padding-left: 1.5rem; margin: 0.5em 0; }
+.rich-text-editor li { display: list-item; margin: 0.25em 0; }
+
+/* Mobile interaction baseline */
+.mobile-tap-target {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.mobile-safe-text {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+/* High-end glassmorphism for navigation */
+.glass-nav {
+  background: rgba(255, 255, 255, 0.8) !important;
+  backdrop-filter: blur(12px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(12px) saturate(180%) !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05) !important;
+}
+
+html.dark .glass-nav {
+  background: rgba(11, 15, 25, 0.8) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Micro-interaction: scale on tap */
+.active-tap:active {
+  transform: scale(0.96);
+  transition: transform 0.1s ease;
+}
+
+/* Bottom navigation specific styles */
+.bottom-nav-item {
+  @apply flex flex-col items-center justify-center gap-1 transition-all duration-200;
+}
+
+.bottom-nav-item.active {
+  @apply text-[var(--qit-primary)] dark:text-[var(--qit-secondary)];
+}
+
+/* Safe area support for modern mobile devices */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.mb-safe {
+  margin-bottom: env(safe-area-inset-bottom);
 }

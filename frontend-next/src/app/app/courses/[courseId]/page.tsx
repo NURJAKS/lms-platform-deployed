@@ -14,7 +14,7 @@ import { TestComponent } from "@/components/tests/TestComponent";
 import { LearningPath, type FlattenedTopic } from "@/components/courses/LearningPath";
 import { DailyQuestWidget } from "@/components/dashboard/DailyQuestWidget";
 import type { Course } from "@/types";
-import { getLocalizedModuleTitle, getLocalizedTopicTitle } from "@/lib/courseUtils";
+import { getLocalizedCourseDesc, getLocalizedCourseTitle, getLocalizedModuleTitle, getLocalizedTopicTitle } from "@/lib/courseUtils";
 
 interface Structure {
   course_id: number;
@@ -263,6 +263,9 @@ export default function CourseDetailPage() {
 
   if (!course) return <p className="text-gray-500">{t("loading")}</p>;
 
+  const localizedCourseTitle = getLocalizedCourseTitle(course as any, t as any);
+  const localizedCourseDesc = getLocalizedCourseDesc(course as any, t as any);
+
   const isPremiumUser = user?.is_premium === 1;
   const isPremiumOnlyLocked = course.is_premium_only && !isPremiumUser;
 
@@ -272,7 +275,7 @@ export default function CourseDetailPage() {
         <div className="w-20 h-20 rounded-full bg-gray-700/90 flex items-center justify-center mx-auto mb-6">
           <Lock className="w-10 h-10 text-gray-300" />
         </div>
-        <h1 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">{course.title}</h1>
+        <h1 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">{localizedCourseTitle}</h1>
         <p className="text-gray-600 dark:text-gray-400 mb-6">{t("coursePremiumOnlyLock")}</p>
         <Link
           href="/app/premium"
@@ -290,8 +293,8 @@ export default function CourseDetailPage() {
     return (
       <div className="max-w-2xl mx-auto text-center py-12">
         <Lock className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-        <h1 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">{course.title}</h1>
-        <p className="text-gray-600 dark:text-gray-400 mb-4 line-clamp-3">{course.description}</p>
+        <h1 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">{localizedCourseTitle}</h1>
+        <p className="text-gray-600 dark:text-gray-400 mb-4 line-clamp-3">{localizedCourseDesc}</p>
         <p className="text-amber-600 font-medium">🔒 {t("courseSoon")}</p>
         <button disabled className="mt-4 py-2 px-4 rounded-lg bg-gray-200 text-gray-500 cursor-not-allowed">{t("courseUnavailable")}</button>
       </div>
@@ -318,7 +321,7 @@ export default function CourseDetailPage() {
             {paymentStep === "method" && (
               <>
                 <p className="mb-4 text-gray-600 dark:text-gray-400">
-                  &quot;{course.title}&quot; — {Number(course.price)}₸
+                  &quot;{localizedCourseTitle}&quot; — {Number(course.price)}₸
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
                   <button
@@ -492,7 +495,7 @@ export default function CourseDetailPage() {
                     </p>
                   )}
                   <p className="text-gray-600 dark:text-gray-300">
-                    <span className="text-gray-500">{t("paymentCourseLabel")}:</span> {course.title}
+                    <span className="text-gray-500">{t("paymentCourseLabel")}:</span> {localizedCourseTitle}
                   </p>
                   <p className="text-gray-600 dark:text-gray-300">
                     <span className="text-gray-500">{t("paymentAmount")}:</span> {Number(course.price)}₸
@@ -505,13 +508,13 @@ export default function CourseDetailPage() {
         </div>
       )}
 
-      <div className="bg-white dark:bg-gray-800 rounded-[20px] shadow-md border border-gray-200 dark:border-gray-700 p-6 mb-6 flex gap-6">
-        <div className="w-48 h-32 rounded-xl overflow-hidden bg-[var(--qit-primary)]/10 shrink-0">
-          <img src={courseImageUrl} alt={course.title} className="w-full h-full object-cover" />
+      <div className="bg-white dark:bg-gray-800 rounded-[20px] shadow-md border border-gray-200 dark:border-gray-700 p-4 sm:p-6 mb-6 flex flex-col sm:flex-row gap-4 sm:gap-6">
+        <div className="w-full sm:w-48 h-44 sm:h-32 rounded-xl overflow-hidden bg-[var(--qit-primary)]/10 shrink-0">
+          <img src={courseImageUrl} alt={localizedCourseTitle} className="w-full h-full object-cover" />
         </div>
         <div className="flex-1">
-          <h1 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">{course.title}</h1>
-          <p className="text-gray-600 dark:text-gray-400 mb-4 line-clamp-3">{course.description}</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-white mb-2 break-words">{localizedCourseTitle}</h1>
+          <p className="text-gray-600 dark:text-gray-400 mb-4 line-clamp-3">{localizedCourseDesc}</p>
           <p className="text-[#1a237e] dark:text-[#00b0ff] font-semibold mb-4">
             {course.is_premium_only ? t("premiumOnly") : `${Number(course.price)}₸`}
           </p>
@@ -520,13 +523,13 @@ export default function CourseDetailPage() {
               isPremiumUser ? (
                 <PremiumEnrollButton courseId={id} onEnrolled={() => queryClient.invalidateQueries({ queryKey: ["my-enrollments"] })} t={t} />
               ) : (
-                <Link href="/app/premium" className="inline-flex items-center gap-2 py-2 px-4 rounded-lg text-white" style={{ background: "linear-gradient(135deg, #7c3aed, #5b21b6)" }}>
+                <Link href="/app/premium" className="inline-flex items-center gap-2 py-2.5 px-4 rounded-lg text-white min-h-[2.5rem]" style={{ background: "linear-gradient(135deg, #7c3aed, #5b21b6)" }}>
                   <Lock className="w-4 h-4" />
                   {t("premiumGetSubscription")}
                 </Link>
               )
             ) : (
-              <button type="button" onClick={openPaymentModal} className="py-2 px-4 rounded-lg text-white" style={{ background: "var(--qit-primary)" }}>
+              <button type="button" onClick={openPaymentModal} className="py-2.5 px-4 rounded-lg text-white min-h-[2.5rem]" style={{ background: "var(--qit-primary)" }}>
                 {t("courseBuy")}
               </button>
             )
@@ -537,7 +540,7 @@ export default function CourseDetailPage() {
 
       {enrolled && (
         <div className="mb-6">
-          <Link href={`/app/ai-challenge/${id}`} className="inline-flex items-center gap-2 py-2 px-4 rounded-lg bg-amber-500 text-white hover:bg-amber-600">
+          <Link href={`/app/ai-challenge/${id}`} className="inline-flex items-center gap-2 py-2.5 px-4 rounded-lg bg-amber-500 text-white hover:bg-amber-600 min-h-[2.5rem]">
             <Zap className="w-4 h-4" /> {t("aiVsStudent")}
           </Link>
         </div>
@@ -580,6 +583,9 @@ export default function CourseDetailPage() {
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
                   {courseTests.map((test) => {
                     const canTake = test.can_take !== false;
+                    const displayTitle = test.is_final
+                      ? getLocalizedCourseTitle({ title: test.course_title || test.title } as any, t as any)
+                      : test.title;
                     const topicsInfo = test.topics_total !== undefined && test.topics_total > 0
                       ? `${test.topics_completed_count || 0}/${test.topics_total}`
                       : null;
@@ -589,10 +595,10 @@ export default function CourseDetailPage() {
                     
                     const missingItems: string[] = [];
                     if (!test.topics_completed && topicsInfo) {
-                      missingItems.push(`темы: ${topicsInfo}`);
+                      missingItems.push(`${t("topicsLabel")}: ${topicsInfo}`);
                     }
                     if (!test.assignments_completed && assignmentsInfo) {
-                      missingItems.push(`задания: ${assignmentsInfo}`);
+                      missingItems.push(`${t("assignmentsLabel")}: ${assignmentsInfo}`);
                     }
                     
                     return (
@@ -610,7 +616,7 @@ export default function CourseDetailPage() {
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1">
                             <div className="font-medium text-gray-800 dark:text-white flex items-center gap-2">
-                              {test.title}
+                              {displayTitle}
                               {!canTake && <Lock className="w-4 h-4 text-gray-400" />}
                             </div>
                             {test.is_final && (
@@ -623,7 +629,7 @@ export default function CourseDetailPage() {
                             </div>
                             {!canTake && missingItems.length > 0 && (
                               <div className="text-xs text-amber-600 dark:text-amber-400 mt-2">
-                                Барлық тақырыптар мен тапсырмаларды орындау керек ({missingItems.join(", ")})
+                                {t("testsAllTopicsAndAssignmentsRequired")} ({missingItems.join(", ")})
                               </div>
                             )}
                           </div>

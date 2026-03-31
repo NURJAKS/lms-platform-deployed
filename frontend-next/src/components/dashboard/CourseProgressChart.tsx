@@ -98,7 +98,7 @@ export function CourseProgressChart() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-lg font-semibold" style={{ color: textColors.primary }}>
-          courseProgress
+          {t("courseProgress")}
         </h3>
         <div className="flex items-center gap-2">
           <div className="relative">
@@ -112,8 +112,8 @@ export function CourseProgressChart() {
                 border: "none",
               }}
             >
-              <option value="progress">sortByProgress</option>
-              <option value="month">sortByMonth</option>
+              <option value="progress">{t("sortByProgress")}</option>
+              <option value="month">{t("sortByMonth")}</option>
             </select>
             <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none" style={{ color: textColors.secondary }} />
           </div>
@@ -128,10 +128,10 @@ export function CourseProgressChart() {
                 border: "none",
               }}
             >
-              <option value="all">allSources</option>
-              <option value="programming">{t("programming" as any) || "Программирование"}</option>
-              <option value="design">{t("design" as any) || "Дизайн"}</option>
-              <option value="marketing">{t("marketing" as any) || "Маркетинг"}</option>
+              <option value="all">{t("allSources")}</option>
+              <option value="programming">{t("programming")}</option>
+              <option value="design">{t("design")}</option>
+              <option value="marketing">{t("marketing")}</option>
             </select>
             <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none" style={{ color: textColors.secondary }} />
           </div>
@@ -148,7 +148,7 @@ export function CourseProgressChart() {
             75.8%
           </p>
           <span className="text-sm font-medium ml-2" style={{ color: textColors.secondary }}>
-            averageProgress
+            {t("averageProgress")}
           </span>
         </div>
         <div className="flex items-center gap-2 mb-2">
@@ -157,7 +157,7 @@ export function CourseProgressChart() {
             <span className="text-xs font-semibold">+73.6%</span>
           </div>
           <span className="text-xs" style={{ color: textColors.secondary }}>
-            betterThanLastMonth
+            {t("betterThanLastMonth")}
           </span>
         </div>
       </div>
@@ -197,25 +197,25 @@ export function CourseProgressChart() {
         <div className="flex items-center gap-1.5">
           <div className="w-3 h-3 rounded-full" style={{ backgroundColor: courseTypeColors.programming }} />
           <span className="text-xs" style={{ color: textColors.secondary }}>
-            programming
+            {t("programming")}
           </span>
         </div>
         <div className="flex items-center gap-1.5">
           <div className="w-3 h-3 rounded-full" style={{ backgroundColor: courseTypeColors.design }} />
           <span className="text-xs" style={{ color: textColors.secondary }}>
-            design
+            {t("design")}
           </span>
         </div>
         <div className="flex items-center gap-1.5">
           <div className="w-3 h-3 rounded-full" style={{ backgroundColor: courseTypeColors.marketing }} />
           <span className="text-xs" style={{ color: textColors.secondary }}>
-            marketing
+            {t("marketing")}
           </span>
         </div>
         <div className="flex items-center gap-1.5">
           <div className="w-3 h-3 rounded-full" style={{ backgroundColor: courseTypeColors.other }} />
           <span className="text-xs" style={{ color: textColors.secondary }}>
-            other
+            {t("other")}
           </span>
         </div>
       </div>

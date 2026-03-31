@@ -46,15 +46,15 @@ echo ""
 echo -e "${BLUE}📦 Запуск Backend сервера...${NC}"
 echo ""
 
-# Запуск backend в фоне
+# Запуск backend в фоне (используем .venv и backend/education.db — см. HOW_TO_RUN.md)
 cd backend
-if [ ! -d "venv" ]; then
-    echo "❌ Виртуальное окружение не найдено!"
-    echo "Создайте его командой: python3 -m venv venv"
+if [ ! -d ".venv" ]; then
+    echo "❌ Виртуальное окружение .venv не найдено!"
+    echo "Создайте его: python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt"
     exit 1
 fi
 
-source venv/bin/activate
+source .venv/bin/activate
 
 # Проверка зависимостей
 if ! python -c "import uvicorn" 2>/dev/null; then
@@ -62,6 +62,7 @@ if ! python -c "import uvicorn" 2>/dev/null; then
     pip install -r requirements.txt
 fi
 
+# Напоминание: для локального запуска в backend/.env должно быть DATABASE_URL=sqlite:///./education.db
 echo -e "${GREEN}✅ Backend запускается на http://127.0.0.1:8000${NC}"
 python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload &
 BACKEND_PID=$!

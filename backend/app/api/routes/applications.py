@@ -4,9 +4,11 @@ import string
 from datetime import datetime, timezone, date
 from typing import Annotated, Literal, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from app.api.deps import get_current_admin_user, get_current_user
 from app.core.database import get_db
@@ -20,6 +22,7 @@ from app.models.payment import Payment
 from app.services.email_sender import send_course_purchase_email
 
 router = APIRouter(prefix="/applications", tags=["applications"])
+limiter = Limiter(key_func=get_remote_address)
 
 
 def _generate_password(length: int = 10) -> str:
@@ -57,7 +60,6 @@ class SubmitApplicationResponse(BaseModel):
 
 class PayApplicationResponse(BaseModel):
     message: str
-    confirmation_token: str
     course_title: str
     student_name: str
     student_email: str
@@ -93,7 +95,9 @@ class PayApplicationRequest(BaseModel):
 
 
 @router.post("/pay", response_model=PayApplicationResponse)
+@limiter.limit("5/minute")
 def pay_application(
+    request: Request,
     body: PayApplicationRequest,
     db: Annotated[Session, Depends(get_db)],
 ):
@@ -231,7 +235,6 @@ def pay_application(
 
     return PayApplicationResponse(
         message="Оплата принята. Подтвердите покупку по ссылке, отправленной на ваш email.",
-        confirmation_token=confirmation_token,
         course_title=course.title,
         student_name=body.full_name,
         student_email=body.email,
@@ -340,7 +343,9 @@ def confirm_purchase(
 
 
 @router.post("/submit", response_model=SubmitApplicationResponse)
+@limiter.limit("5/minute")
 def submit_application(
+    request: Request,
     body: SubmitApplicationRequest,
     db: Annotated[Session, Depends(get_db)],
 ):

@@ -12,6 +12,7 @@ class UserPurchase(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     shop_item_id = Column(Integer, ForeignKey("shop_items.id", ondelete="CASCADE"), nullable=False)
     purchased_at = Column(DateTime(timezone=True), server_default=func.now())
+    price_paid = Column(Integer, nullable=True)  # фактически оплаченная сумма (с учётом скидок)
     delivery_status = Column(String(50), default="pending", nullable=False)  # pending, processing, shipped, delivered, cancelled
     estimated_delivery_date = Column(DateTime(timezone=True), nullable=True)
     delivered_at = Column(DateTime(timezone=True), nullable=True)

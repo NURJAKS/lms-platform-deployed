@@ -149,7 +149,7 @@ export function CoursePickerWidget() {
               <p className="font-bold text-sm mb-1">{t(recommended.fullTitleKey as TranslationKey)}</p>
               <p className="text-white/90 text-xs mb-3 line-clamp-2">{t(recommended.descKey as TranslationKey)}</p>
               <Link
-                href="/register"
+                href="/courses"
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold bg-white text-gray-900 hover:bg-gray-100 transition-colors"
               >
                 {t("pickerCta")} <ArrowRight className="w-4 h-4" />

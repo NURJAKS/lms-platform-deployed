@@ -86,7 +86,7 @@ export function DashboardStatsCards() {
   ];
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-5 mb-6 sm:mb-8">
       {cards.map((card, i) => {
         const Icon = card.icon;
         const isDark = theme === "dark";
@@ -101,7 +101,7 @@ export function DashboardStatsCards() {
             blur="8px"
           >
             <div
-              className={`group relative overflow-hidden rounded-xl p-6 transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5`}
+              className={`group relative overflow-hidden rounded-xl p-4 sm:p-5 lg:p-6 transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5`}
               style={{
                 background: isDark 
                   ? "rgba(30, 41, 59, 0.8)" 
@@ -124,15 +124,15 @@ export function DashboardStatsCards() {
 
               <div className="relative flex items-start justify-between">
                 <div className="flex-1 min-w-0">
-                  <p className="text-3xl font-bold tracking-tight mb-1.5" style={{ color: textColors.primary }}>
+                  <p className="text-2xl sm:text-3xl font-bold tracking-tight mb-1" style={{ color: textColors.primary }}>
                     {card.value}
                   </p>
-                  <p className="text-sm font-medium leading-tight" style={{ color: textColors.secondary }}>
+                  <p className="text-sm font-medium leading-tight break-words" style={{ color: textColors.secondary }}>
                     {card.label}
                   </p>
                 </div>
                 <div
-                  className={`w-12 h-12 rounded-lg flex items-center justify-center shrink-0 text-white shadow-sm ${card.iconBg}`}
+                  className={`w-11 h-11 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center shrink-0 text-white shadow-sm ${card.iconBg}`}
                 >
                   <Icon className="w-5 h-5" />
                 </div>

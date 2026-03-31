@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { useState, useMemo } from "react";
 import Image from "next/image";
 import { api } from "@/api/client";
@@ -35,15 +35,20 @@ import {
   CheckCircle,
   X,
   AlertCircle,
+  LayoutGrid,
+  ChevronDown,
 } from "lucide-react";
+import { motion, AnimatePresence } from "motion/react";
 import { useTheme } from "@/context/ThemeContext";
 import { getGlassCardStyle, getTextColors, getDashboardCardStyle } from "@/utils/themeStyles";
 import { ProductCard } from "@/components/shop/ProductCard";
 import { CartSheet } from "@/components/shop/CartSheet";
 import { PurchaseSuccessModal } from "@/components/shop/PurchaseSuccessModal";
 import { DeliveryAddressModal, type DeliveryData } from "@/components/shop/DeliveryAddressModal";
+import { ShopSkeleton } from "@/components/shop/ShopSkeleton";
 import { AnimatedGradientText } from "@/components/ui/animated-gradient-text";
 import { NumberTicker } from "@/components/ui/number-ticker";
+import { DeleteConfirmButton } from "@/components/ui/DeleteConfirmButton";
 import { cn } from "@/lib/utils";
 import type { User } from "@/types";
 import { getLocalizedShopItemTitle, getLocalizedShopItemDesc, CATEGORY_KEYS } from "@/lib/shopUtils";
@@ -73,9 +78,11 @@ type ShopItem = {
   title: string;
   description: string | null;
   price_coins: number;
+  original_price?: number;
   category: string;
   icon_name: string | null;
   image_url: string | null;
+  has_premium_discount?: boolean;
 };
 
 type Purchase = {
@@ -93,15 +100,8 @@ type Purchase = {
   courier_name?: string | null;
 };
 
-type CartItem = {
-  id: number;
+type CartItem = ShopItem & {
   shop_item_id: number;
-  title: string;
-  description: string | null;
-  price_coins: number;
-  category: string;
-  icon_name: string | null;
-  image_url: string | null;
   quantity: number;
 };
 
@@ -158,12 +158,13 @@ export default function ShopPage() {
   const [successItemTitle, setSuccessItemTitle] = useState("");
   const [successDeliveryDate, setSuccessDeliveryDate] = useState<string | undefined>();
   const [pendingPurchase, setPendingPurchase] = useState<{ type: "single" | "cart"; itemId?: number } | null>(null);
+  const [isCategoryMenuOpen, setIsCategoryMenuOpen] = useState(false);
 
   const textColors = getTextColors(theme);
   const cardStyle = getGlassCardStyle(theme);
   const isDark = theme === "dark";
 
-  const { data: items = [] } = useQuery({
+  const { data: items = [], isLoading: isItemsLoading } = useQuery({
     queryKey: ["shop-items", category],
     queryFn: async () => {
       if (category === "favorites") {
@@ -174,6 +175,7 @@ export default function ShopPage() {
       const { data } = await api.get<ShopItem[]>(url);
       return data;
     },
+    placeholderData: keepPreviousData,
   });
 
   const { data: favorites = [] } = useQuery({
@@ -211,11 +213,48 @@ export default function ShopPage() {
         await api.post(`/shop/items/${itemId}/favorite`);
       }
     },
+    onMutate: async ({ itemId, isFavorite }) => {
+      await queryClient.cancelQueries({ queryKey: ["shop-favorites"] });
+      await queryClient.cancelQueries({ queryKey: ["shop-items", "favorites"] });
+
+      const prevFavoriteIds = queryClient.getQueryData<number[]>(["shop-favorites"]);
+      const prevFavoriteItems = queryClient.getQueryData<ShopItem[]>(["shop-items", "favorites"]);
+
+      // Optimistically update favorites IDs
+      queryClient.setQueryData<number[]>(["shop-favorites"], (old = []) => {
+        const set = new Set(old);
+        if (isFavorite) set.delete(itemId);
+        else set.add(itemId);
+        return Array.from(set);
+      });
+
+      // Optimistically update favorites list items (used by category === "favorites")
+      queryClient.setQueryData<ShopItem[]>(["shop-items", "favorites"], (old = []) => {
+        if (isFavorite) {
+          return old.filter((x) => x.id !== itemId);
+        }
+        const exists = old.some((x) => x.id === itemId);
+        if (exists) return old;
+        const found = items.find((x) => x.id === itemId);
+        return found ? [found, ...old] : old;
+      });
+
+      return { prevFavoriteIds, prevFavoriteItems };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (!ctx) return;
+      queryClient.setQueryData(["shop-favorites"], ctx.prevFavoriteIds);
+      queryClient.setQueryData(["shop-items", "favorites"], ctx.prevFavoriteItems);
+    },
     onSuccess: () => {
+      // Always invalidate favorites list so switching tab refetches even with refetchOnMount=false
       queryClient.invalidateQueries({ queryKey: ["shop-favorites"] });
-      if (category === "favorites") {
-        queryClient.invalidateQueries({ queryKey: ["shop-items", "favorites"] });
-      }
+      queryClient.invalidateQueries({ queryKey: ["shop-items", "favorites"] });
+    },
+    onSettled: () => {
+      // Ensure eventual consistency with backend
+      queryClient.invalidateQueries({ queryKey: ["shop-favorites"] });
+      queryClient.invalidateQueries({ queryKey: ["shop-items", "favorites"] });
     },
   });
 
@@ -237,18 +276,33 @@ export default function ShopPage() {
     },
   });
 
+  const updateCartQuantityMutation = useMutation({
+    mutationFn: async ({ itemId, quantity }: { itemId: number; quantity: number }) => {
+      await api.patch(`/shop/cart/${itemId}?quantity=${quantity}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["shop-cart"] });
+    },
+  });
+
   const checkoutMutation = useMutation({
     mutationFn: async () => {
-      const { data } = await api.post<{ estimated_delivery_date: string }>("/shop/cart/checkout");
+      const { data } = await api.post<{ estimated_delivery_date: string; new_balance?: number }>("/shop/cart/checkout");
       return data;
     },
     onSuccess: async (data) => {
       queryClient.invalidateQueries({ queryKey: ["shop-items"] });
       queryClient.invalidateQueries({ queryKey: ["shop-my-purchases"] });
       queryClient.invalidateQueries({ queryKey: ["shop-cart"] });
-      const { data: freshUser } = await api.get<typeof user>("/users/me");
-      const token = useAuthStore.getState().token;
-      if (freshUser && token) useAuthStore.getState().setAuth(freshUser, token);
+      // Сразу обновляем баланс из ответа API и рефетчим полные данные пользователя
+      if (typeof data.new_balance === "number") {
+        const currentStoreUser = useAuthStore.getState().user;
+        const currentToken = useAuthStore.getState().token;
+        if (currentStoreUser && currentToken) {
+          useAuthStore.getState().setAuth({ ...currentStoreUser, points: data.new_balance }, currentToken);
+        }
+      }
+      queryClient.invalidateQueries({ queryKey: ["me"] });
       setIsCartOpen(false);
       setSuccessItemTitle(t("shopCartItems"));
       setSuccessDeliveryDate(data.estimated_delivery_date);
@@ -263,18 +317,25 @@ export default function ShopPage() {
 
   const purchaseMutation = useMutation({
     mutationFn: async (itemId: number) => {
-      const { data } = await api.post<{ estimated_delivery_date: string }>(`/shop/items/${itemId}/purchase`);
+      const { data } = await api.post<{ estimated_delivery_date: string; new_balance?: number }>(`/shop/items/${itemId}/purchase`);
       return data;
     },
     onSuccess: async (data) => {
       queryClient.invalidateQueries({ queryKey: ["shop-items"] });
       queryClient.invalidateQueries({ queryKey: ["shop-my-purchases"] });
-      const { data: freshUser } = await api.get<typeof user>("/users/me");
-      const token = useAuthStore.getState().token;
-      if (freshUser && token) useAuthStore.getState().setAuth(freshUser, token);
+      // Сразу обновляем баланс из ответа API
+      if (typeof data.new_balance === "number") {
+        const currentStoreUser = useAuthStore.getState().user;
+        const currentToken = useAuthStore.getState().token;
+        if (currentStoreUser && currentToken) {
+          useAuthStore.getState().setAuth({ ...currentStoreUser, points: data.new_balance }, currentToken);
+        }
+      }
+      queryClient.invalidateQueries({ queryKey: ["me"] });
       setPurchasingId(null);
       setSelectedItem(null);
-      setSuccessItemTitle(items.find((i) => i.id === purchasingId)?.title || "");
+      const purchased = items.find((i) => i.id === purchasingId);
+      setSuccessItemTitle(purchased ? getLocalizedShopItemTitle(purchased as any, lang, t) : "");
       setSuccessDeliveryDate(data.estimated_delivery_date);
       setShowSuccessModal(true);
     },
@@ -288,14 +349,20 @@ export default function ShopPage() {
 
   const cancelPurchaseMutation = useMutation({
     mutationFn: async (purchaseId: number) => {
-      const { data } = await api.post<{ refund_amount: number; message: string }>(`/shop/purchases/${purchaseId}/cancel`);
+      const { data } = await api.post<{ refund_amount: number; message: string; new_balance?: number }>(`/shop/purchases/${purchaseId}/cancel`);
       return data;
     },
     onSuccess: async (data) => {
       queryClient.invalidateQueries({ queryKey: ["shop-my-purchases"] });
-      const { data: freshUser } = await api.get<typeof user>("/users/me");
-      const token = useAuthStore.getState().token;
-      if (freshUser && token) useAuthStore.getState().setAuth(freshUser, token);
+      // Сразу обновляем баланс из ответа API
+      if (typeof data.new_balance === "number") {
+        const currentStoreUser = useAuthStore.getState().user;
+        const currentToken = useAuthStore.getState().token;
+        if (currentStoreUser && currentToken) {
+          useAuthStore.getState().setAuth({ ...currentStoreUser, points: data.new_balance }, currentToken);
+        }
+      }
+      queryClient.invalidateQueries({ queryKey: ["me"] });
       alert(data.message);
     },
     onError: (error: unknown) => {
@@ -332,6 +399,10 @@ export default function ShopPage() {
 
   const handleRemoveFromCart = (itemId: number) => {
     removeFromCartMutation.mutate(itemId);
+  };
+
+  const handleUpdateCartQuantity = (itemId: number, quantity: number) => {
+    updateCartQuantityMutation.mutate({ itemId, quantity });
   };
 
   const handleCheckout = () => {
@@ -388,17 +459,17 @@ export default function ShopPage() {
   return (
     <div className="relative min-h-screen">
       <div className="relative z-10">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-3xl font-bold flex items-center gap-3" style={{ color: textColors.primary }}>
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-5 sm:mb-6">
+          <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2 sm:gap-3" style={{ color: textColors.primary }}>
             <ShoppingBag className="w-10 h-10" style={{ background: "linear-gradient(135deg, #FF4181 0%, #B938EB 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }} />
             <AnimatedGradientText colorFrom="#FF4181" colorTo="#B938EB" speed={1.5}>
               {t("shopTitle")}
             </AnimatedGradientText>
           </h1>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-end">
             <button
               onClick={() => setIsCartOpen(true)}
-              className="relative flex items-center gap-2 px-4 py-2 rounded-xl transition-all hover:scale-105"
+              className="relative flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-xl transition-all hover:scale-105 min-h-[2.5rem]"
               style={cardStyle}
             >
               <ShoppingCart className="w-6 h-6 shrink-0" style={{ color: "#FF4181" }} />
@@ -414,7 +485,7 @@ export default function ShopPage() {
                 </span>
               )}
             </button>
-            <div className="flex items-center gap-2 px-4 py-2 rounded-xl border-0 backdrop-blur-sm" style={{ ...cardStyle, border: isDark ? "1px solid rgba(251, 191, 36, 0.3)" : "1px solid rgba(251, 191, 36, 0.2)" }}>
+            <div className="flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-xl border-0 backdrop-blur-sm min-h-[2.5rem]" style={{ ...cardStyle, border: isDark ? "1px solid rgba(251, 191, 36, 0.3)" : "1px solid rgba(251, 191, 36, 0.2)" }}>
               <Image src="/icons/coin.png" alt="coins" width={24} height={24} />
               <NumberTicker value={points} className="font-semibold" style={{ color: "#FBBF24" }} />
               <span className="text-sm" style={{ color: "#FBBF24" }}>{t("shopCoins")}</span>
@@ -443,7 +514,7 @@ export default function ShopPage() {
                         <IconComponent className="w-6 h-6" style={{ color: "#06B6D4" }} />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <h3 className="font-medium truncate" style={{ color: textColors.primary }}>{getLocalizedShopItemTitle(p as any, t)}</h3>
+                        <h3 className="font-medium truncate" style={{ color: textColors.primary }}>{getLocalizedShopItemTitle(p as any, lang, t)}</h3>
                         {p.purchased_at && (
                           <p className="text-xs mt-0.5" style={{ color: textColors.secondary }}>
                             {new Date(p.purchased_at).toLocaleDateString(locale)}
@@ -483,32 +554,15 @@ export default function ShopPage() {
                       </div>
                     )}
                     {p.delivery_status !== "delivered" && p.delivery_status !== "cancelled" && (
-                      <button
-                        onClick={() => {
-                          if (confirm(t("shopCancelOrderConfirm"))) {
-                            cancelPurchaseMutation.mutate(p.id);
-                          }
-                        }}
-                        disabled={cancelPurchaseMutation.isPending}
-                        className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
-                        style={{
-                          background: "rgba(239, 68, 68, 0.1)",
-                          color: "#EF4444",
-                          border: "1px solid rgba(239, 68, 68, 0.3)",
-                        }}
-                      >
-                        {cancelPurchaseMutation.isPending ? (
-                          <>
-                            <AlertCircle className="w-3.5 h-3.5 animate-spin" />
-                            <span>{t("shopCancelling")}</span>
-                          </>
-                        ) : (
-                          <>
-                            <X className="w-3.5 h-3.5" />
-                            <span>{t("shopCancelOrder")}</span>
-                          </>
-                        )}
-                      </button>
+                      <DeleteConfirmButton
+                        onDelete={() => cancelPurchaseMutation.mutate(p.id)}
+                        isLoading={cancelPurchaseMutation.isPending}
+                        text={t("shopCancelOrder")}
+                        title={t("shopCancelOrderConfirm")}
+                        description={t("confirmDelete")}
+                        size="sm"
+                        className="w-full justify-center"
+                      />
                     )}
                     {p.delivery_status === "cancelled" && (
                       <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs" style={{ background: "rgba(239, 68, 68, 0.1)", color: "#EF4444" }}>
@@ -523,39 +577,90 @@ export default function ShopPage() {
           </div>
         )}
 
-        <div className="flex flex-wrap gap-2 mb-6">
-          {Object.entries(CATEGORY_KEYS).map(([id, key]) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setCategory(id)}
-              className={cn("py-1.5 px-3 rounded-lg text-sm font-medium transition-all")}
-              style={
-                category === id
-                  ? { background: "linear-gradient(135deg, #FF4181 0%, #B938EB 100%)", color: "#FFFFFF" }
-                  : { ...cardStyle, color: textColors.secondary, border: isDark ? "1px solid rgba(255, 255, 255, 0.08)" : "1px solid rgba(0, 0, 0, 0.06)" }
-              }
-              onMouseEnter={(e) => {
-                if (category !== id) {
-                  e.currentTarget.style.color = textColors.primary;
-                  e.currentTarget.style.background = isDark ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.05)";
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (category !== id) {
-                  e.currentTarget.style.color = textColors.secondary;
-                  e.currentTarget.style.background = cardStyle.background;
-                }
-              }}
-            >
-              {id === "favorites" && <Heart className="w-3 h-3 inline mr-1" />}
-              {t(key as TranslationKey)}
-            </button>
-          ))}
+        <div className="relative mb-8">
+          <button
+            onClick={() => setIsCategoryMenuOpen(!isCategoryMenuOpen)}
+            className="flex items-center gap-2.5 px-5 py-3 rounded-2xl transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-pink-500/20 font-semibold group min-h-[3rem]"
+            style={{ 
+              background: "linear-gradient(135deg, #FF4181 0%, #B938EB 100%)",
+              color: "#FFFFFF"
+            }}
+          >
+            <div className="p-1.5 rounded-lg bg-white/20 group-hover:rotate-12 transition-transform">
+              <LayoutGrid className="w-5 h-5" />
+            </div>
+            <div className="flex flex-col items-start leading-tight">
+              <span className="text-[10px] opacity-70 uppercase tracking-wider">{t("shopCategory")}</span>
+              <span className="text-sm">{t(CATEGORY_KEYS[category] as TranslationKey)}</span>
+            </div>
+            <ChevronDown className={cn("ml-2 w-5 h-5 transition-transform duration-300", isCategoryMenuOpen && "rotate-180")} />
+          </button>
+
+          <AnimatePresence>
+            {isCategoryMenuOpen && (
+              <>
+                <div 
+                  className="fixed inset-0 z-20" 
+                  onClick={() => setIsCategoryMenuOpen(false)} 
+                />
+                <motion.div
+                  initial={{ opacity: 0, y: 15, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 15, scale: 0.95 }}
+                  className="absolute top-[calc(100%+0.75rem)] left-0 z-30 p-3 rounded-[2rem] shadow-2xl backdrop-blur-2xl border w-full max-w-sm sm:max-w-md grid grid-cols-2 sm:grid-cols-2 gap-2"
+                  style={{ 
+                    ...getDashboardCardStyle(theme), 
+                    border: isDark ? "1px solid rgba(255, 255, 255, 0.12)" : "1px solid rgba(0, 0, 0, 0.08)",
+                    boxShadow: isDark ? "0 20px 40px rgba(0,0,0,0.4)" : "0 20px 40px rgba(0,0,0,0.1)"
+                  }}
+                >
+                  {Object.entries(CATEGORY_KEYS).map(([id, key]) => (
+                    <button
+                      key={id}
+                      onClick={() => {
+                        setCategory(id);
+                        setIsCategoryMenuOpen(false);
+                      }}
+                      className={cn(
+                        "flex items-center gap-3 p-3.5 rounded-2xl text-sm font-medium transition-all duration-200 group/item",
+                        category === id 
+                          ? "bg-pink-500/10 dark:bg-pink-500/20" 
+                          : "hover:bg-black/5 dark:hover:bg-white/5"
+                      )}
+                    >
+                      <div 
+                        className={cn(
+                          "w-8 h-8 rounded-lg flex items-center justify-center transition-all",
+                          category === id 
+                            ? "bg-pink-500 text-white" 
+                            : "bg-black/5 dark:bg-white/10 text-gray-400 group-hover/item:text-pink-500"
+                        )}
+                      >
+                        {id === "favorites" ? (
+                          <Heart className={cn("w-4 h-4", category === id ? "fill-current" : "")} />
+                        ) : (
+                          <ShoppingCart className="w-4 h-4" />
+                        )}
+                      </div>
+                      <span 
+                        className="truncate" 
+                        style={{ color: category === id ? "#FF4181" : textColors.primary }}
+                      >
+                        {t(key as TranslationKey)}
+                      </span>
+                      {category === id && (
+                         <div className="ml-auto w-1.5 h-1.5 rounded-full bg-pink-500 animate-pulse" />
+                      )}
+                    </button>
+                  ))}
+                </motion.div>
+              </>
+            )}
+          </AnimatePresence>
         </div>
 
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {items.map((item, index) => {
+        <div className="grid gap-3 sm:gap-4 lg:gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {!isItemsLoading && items.map((item, index) => {
             const IconComponent = item.icon_name ? ICON_MAP[item.icon_name] ?? Gift : Gift;
             const canBuy = points >= item.price_coins;
             const isPurchasing = purchasingId === item.id && purchaseMutation.isPending;
@@ -578,7 +683,9 @@ export default function ShopPage() {
           })}
         </div>
 
-        {items.length === 0 && (
+        {isItemsLoading && <ShopSkeleton />}
+
+        {!isItemsLoading && items.length === 0 && (
           <div className="text-center py-12">
             <Package className="w-16 h-16 mx-auto mb-4 opacity-20" style={{ color: textColors.secondary }} />
             <p className="text-lg font-medium mb-2" style={{ color: textColors.primary }}>
@@ -627,7 +734,7 @@ export default function ShopPage() {
                   )}
                   <div className="flex-1 min-w-0">
                     <h2 id="product-detail-title" className="text-xl font-bold mb-2" style={{ color: textColors.primary }}>
-                      {getLocalizedShopItemTitle(selectedItem as any, t)}
+                      {getLocalizedShopItemTitle(selectedItem as any, lang, t)}
                     </h2>
                     <div className="flex items-center gap-2 font-semibold">
                       <Image src="/icons/coin.png" alt="" width={20} height={20} />
@@ -643,7 +750,7 @@ export default function ShopPage() {
                 {selectedItem.description && (
                   <div className="mb-6">
                     <h3 className="text-sm font-semibold mb-2" style={{ color: textColors.primary }}>{t("shopProductDescription")}</h3>
-                    <p style={{ color: textColors.secondary }}>{getLocalizedShopItemDesc(selectedItem as any, t)}</p>
+                    <p style={{ color: textColors.secondary }}>{getLocalizedShopItemDesc(selectedItem as any, lang, t)}</p>
                   </div>
                 )}
 
@@ -694,6 +801,7 @@ export default function ShopPage() {
           onClose={() => setIsCartOpen(false)}
           items={cartItems}
           onRemove={handleRemoveFromCart}
+          onUpdateQuantity={handleUpdateCartQuantity}
           onCheckout={handleCheckout}
           totalCost={totalCartCost}
           userBalance={points}

@@ -18,6 +18,7 @@ import { DotPattern } from "@/components/ui/dot-pattern";
 import { BlurFade } from "@/components/ui/blur-fade";
 import { motion, AnimatePresence } from "motion/react";
 import { getLocalizedCourseTitle } from "@/lib/courseUtils";
+import { useTheme } from "@/context/ThemeContext";
 
 type LeaderboardRow = {
   rank: number;
@@ -70,6 +71,61 @@ function RatingTable({
   );
 }
 
+function RatingCards({
+  rows,
+  t,
+  onCoursesClick,
+}: {
+  rows: LeaderboardRow[];
+  t: (k: TranslationKey) => string;
+  onCoursesClick?: (row: LeaderboardRow) => void;
+}) {
+  return (
+    <div className="space-y-3 p-3 sm:hidden">
+      {rows.map((r) => (
+        <div key={r.user_id} className="rounded-xl border border-gray-200 dark:border-gray-700 p-3 bg-white/80 dark:bg-gray-800/80">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-xs text-gray-500 dark:text-gray-400">{t("leaderboardPlace")} #{r.rank}</p>
+              <Link href={`/app/profile/${r.user_id}`} className="font-semibold text-[var(--qit-primary)] dark:text-[#00b0ff] line-clamp-2">
+                {r.full_name}
+              </Link>
+            </div>
+            <div className="text-right shrink-0">
+              <p className="text-xs text-gray-500 dark:text-gray-400">{t("profileCoins")}</p>
+              <p className="font-semibold text-amber-500 dark:text-amber-400">{r.points ?? 0}</p>
+            </div>
+          </div>
+          <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+            <div>
+              <p className="text-gray-500 dark:text-gray-400">{t("leaderboardAvgScore")}</p>
+              <p className="font-medium text-gray-800 dark:text-gray-200">{r.avg_score.toFixed(1)}</p>
+            </div>
+            <div>
+              <p className="text-gray-500 dark:text-gray-400">{t("leaderboardActivity")}</p>
+              <p className="font-medium text-gray-800 dark:text-gray-200">{r.activity}</p>
+            </div>
+            <div>
+              <p className="text-gray-500 dark:text-gray-400">{t("leaderboardCourses")}</p>
+              {r.courses_done > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => onCoursesClick?.(r)}
+                  className="font-medium text-amber-500 dark:text-amber-400 hover:underline"
+                >
+                  {r.courses_done}
+                </button>
+              ) : (
+                <p className="font-medium text-amber-500 dark:text-amber-400">{r.courses_done}</p>
+              )}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 const TABLE_COLUMN_KEYS: { key: keyof LeaderboardRow; labelKey: TranslationKey }[] = [
   { key: "full_name", labelKey: "leaderboardName" },
   { key: "avg_score", labelKey: "leaderboardAvgScore" },
@@ -84,6 +140,8 @@ type CourseItem = { course_id: number; course_title: string };
 
 export default function LeaderboardPage() {
   const { t } = useLanguage();
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
   const [activeBlock, setActiveBlock] = useState<ActiveBlock>("top");
   const [coursesModal, setCoursesModal] = useState<LeaderboardRow | null>(null);
 
@@ -136,6 +194,25 @@ export default function LeaderboardPage() {
     }
   };
 
+  const handleExportExcel = async () => {
+    try {
+      const { data } = await api.get<Blob>("/analytics/leaderboard/excel", {
+        responseType: "blob",
+      });
+      const url = URL.createObjectURL(data);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "leaderboard.xlsx";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Failed to export Excel:", error);
+      const err = error as { response?: { data?: { detail?: string }; status?: number }; message?: string };
+      const errorMessage = err?.response?.data?.detail || err?.message || t("csvExportError");
+      alert(errorMessage);
+    }
+  };
+
   const n = list.length;
   const topCount = Math.max(1, Math.ceil(n / 3));
   const midCount = Math.max(0, Math.ceil(n / 3));
@@ -180,7 +257,7 @@ export default function LeaderboardPage() {
   };
 
   return (
-    <div className="relative min-h-screen space-y-8 pb-8">
+    <div className="relative min-h-screen space-y-5 sm:space-y-8 pb-8">
       {/* Background Effects */}
       <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
         <AnimatedGridPattern
@@ -262,21 +339,34 @@ export default function LeaderboardPage() {
       <div className="relative z-10">
         <div className="flex items-center justify-between flex-wrap gap-4 mb-4">
           <LeaderboardHeader lastReward={lastReward} />
-          <BlurFade delay={0.2} inView>
-            <ShimmerButton
-              onClick={handleExportCsv}
-              className="bg-gradient-to-r from-[var(--qit-primary)] to-purple-600 text-white border-0"
-              shimmerColor="#ffffff"
-              borderRadius="12px"
-            >
-              <Download className="w-4 h-4 mr-2" /> CSV
-            </ShimmerButton>
-          </BlurFade>
+          <div className="flex gap-2">
+            <BlurFade delay={0.2} inView>
+              <ShimmerButton
+                onClick={handleExportCsv}
+                background={isDark ? "rgba(255, 255, 255, 0.1)" : "rgba(243, 244, 246, 1)"}
+                shimmerColor={isDark ? "#ffffff" : "#000000"}
+                className="text-gray-900 dark:text-white border-0"
+                borderRadius="12px"
+              >
+                <Download className="w-4 h-4 mr-2" /> CSV
+              </ShimmerButton>
+            </BlurFade>
+            <BlurFade delay={0.25} inView>
+              <ShimmerButton
+                onClick={handleExportExcel}
+                className="bg-gradient-to-r from-[var(--qit-primary)] to-purple-600 text-white border-0"
+                shimmerColor="#ffffff"
+                borderRadius="12px"
+              >
+                <Download className="w-4 h-4 mr-2" /> Excel
+              </ShimmerButton>
+            </BlurFade>
+          </div>
         </div>
       </div>
 
       {/* Stat Cards */}
-      <div className="grid gap-4 sm:grid-cols-3 relative z-10">
+      <div className="grid gap-3 sm:gap-4 sm:grid-cols-3 relative z-10">
         <StatCard
           title={t("leaderboardTopLevel")}
           description={t("leaderboardTopDesc")}
@@ -313,7 +403,7 @@ export default function LeaderboardPage() {
       <BlurFade delay={0.4} inView className="relative z-10">
         <div className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl rounded-xl shadow-xl overflow-hidden border border-gray-200 dark:border-gray-700">
           <div
-            className={`border-b px-6 py-4 backdrop-blur-sm ${
+            className={`border-b px-4 sm:px-6 py-3 sm:py-4 backdrop-blur-sm ${
               activeBlock === "top"
                 ? "bg-green-50/80 dark:bg-green-900/20 border-green-200 dark:border-green-800"
                 : activeBlock === "middle"
@@ -321,7 +411,7 @@ export default function LeaderboardPage() {
                 : "bg-blue-50/80 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800"
             }`}
           >
-            <h2 className="font-semibold flex items-center gap-2 text-lg">
+            <h2 className="font-semibold flex items-center gap-2 text-base sm:text-lg">
               {activeBlock === "top" && <Trophy className="w-5 h-5 text-green-600 dark:text-green-400" />}
               {activeBlock === "middle" && <Medal className="w-5 h-5 text-amber-600 dark:text-amber-400" />}
               {activeBlock === "low" && <Award className="w-5 h-5 text-blue-600 dark:text-blue-400" />}
@@ -330,7 +420,7 @@ export default function LeaderboardPage() {
               {activeBlock === "low" && t("leaderboardLowLevel")}
             </h2>
           </div>
-          <div className="overflow-x-auto max-h-[32rem] overflow-y-auto">
+          <div className="max-h-[32rem] overflow-y-auto">
             <AnimatePresence mode="wait">
               {activeBlock === "top" && (
                 <motion.div
@@ -340,7 +430,12 @@ export default function LeaderboardPage() {
                   exit={{ opacity: 0, y: -20 }}
                   transition={{ duration: 0.3 }}
                 >
-                  <RatingTable rows={top} columns={TABLE_COLUMN_KEYS} t={t} onCoursesClick={setCoursesModal} />
+                  <>
+                    <RatingCards rows={top} t={t} onCoursesClick={setCoursesModal} />
+                    <div className="hidden sm:block overflow-x-auto">
+                      <RatingTable rows={top} columns={TABLE_COLUMN_KEYS} t={t} onCoursesClick={setCoursesModal} />
+                    </div>
+                  </>
                 </motion.div>
               )}
               {activeBlock === "middle" && (
@@ -351,7 +446,12 @@ export default function LeaderboardPage() {
                   exit={{ opacity: 0, y: -20 }}
                   transition={{ duration: 0.3 }}
                 >
-                  <RatingTable rows={middle} columns={TABLE_COLUMN_KEYS} t={t} onCoursesClick={setCoursesModal} />
+                  <>
+                    <RatingCards rows={middle} t={t} onCoursesClick={setCoursesModal} />
+                    <div className="hidden sm:block overflow-x-auto">
+                      <RatingTable rows={middle} columns={TABLE_COLUMN_KEYS} t={t} onCoursesClick={setCoursesModal} />
+                    </div>
+                  </>
                 </motion.div>
               )}
               {activeBlock === "low" && (
@@ -362,7 +462,12 @@ export default function LeaderboardPage() {
                   exit={{ opacity: 0, y: -20 }}
                   transition={{ duration: 0.3 }}
                 >
-                  <RatingTable rows={low} columns={TABLE_COLUMN_KEYS} t={t} onCoursesClick={setCoursesModal} />
+                  <>
+                    <RatingCards rows={low} t={t} onCoursesClick={setCoursesModal} />
+                    <div className="hidden sm:block overflow-x-auto">
+                      <RatingTable rows={low} columns={TABLE_COLUMN_KEYS} t={t} onCoursesClick={setCoursesModal} />
+                    </div>
+                  </>
                 </motion.div>
               )}
             </AnimatePresence>

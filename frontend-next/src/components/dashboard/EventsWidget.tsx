@@ -85,15 +85,15 @@ export function EventsWidget() {
   return (
     <div className="h-full flex flex-col rounded-2xl border-0 shadow-lg overflow-hidden bg-white dark:bg-gray-800" style={{ boxShadow: "0 4px 20px rgba(0, 0, 0, 0.08)" }}>
       {/* Header with gradient */}
-      <div className="relative p-2.5 text-white flex items-center justify-between overflow-hidden" style={{ background: "linear-gradient(135deg, #7c3aed 0%, #3b82f6 100%)" }}>
+      <div className="relative p-3 text-white flex items-center justify-between overflow-hidden" style={{ background: "linear-gradient(135deg, #7c3aed 0%, #3b82f6 100%)" }}>
         {/* Decorative background pattern */}
         <div className="absolute inset-0 opacity-10">
           <div className="absolute top-0 right-0 w-32 h-32 bg-white rounded-full blur-3xl" />
           <div className="absolute bottom-0 left-0 w-24 h-24 bg-white rounded-full blur-2xl" />
         </div>
         <h3 className="relative font-bold text-sm">{t("events")}</h3>
-        <button type="button" className="relative p-1 rounded-lg hover:bg-white/20 transition-colors" aria-label={t("ariaOptions")}>
-          <MoreVertical className="w-3.5 h-3.5" />
+        <button type="button" className="relative p-2 rounded-lg hover:bg-white/20 transition-colors mobile-tap-target" aria-label={t("ariaOptions")}>
+          <MoreVertical className="w-4 h-4" />
         </button>
       </div>
 
@@ -137,18 +137,18 @@ export function EventsWidget() {
           <button
             type="button"
             onClick={() => scrollDates("left")}
-            className="absolute left-0 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-white dark:bg-gray-700 shadow-md flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors z-10"
+            className="absolute left-0 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white dark:bg-gray-700 shadow-md flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors z-10 mobile-tap-target"
             style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.15)" }}
           >
-            <ChevronLeft className="w-3 h-3" style={{ color: textColors.primary }} />
+            <ChevronLeft className="w-4 h-4" style={{ color: textColors.primary }} />
           </button>
           <button
             type="button"
             onClick={() => scrollDates("right")}
-            className="absolute right-0 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-white dark:bg-gray-700 shadow-md flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors z-10"
+            className="absolute right-0 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white dark:bg-gray-700 shadow-md flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors z-10 mobile-tap-target"
             style={{ boxShadow: "0 2px 8px rgba(0, 0, 0, 0.15)" }}
           >
-            <ChevronRight className="w-3 h-3" style={{ color: textColors.primary }} />
+            <ChevronRight className="w-4 h-4" style={{ color: textColors.primary }} />
           </button>
         </div>
 
@@ -175,14 +175,14 @@ export function EventsWidget() {
                     border: `1px solid ${theme === "dark" ? "rgba(255, 255, 255, 0.05)" : "rgba(0, 0, 0, 0.05)"}`,
                   }}
                 >
-                  <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${colorClass}`}>
-                    <Icon className="w-3 h-3" />
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${colorClass}`}>
+                    <Icon className="w-4 h-4" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-[10px] font-semibold truncate group-hover:text-[#7c3aed] transition-colors" style={{ color: textColors.primary }}>
+                    <p className="text-xs font-semibold truncate group-hover:text-[#7c3aed] transition-colors" style={{ color: textColors.primary }}>
                       {title}
                     </p>
-                    <p className="text-[10px] mt-0.5 line-clamp-1" style={{ color: textColors.secondary }}>
+                    <p className="text-xs mt-0.5 line-clamp-1" style={{ color: textColors.secondary }}>
                       {subtitle}
                     </p>
                   </div>
@@ -195,7 +195,7 @@ export function EventsWidget() {
         {/* View All link */}
         <Link
           href="/app/tasks-calendar"
-          className="flex items-center justify-center w-full py-1.5 rounded-xl font-semibold text-[10px] transition-all hover:opacity-80"
+          className="flex items-center justify-center w-full py-2.5 rounded-xl font-semibold text-xs transition-all hover:opacity-80 min-h-[2.5rem]"
           style={{
             color: theme === "dark" ? "#3b82f6" : "#3b82f6",
             background: theme === "dark" ? "transparent" : "rgba(59, 130, 246, 0.1)",

@@ -6,6 +6,7 @@ import { BorderBeam } from "@/components/ui/border-beam";
 import { NumberTicker } from "@/components/ui/number-ticker";
 import { DotPattern } from "@/components/ui/dot-pattern";
 import { BlurFade } from "@/components/ui/blur-fade";
+import { useLanguage } from "@/context/LanguageContext";
 import { cn } from "@/lib/utils";
 
 interface StatCardProps {
@@ -39,6 +40,7 @@ export function StatCard({
   colorScheme,
   delay = 0,
 }: StatCardProps) {
+  const { t } = useLanguage();
   return (
     <BlurFade delay={delay} inView>
       <button
@@ -135,7 +137,7 @@ export function StatCard({
                   : "text-gray-500 dark:text-gray-500"
               )}
             >
-              студентов
+              {t("coursesStudents")}
             </span>
           </div>
         </div>

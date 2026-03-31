@@ -6,6 +6,7 @@ import { Bot, X, Send } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 import { useAuthStore } from "@/store/authStore";
 import { api } from "@/api/client";
+import { useSidebar } from "@/context/SidebarContext";
 
 const STORAGE_KEY = "ai-chat-history";
 
@@ -41,6 +42,8 @@ export function LandingChatWidget() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { mobileOpen } = useSidebar();
+  
   useEffect(() => {
     setMessages(loadMessages(userId));
   }, [userId]);
@@ -72,7 +75,7 @@ export function LandingChatWidget() {
   const renderPanel = () => {
     if (token) {
       return (
-        <div className="absolute bottom-20 right-0 w-80 sm:w-96 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-700 overflow-hidden flex flex-col max-h-[28rem]">
+        <div className="absolute bottom-[calc(100%+0.75rem)] right-[-1.5rem] sm:right-0 w-[calc(100vw-2rem)] sm:w-96 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-700 overflow-hidden flex flex-col max-h-[min(30rem,70vh)]">
           <div className="p-4 text-white shrink-0" style={{ background: "var(--qit-gradient-1)" }}>
             <div className="flex items-center justify-between">
               <div>
@@ -109,7 +112,7 @@ export function LandingChatWidget() {
       );
     }
     return (
-      <div className="absolute bottom-20 right-0 w-80 sm:w-96 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-700 overflow-hidden">
+      <div className="absolute bottom-[calc(100%+0.75rem)] right-[-1.5rem] sm:right-0 w-[calc(100vw-2rem)] sm:w-96 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-700 overflow-hidden">
         <div className="p-6 text-white" style={{ background: "var(--qit-gradient-1)" }}>
           <div className="flex items-center justify-between">
             <div>
@@ -123,12 +126,9 @@ export function LandingChatWidget() {
         </div>
         <div className="p-6 space-y-4">
           <p className="text-gray-600 dark:text-gray-300 text-sm">{t("chatbotWelcome")}</p>
-          <div className="flex gap-3">
-            <Link href="/login" className="flex-1 py-2.5 px-4 rounded-xl text-white text-center font-medium hover:opacity-90 transition-opacity" style={{ background: "var(--qit-gradient-1)" }}>
+          <div className="flex">
+            <Link href="/login" className="w-full py-2.5 px-4 rounded-xl text-white text-center font-medium hover:opacity-90 transition-opacity" style={{ background: "var(--qit-gradient-1)" }}>
               {t("chatbotLoginPrompt")}
-            </Link>
-            <Link href="/register" className="flex-1 py-2.5 px-4 rounded-xl text-white text-center font-medium hover:opacity-90 transition-opacity" style={{ background: "var(--qit-gradient-3)" }}>
-              {t("chatbotRegisterPrompt")}
             </Link>
           </div>
         </div>
@@ -137,9 +137,9 @@ export function LandingChatWidget() {
   };
 
   return (
-    <div className="fixed bottom-8 right-8 z-[1000]">
+    <div className="fixed bottom-32 right-10 sm:bottom-6 sm:right-6 lg:bottom-8 lg:right-8 z-50">
       {open && renderPanel()}
-      <div className="animate-float">
+      <div className={`animate-float transition-opacity duration-300 ${mobileOpen ? "opacity-0 pointer-events-none" : "opacity-100"}`}>
         <button
           type="button"
           onClick={() => setOpen(!open)}

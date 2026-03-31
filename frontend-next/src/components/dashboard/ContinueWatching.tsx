@@ -47,8 +47,8 @@ export function ContinueWatching() {
   if (items.length === 0) return null;
 
   return (
-    <section className="mb-10">
-      <h2 className="text-lg font-semibold mb-4" style={{ color: textColors.primary }}>{t("continueWatching")}</h2>
+    <section className="mb-6 sm:mb-10">
+      <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4" style={{ color: textColors.primary }}>{t("continueWatching")}</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {items.map((item) => (
           <Link
@@ -57,7 +57,7 @@ export function ContinueWatching() {
             className="group rounded-[20px] overflow-hidden shadow-md hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 card-glow-hover card-hover-lift"
             style={glassStyle}
           >
-            <div className="relative h-28 bg-gray-100 dark:bg-gray-700 overflow-hidden">
+            <div className="relative h-32 sm:h-28 bg-gray-100 dark:bg-gray-700 overflow-hidden">
               <img
                 src={courseImageUrl(item)}
                 alt={getLocalizedCourseTitle({ title: item.course_title } as any, t)}
@@ -78,12 +78,12 @@ export function ContinueWatching() {
                 />
               </div>
             </div>
-            <div className="p-4">
-              <p className="font-semibold line-clamp-1" style={{ color: textColors.primary }}>
+            <div className="p-3.5 sm:p-4">
+              <p className="font-semibold line-clamp-2 sm:line-clamp-1 leading-snug" style={{ color: textColors.primary }}>
                 {getLocalizedTopicTitle(item.topic_title, t as any)}
               </p>
-              <p className="text-sm mt-0.5" style={{ color: textColors.secondary }}>{getLocalizedCourseTitle({ title: item.course_title } as any, t)}</p>
-              <p className="text-xs mt-2" style={{ color: "#8B5CF6" }}>
+              <p className="text-sm mt-0.5 line-clamp-1" style={{ color: textColors.secondary }}>{getLocalizedCourseTitle({ title: item.course_title } as any, t)}</p>
+              <p className="text-xs mt-1.5 sm:mt-2" style={{ color: "#8B5CF6" }}>
                 {formatTime(item.video_watched_seconds)} / {formatTime(item.video_duration)}
               </p>
             </div>

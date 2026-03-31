@@ -32,7 +32,7 @@ function TopicBlock({
   courseId: number;
   t: (k: TranslationKey) => string;
 }) {
-  const base = "rounded-lg px-4 py-3 font-medium transition-colors min-w-[140px] text-center";
+  const base = "rounded-lg px-3 sm:px-4 py-2.5 sm:py-3 font-medium transition-colors min-w-[140px] max-w-full text-center";
   const completed =
     "bg-green-500 dark:bg-green-600 text-white hover:bg-green-600 dark:hover:bg-green-700";
   const current =
@@ -48,10 +48,10 @@ function TopicBlock({
         : locked;
 
   const content = (
-    <span className="flex items-center justify-center gap-2">
+      <span className="flex items-center justify-center gap-2 min-w-0">
       {item.nodeType === "completed" && <Check className="h-4 w-4 shrink-0" strokeWidth={2.5} />}
       {item.nodeType === "locked" && <Lock className="h-4 w-4 shrink-0" />}
-      <span className="truncate">{item.topic_title}</span>
+      <span className="line-clamp-2 sm:line-clamp-1 mobile-safe-text">{item.topic_title}</span>
     </span>
   );
 

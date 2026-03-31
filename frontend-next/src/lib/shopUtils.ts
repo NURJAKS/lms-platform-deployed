@@ -1,4 +1,7 @@
 /** Maps API product title to translation key for localized display */
+import type { Lang } from "@/i18n/translations";
+import { localizeShopItem } from "@/lib/shopItemI18n";
+
 export const PRODUCT_TITLE_KEYS: Record<string, string> = {
   // Kazakh (Primary)
   "IT значок": "productITBadge",
@@ -71,16 +74,38 @@ export function getLocalizedProductTitle<K extends string>(
 }
 
 export function getLocalizedShopItemTitle<K extends string>(
-  item: { title: string },
-  t: (key: K) => string
+  item: { title: string; description?: string | null },
+  lang: Lang,
+  t?: (key: K) => string
 ): string {
-  return getLocalizedProductTitle(item.title, t);
+  // Prefer existing translation keys when they exist (keeps compatibility).
+  if (t) {
+    const key = PRODUCT_TITLE_KEYS[item.title];
+    if (key) return (t as (key: string) => string)(key);
+  }
+
+  return localizeShopItem({
+    title: item.title,
+    description: item.description ?? null,
+    lang,
+  }).title;
 }
 
 export function getLocalizedShopItemDesc<K extends string>(
   item: { title: string; description: string | null },
-  t: (key: K) => string
+  lang: Lang,
+  t?: (key: K) => string
 ): string {
-  const key = PRODUCT_DESC_KEYS[item.title];
-  return key ? (t as (key: string) => string)(key) : (item.description ?? "");
+  if (t) {
+    const key = PRODUCT_DESC_KEYS[item.title];
+    if (key) return (t as (key: string) => string)(key);
+  }
+
+  return (
+    localizeShopItem({
+      title: item.title,
+      description: item.description,
+      lang,
+    }).description ?? ""
+  );
 }

@@ -1,6 +1,21 @@
 import secrets
+from pathlib import Path
 
 from pydantic_settings import BaseSettings
+
+# Корень backend (где .env и education.db) — не зависит от CWD при запуске uvicorn
+_BACKEND_ROOT = Path(__file__).resolve().parent.parent.parent
+
+
+def _resolve_sqlite_url(url: str) -> str:
+    """Если DATABASE_URL указывает на sqlite с относительным путём, разрешаем его от backend root."""
+    if not url.startswith("sqlite:///./") and not url.startswith("sqlite:///"):
+        return url
+    # sqlite:///./education.db -> путь относительно backend/
+    path = url.replace("sqlite:///./", "").replace("sqlite:///", "")
+    abs_path = (_BACKEND_ROOT / path).resolve()
+    abs_path.parent.mkdir(parents=True, exist_ok=True)
+    return f"sqlite:///{abs_path}"
 
 
 class Settings(BaseSettings):
@@ -8,7 +23,6 @@ class Settings(BaseSettings):
     SECRET_KEY: str = secrets.token_urlsafe(64)
     OPENAI_API_KEY: str = ""
     GEMINI_API_KEY: str = ""
-    GOOGLE_CLIENT_ID: str = ""
     UPLOAD_DIR: str = "./uploads"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 24 * 60  # 24 hours
     PREMIUM_PRICE_TENGE: int = 199999  # цена Premium в тенге
@@ -22,8 +36,16 @@ class Settings(BaseSettings):
     SMTP_USE_TLS: bool = True
 
     class Config:
-        env_file = ".env"
+        env_file = str(_BACKEND_ROOT / ".env")
+        env_file_encoding = "utf-8"
         extra = "ignore"
 
 
-settings = Settings()
+def _get_settings() -> Settings:
+    s = Settings()
+    if "sqlite" in s.DATABASE_URL:
+        s.DATABASE_URL = _resolve_sqlite_url(s.DATABASE_URL)
+    return s
+
+
+settings = _get_settings()

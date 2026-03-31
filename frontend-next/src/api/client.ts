@@ -3,9 +3,15 @@ import { useAuthStore } from "../store/authStore";
 
 const token = () => {
   if (typeof window === "undefined") return null;
+  // Try to get from localStorage first as it's the most reliable source if rehydration is slow
+  const rawToken = localStorage.getItem("token");
+  if (rawToken) return rawToken;
+  
+  // Fallback to store
   const fromStore = useAuthStore.getState().token;
   if (fromStore) return fromStore;
-  return localStorage.getItem("token");
+  
+  return null;
 };
 
 export const api = axios.create({

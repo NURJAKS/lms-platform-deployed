@@ -17,20 +17,17 @@ import {
   Award,
   TrendingUp,
   Clock,
-  Calendar,
   Target,
   Trophy,
   AlertCircle,
-  Sparkles,
   GraduationCap,
-  Activity,
   BarChart3,
   Star,
   Zap,
 } from "lucide-react";
 import { getGlassCardStyle, getTextColors, getDashboardCardStyle } from "@/utils/themeStyles";
 import { BlurFade } from "@/components/ui/blur-fade";
-import { getLocalizedCourseTitle } from "@/lib/courseUtils";
+import { getLocalizedCourseTitle, getLocalizedTopicTitle } from "@/lib/courseUtils";
 
 interface ReportCourse {
   course_id: number;
@@ -80,149 +77,6 @@ interface ParentAssignment {
   teacher_comment: string | null;
 }
 
-// Mock data для демонстрации
-const MOCK_CHILDREN: Child[] = [
-  { id: 1, full_name: "Алия Нурланова", email: "aliya@example.com", avatarColor: "linear-gradient(135deg, #FF6B6B 0%, #EE5A24 100%)" },
-  { id: 2, full_name: "Данияр Ахметов", email: "daniyar@example.com", avatarColor: "linear-gradient(135deg, #7C3AED 0%, #DB2777 100%)" },
-  { id: 3, full_name: "Камила Жумабаева", email: "kamila@example.com", avatarColor: "linear-gradient(135deg, #059669 0%, #14B8A6 100%)" },
-];
-
-const MOCK_REPORTS: Record<number, Report> = {
-  1: {
-    student: { id: 1, full_name: "Алия Нурланова", email: "aliya@example.com" },
-    courses: [
-      {
-        course_id: 1,
-        course_title: "Python для начинающих",
-        progress_percent: 75,
-        topics_completed: 15,
-        completed_topic_titles: ["Введение", "Переменные", "Циклы", "Функции", "ООП"],
-        total_topics: 20,
-        test_scores: [85, 90, 78, 92],
-        avg_test_score: 86.25,
-        certificate: null,
-      },
-      {
-        course_id: 2,
-        course_title: "Web разработка",
-        progress_percent: 45,
-        topics_completed: 9,
-        completed_topic_titles: ["HTML основы", "CSS стили", "JavaScript базовый"],
-        total_topics: 20,
-        test_scores: [88, 75],
-        avg_test_score: 81.5,
-        certificate: null,
-      },
-    ],
-    certificates: [],
-    overall_stats: {
-      avg_score: 84.0,
-      total_topics_completed: 24,
-      courses_enrolled: 2,
-      certificates_count: 0,
-    },
-  },
-  2: {
-    student: { id: 2, full_name: "Данияр Ахметов", email: "daniyar@example.com" },
-    courses: [
-      {
-        course_id: 1,
-        course_title: "Python для начинающих",
-        progress_percent: 100,
-        topics_completed: 20,
-        completed_topic_titles: ["Все темы завершены"],
-        total_topics: 20,
-        test_scores: [95, 98, 92, 96, 94],
-        avg_test_score: 95.2,
-        certificate: { id: 1, final_score: 95.2, issued_at: "2024-12-15T10:00:00Z" },
-      },
-    ],
-    certificates: [{ course_id: 1, course_title: "Python для начинающих", final_score: 95.2 }],
-    overall_stats: {
-      avg_score: 95.2,
-      total_topics_completed: 20,
-      courses_enrolled: 1,
-      certificates_count: 1,
-    },
-  },
-  3: {
-    student: { id: 3, full_name: "Камила Жумабаева", email: "kamila@example.com" },
-    courses: [
-      {
-        course_id: 2,
-        course_title: "Web разработка",
-        progress_percent: 60,
-        topics_completed: 12,
-        completed_topic_titles: ["HTML", "CSS", "JavaScript", "React основы"],
-        total_topics: 20,
-        test_scores: [82, 85, 80],
-        avg_test_score: 82.3,
-        certificate: null,
-      },
-    ],
-    certificates: [],
-    overall_stats: {
-      avg_score: 82.3,
-      total_topics_completed: 12,
-      courses_enrolled: 1,
-      certificates_count: 0,
-    },
-  },
-};
-
-const MOCK_ASSIGNMENTS: Record<number, ParentAssignment[]> = {
-  1: [
-    {
-      id: 1,
-      title: "Создать калькулятор на Python",
-      description: "Реализовать базовые операции",
-      course_id: 1,
-      course_title: "Python для начинающих",
-      deadline: "2024-12-20T23:59:59Z",
-      submitted: false,
-      grade: null,
-      teacher_comment: null,
-    },
-    {
-      id: 2,
-      title: "Верстка landing page",
-      description: "Использовать HTML и CSS",
-      course_id: 2,
-      course_title: "Web разработка",
-      deadline: null,
-      submitted: true,
-      grade: 88,
-      teacher_comment: "Отличная работа! Хорошая структура и стилизация.",
-    },
-  ],
-  2: [
-    {
-      id: 3,
-      title: "Финальный проект: To-Do приложение",
-      description: "Полноценное приложение с базой данных",
-      course_id: 1,
-      course_title: "Python для начинающих",
-      deadline: null,
-      submitted: true,
-      grade: 96,
-      teacher_comment: "Превосходно! Код чистый и структурированный.",
-    },
-  ],
-  3: [
-    {
-      id: 4,
-      title: "React компонент: форма регистрации",
-      description: "Создать форму с валидацией",
-      course_id: 2,
-      course_title: "Web разработка",
-      deadline: "2024-12-18T23:59:59Z",
-      submitted: false,
-      grade: null,
-      teacher_comment: null,
-    },
-  ],
-};
-
 function getInitials(name: string): string {
   return name
     .split(" ")
@@ -241,58 +95,63 @@ export function ParentDashboard() {
   const isDark = theme === "dark";
   const [selectedChildId, setSelectedChildId] = useState<number | null>(null);
   const reportRef = useRef<HTMLDivElement>(null);
+  const avatarColors = [
+    "linear-gradient(135deg, #FF6B6B 0%, #EE5A24 100%)",
+    "linear-gradient(135deg, #7C3AED 0%, #DB2777 100%)",
+    "linear-gradient(135deg, #059669 0%, #14B8A6 100%)",
+    "linear-gradient(135deg, #2563EB 0%, #06B6D4 100%)",
+  ];
 
-  // Используем моковые данные если API не возвращает данные
-  const { data: childrenData = [] } = useQuery({
+  const { data: childrenData = [], isLoading: childrenLoading, error: childrenError } = useQuery({
     queryKey: ["parent-children"],
     queryFn: async () => {
-      try {
-        const { data } = await api.get<Array<{ id: number; full_name: string; email: string }>>("/parent/children");
-        return data.length > 0 ? data : MOCK_CHILDREN;
-      } catch {
-        return MOCK_CHILDREN;
-      }
+      const { data } = await api.get<Array<{ id: number; full_name: string; email: string }>>("/parent/children");
+      return data;
     },
   });
 
   const children = childrenData.map((c, idx) => ({
     ...c,
-    avatarColor: MOCK_CHILDREN[idx]?.avatarColor || `linear-gradient(135deg, #${Math.floor(Math.random() * 16777215).toString(16)} 0%, #${Math.floor(Math.random() * 16777215).toString(16)} 100%)`,
+    avatarColor: avatarColors[idx % avatarColors.length],
   }));
 
-  const { data: childReport } = useQuery({
+  const childIds = children.map((child) => child.id);
+
+  const { data: childrenReports = [], isLoading: childrenReportsLoading } = useQuery({
+    queryKey: ["parent-children-reports", childIds],
+    enabled: childIds.length > 0,
+    queryFn: async () => {
+      const settled = await Promise.allSettled(
+        childIds.map(async (childId) => {
+          const { data } = await api.get<Report>(`/parent/children/${childId}/report`);
+          return { childId, report: data };
+        })
+      );
+      return settled.flatMap((result) => (result.status === "fulfilled" ? [result.value] : []));
+    },
+  });
+
+  const reportsByChildId = new Map(childrenReports.map(({ childId, report }) => [childId, report]));
+
+  const { data: childReport, isLoading: childReportLoading, error: childReportError } = useQuery({
     queryKey: ["parent-child-report", selectedChildId],
     queryFn: async () => {
       if (!selectedChildId) return null;
-      try {
-        const { data } = await api.get<Report>(`/parent/children/${selectedChildId}/report`);
-        return data;
-      } catch {
-        return MOCK_REPORTS[selectedChildId] || null;
-      }
+      const { data } = await api.get<Report>(`/parent/children/${selectedChildId}/report`);
+      return data;
     },
     enabled: !!selectedChildId,
   });
 
-  const { data: childAssignmentsData } = useQuery({
+  const { data: childAssignmentsData, isLoading: childAssignmentsLoading, error: childAssignmentsError } = useQuery({
     queryKey: ["parent-child-assignments", selectedChildId],
     queryFn: async () => {
       if (!selectedChildId) return null;
-      try {
-        const { data } = await api.get<{
-          student: { id: number; full_name: string; email: string };
-          assignments: ParentAssignment[];
-        }>(`/parent/children/${selectedChildId}/assignments`);
-        return data;
-      } catch {
-        const child = children.find((c) => c.id === selectedChildId);
-        return child
-          ? {
-              student: { id: child.id, full_name: child.full_name, email: child.email },
-              assignments: MOCK_ASSIGNMENTS[selectedChildId] || [],
-            }
-          : null;
-      }
+      const { data } = await api.get<{
+        student: { id: number; full_name: string; email: string };
+        assignments: ParentAssignment[];
+      }>(`/parent/children/${selectedChildId}/assignments`);
+      return data;
     },
     enabled: !!selectedChildId,
   });
@@ -315,7 +174,7 @@ export function ParentDashboard() {
         getLocalizedCourseTitle({ title: c.course_title } as any, t),
         `  ${t("parentProgress")}: ${c.progress_percent}%`,
         `  ${t("parentTestScores")}: ${c.test_scores.length ? c.test_scores.join(", ") : "—"}`,
-        `  ${t("profileTopic")}: ${c.completed_topic_titles.length ? c.completed_topic_titles.join(", ") : "—"}`,
+        `  ${t("profileTopic")}: ${c.completed_topic_titles.length ? c.completed_topic_titles.map((tt) => getLocalizedTopicTitle(tt, t)).join(", ") : "—"}`,
         "",
       ]),
       `=== ${t("parentOverallStats")} ===`,
@@ -342,26 +201,71 @@ export function ParentDashboard() {
       )
     : 0;
 
-  // Общая статистика по всем детям
   const totalChildren = children.length;
-  const totalCourses = children.reduce((sum, child) => {
-    const report = MOCK_REPORTS[child.id];
-    return sum + (report?.courses.length || 0);
+  const totalCourses = childrenReports.reduce((sum, { report }) => {
+    return sum + (report.overall_stats.courses_enrolled || 0);
   }, 0);
-  const totalCertificates = children.reduce((sum, child) => {
-    const report = MOCK_REPORTS[child.id];
-    return sum + (report?.overall_stats.certificates_count || 0);
+  const totalCertificates = childrenReports.reduce((sum, { report }) => {
+    return sum + (report.overall_stats.certificates_count || 0);
   }, 0);
-  const avgProgress = children.length
+  const avgProgress = childrenReports.length
     ? Math.round(
-        children.reduce((sum, child) => {
-          const report = MOCK_REPORTS[child.id];
-          if (!report || !report.courses.length) return sum;
+        childrenReports.reduce((sum, { report }) => {
+          if (!report.courses.length) return sum;
           const childProgress = report.courses.reduce((s, c) => s + c.progress_percent, 0) / report.courses.length;
           return sum + childProgress;
-        }, 0) / children.length
+        }, 0) / childrenReports.length
       )
     : 0;
+
+  if (childrenLoading) {
+    return (
+      <div className="max-w-2xl mx-auto">
+        <h1 className="text-2xl font-bold mb-6" style={{ color: textColors.primary }}>
+          {t("parentDashboardTitle")}
+        </h1>
+        <div className="rounded-xl p-6 text-center" style={glassStyle}>
+          <p className="font-medium" style={{ color: textColors.primary }}>
+            {t("parentLoading")}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (childrenError) {
+    return (
+      <div className="max-w-2xl mx-auto">
+        <h1 className="text-2xl font-bold mb-6" style={{ color: textColors.primary }}>
+          {t("parentDashboardTitle")}
+        </h1>
+        <div className="rounded-xl p-6 text-center" style={glassStyle}>
+          <AlertCircle className="w-12 h-12 mx-auto mb-3" style={{ color: "#EF4444" }} />
+          <p className="font-medium mb-2" style={{ color: textColors.primary }}>
+            {t("error")}
+          </p>
+          <p className="text-sm" style={{ color: textColors.secondary }}>
+            {childrenError instanceof Error ? childrenError.message : t("parentLoading")}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (children.length > 0 && childrenReportsLoading && childrenReports.length === 0) {
+    return (
+      <div className="max-w-2xl mx-auto">
+        <h1 className="text-2xl font-bold mb-6" style={{ color: textColors.primary }}>
+          {t("parentDashboardTitle")}
+        </h1>
+        <div className="rounded-xl p-6 text-center" style={glassStyle}>
+          <p className="font-medium" style={{ color: textColors.primary }}>
+            {t("parentLoading")}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (children.length === 0) {
     return (
@@ -417,7 +321,12 @@ export function ParentDashboard() {
           { icon: Users, value: totalChildren, label: t("profileChildren"), color: "#7C3AED" },
           { icon: BookOpen, value: totalCourses, label: t("parentTotalCourses"), color: "#3B82F6" },
           { icon: Trophy, value: totalCertificates, label: t("parentCertificates"), color: "#F59E0B" },
-          { icon: TrendingUp, value: `${avgProgress}%`, label: t("parentAvgProgress"), color: "#10B981" },
+          {
+            icon: TrendingUp,
+            value: childrenReportsLoading && childrenReports.length === 0 ? t("parentLoading") : `${avgProgress}%`,
+            label: t("parentAvgProgress"),
+            color: "#10B981",
+          },
         ].map((stat, index) => (
           <BlurFade key={stat.label} delay={0.2 + index * 0.1} duration={0.5} blur="6px" offset={15} direction="up">
             <div className="rounded-xl p-4 flex items-center gap-3" style={cardStyle}>
@@ -443,7 +352,7 @@ export function ParentDashboard() {
       {/* Children Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {children.map((child, index) => {
-          const report = MOCK_REPORTS[child.id];
+          const report = reportsByChildId.get(child.id);
           const childProgress = report?.courses.length
             ? Math.round(
                 report.courses.reduce((s, c) => s + c.progress_percent, 0) / report.courses.length
@@ -506,7 +415,9 @@ export function ParentDashboard() {
                   />
                 </div>
                 <div className="flex items-center gap-4 text-xs" style={{ color: textColors.secondary }}>
-                  <span>{report?.courses.length || 0} {t("courses")}</span>
+                  <span>
+                    {report?.overall_stats.courses_enrolled || 0} {t("courses")}
+                  </span>
                   {report?.overall_stats.certificates_count ? (
                     <span className="flex items-center gap-1">
                       <Trophy className="w-3 h-3" style={{ color: "#F59E0B" }} />
@@ -522,6 +433,28 @@ export function ParentDashboard() {
       </div>
 
       {/* Detailed View */}
+      {selectedChildId && childReportLoading && (
+        <BlurFade delay={0.1} duration={0.6} blur="8px" offset={30} direction="up">
+          <div className="rounded-xl p-6 text-center" style={cardStyle}>
+            <p style={{ color: textColors.secondary }}>{t("parentLoading")}</p>
+          </div>
+        </BlurFade>
+      )}
+
+      {selectedChildId && childReportError && (
+        <BlurFade delay={0.1} duration={0.6} blur="8px" offset={30} direction="up">
+          <div className="rounded-xl p-6 text-center" style={cardStyle}>
+            <AlertCircle className="w-12 h-12 mx-auto mb-3" style={{ color: "#EF4444" }} />
+            <p className="font-medium mb-2" style={{ color: textColors.primary }}>
+              {t("error")}
+            </p>
+            <p style={{ color: textColors.secondary }}>
+              {childReportError instanceof Error ? childReportError.message : t("parentLoading")}
+            </p>
+          </div>
+        </BlurFade>
+      )}
+
       {selectedChildId && childReport && (
         <BlurFade delay={0.1} duration={0.6} blur="8px" offset={30} direction="up">
           <div ref={reportRef} className="rounded-xl overflow-hidden" style={cardStyle}>
@@ -698,15 +631,7 @@ export function ParentDashboard() {
                           </span>
                         </div>
                       )}
-                      {childReport.overall_stats.points != null && (
-                        <div className="flex items-center justify-between">
-                          <span style={{ color: textColors.secondary }}>{t("profileCoins")}:</span>
-                          <span className="font-semibold flex items-center gap-1" style={{ color: textColors.primary }}>
-                            <Zap className="w-3 h-3" style={{ color: "#F59E0B" }} />
-                            {childReport.overall_stats.points}
-                          </span>
-                        </div>
-                      )}
+
                     </div>
                     </div>
                   </BlurFade>
@@ -820,7 +745,19 @@ export function ParentDashboard() {
                 </div>
 
                 {/* Assignments */}
-                {childAssignmentsData && (
+                {childAssignmentsLoading ? (
+                  <BlurFade delay={0.2} duration={0.4}>
+                    <p className="text-sm py-6 text-center" style={{ color: textColors.secondary }}>
+                      {t("parentLoading")}
+                    </p>
+                  </BlurFade>
+                ) : childAssignmentsError ? (
+                  <BlurFade delay={0.2} duration={0.4}>
+                    <p className="text-sm py-6 text-center" style={{ color: textColors.secondary }}>
+                      {t("error")}
+                    </p>
+                  </BlurFade>
+                ) : childAssignmentsData && (
                   <div>
                     <BlurFade delay={0.2} duration={0.4} blur="4px" offset={10}>
                       <h3 className="font-semibold mb-4 flex items-center gap-2" style={{ color: textColors.primary }}>

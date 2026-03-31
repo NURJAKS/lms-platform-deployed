@@ -205,6 +205,7 @@ export default function PremiumPage() {
               </div>
               <h3 className="text-xl font-bold text-gray-900 dark:text-white">
                 {t(key as TranslationKey)}
+                {key === "premiumBenefit1" && premiumCourses.length > 0 && ` (${premiumCourses.length})`}
               </h3>
             </div>
           ))}
@@ -256,7 +257,7 @@ export default function PremiumPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="max-w-4xl mx-auto px-1 sm:px-0">
       {/* Payment simulation modal */}
       {paymentModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" role="dialog" aria-modal="true" aria-labelledby="premium-payment-title">
@@ -366,7 +367,7 @@ export default function PremiumPage() {
 
       {/* Hero */}
       <div
-        className="relative rounded-3xl overflow-hidden mb-16 p-12 md:p-16 lg:p-20 text-white"
+        className="relative rounded-3xl overflow-hidden mb-10 sm:mb-16 p-5 sm:p-8 md:p-12 lg:p-20 text-white"
         style={{
           background: "linear-gradient(135deg, #1a237e 0%, #311b92 40%, #7c3aed 100%)",
           boxShadow: "0 25px 50px -12px rgba(124, 58, 237, 0.35)",
@@ -382,10 +383,10 @@ export default function PremiumPage() {
               <Sparkles className="w-5 h-5" />
               {t("premiumBadge")}
             </div>
-            <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold font-montserrat leading-[1.1] mb-6 tracking-tight">
+            <h1 className="text-3xl sm:text-4xl md:text-6xl lg:text-7xl font-bold font-montserrat leading-[1.1] mb-4 sm:mb-6 tracking-tight">
               {t("premiumPageTitle")}
             </h1>
-            <p className="text-white/90 text-xl md:text-2xl max-w-2xl leading-relaxed">
+            <p className="text-white/90 text-base sm:text-lg md:text-2xl max-w-2xl leading-relaxed">
               {t("premiumPageSubtitle")}
             </p>
           </div>
@@ -397,24 +398,24 @@ export default function PremiumPage() {
 
       {/* Free vs Premium Comparison */}
       <div className="mb-16">
-        <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold text-center text-gray-900 dark:text-white mb-12 tracking-tight">
+        <h2 className="text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-center text-gray-900 dark:text-white mb-8 sm:mb-12 tracking-tight">
           {t("freeVsPremiumTitle")}
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8">
           {/* Free Plan */}
-          <div className="rounded-3xl p-8 lg:p-10 bg-gray-50 dark:bg-gray-800/50 border-2 border-gray-200 dark:border-gray-700">
+          <div className="rounded-3xl p-5 sm:p-8 lg:p-10 bg-gray-50 dark:bg-gray-800/50 border-2 border-gray-200 dark:border-gray-700">
             <div className="text-center mb-8">
               <h3 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-2">
                 {t("freePlan")}
               </h3>
             </div>
-            <ul className="space-y-4">
+            <ul className="space-y-3 sm:space-y-4">
               {freeLimits.map((key) => (
                 <li key={key} className="flex items-start gap-3 text-gray-700 dark:text-gray-300">
                   <span className="w-6 h-6 rounded-full bg-red-100 dark:bg-red-900/50 flex items-center justify-center shrink-0 mt-0.5">
                     <X className="w-4 h-4 text-red-600 dark:text-red-400" />
                   </span>
-                  <span className="text-lg">{t(key)}</span>
+                  <span className="text-base sm:text-lg">{t(key)}</span>
                 </li>
               ))}
             </ul>
@@ -422,7 +423,7 @@ export default function PremiumPage() {
 
           {/* Premium Plan */}
           <div
-            className="relative rounded-3xl p-8 lg:p-10 border-2 overflow-hidden"
+            className="relative rounded-3xl p-5 sm:p-8 lg:p-10 border-2 overflow-hidden"
             style={{
               background: "linear-gradient(135deg, rgba(124, 58, 237, 0.1) 0%, rgba(91, 33, 182, 0.1) 100%)",
               borderColor: "rgba(124, 58, 237, 0.3)",
@@ -439,13 +440,13 @@ export default function PremiumPage() {
                 {t("premiumPlan")}
               </h3>
             </div>
-            <ul className="space-y-4">
+            <ul className="space-y-3 sm:space-y-4">
               {premiumFeatures.map(({ icon: Icon, key }) => (
                 <li key={key} className="flex items-start gap-3 text-gray-700 dark:text-gray-300">
                   <span className="w-6 h-6 rounded-full bg-purple-100 dark:bg-purple-900/50 flex items-center justify-center shrink-0 mt-0.5">
                     <Check className="w-4 h-4 text-purple-600 dark:text-purple-400" />
                   </span>
-                  <span className="text-lg">{t(key as TranslationKey)}</span>
+                  <span className="text-base sm:text-lg">{t(key as TranslationKey)}</span>
                 </li>
               ))}
             </ul>
@@ -473,6 +474,7 @@ export default function PremiumPage() {
               </div>
               <h3 className="text-xl lg:text-2xl font-bold text-gray-900 dark:text-white leading-tight">
                 {t(key as TranslationKey)}
+                {key === "premiumFeature1" && premiumCourses.length > 0 && ` (${premiumCourses.length})`}
               </h3>
             </div>
           ))}

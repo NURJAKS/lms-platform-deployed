@@ -6,7 +6,8 @@ import { X, Calendar, BookOpen, FileText, Trash2, CheckCircle2, Circle, Pencil, 
 import { useLanguage } from "@/context/LanguageContext";
 import { api } from "@/api/client";
 import { cn } from "@/lib/utils";
-import { getLocalizedCourseTitle } from "@/lib/courseUtils";
+import { getLocalizedCourseTitle, getLocalizedTopicTitle } from "@/lib/courseUtils";
+import { DeleteConfirmButton } from "@/components/ui/DeleteConfirmButton";
 
 type ScheduleItem = {
   id: number;
@@ -80,6 +81,17 @@ export function EventDetailsModal({
     }
   }, [editCourseId, isEditing]);
 
+  // Sync edit form fields when event prop updates (e.g. after refetch) and form is closed
+  useEffect(() => {
+    if (!isEditing && type === "schedule") {
+      const item = event as ScheduleItem;
+      setEditCourseId(item.course_id || "");
+      setEditTopicId(item.topic_id || "");
+      setEditNotes(item.notes || "");
+      setEditDate(item.scheduled_date);
+    }
+  }, [event, type, isEditing]);
+
   const isSchedule = type === "schedule";
   const scheduleItem = isSchedule ? (event as ScheduleItem) : null;
   const assignment = !isSchedule ? (event as Assignment) : null;
@@ -115,7 +127,7 @@ export function EventDetailsModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 flex items-center justify-between rounded-t-2xl">
           <h2 className="text-xl font-semibold text-gray-800 dark:text-white">
@@ -192,7 +204,7 @@ export function EventDetailsModal({
                       <option value="">{t("scheduleSelectTopic")}</option>
                       {editTopicsForSelect.map((topic) => (
                         <option key={topic.id} value={topic.id}>
-                          {topic.title}
+                          {getLocalizedTopicTitle(topic.title, t)}
                         </option>
                       ))}
                     </select>
@@ -279,7 +291,7 @@ export function EventDetailsModal({
                     <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
                       {t("scheduleSelectTopic")}
                     </p>
-                    <p className="text-gray-800 dark:text-white">{scheduleItem!.topic_title}</p>
+                    <p className="text-gray-800 dark:text-white">{getLocalizedTopicTitle(scheduleItem!.topic_title, t)}</p>
                   </div>
                 </div>
               )}
@@ -350,19 +362,13 @@ export function EventDetailsModal({
                 </span>
               </button>
               {onDelete && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (confirm(t("scheduleDeleteConfirm"))) {
-                      onDelete(scheduleItem.id);
-                      onClose();
-                    }
-                  }}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  <span className="text-sm font-medium">{t("scheduleDelete")}</span>
-                </button>
+                <DeleteConfirmButton
+                  onDelete={() => onDelete(scheduleItem.id)}
+                  isLoading={isUpdating}
+                  text={t("scheduleDelete")}
+                  title={`${t("scheduleDelete")}?`}
+                  description={t("confirmDelete")}
+                />
               )}
             </div>
           )}

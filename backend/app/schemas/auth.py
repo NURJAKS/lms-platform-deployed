@@ -32,19 +32,3 @@ class RegisterResponse(BaseModel):
     """Ответ регистрации: пользователь и токен для немедленного входа."""
     user: UserResponse
     access_token: str
-
-
-class GoogleLoginRequest(BaseModel):
-    id_token: str
-
-
-class GoogleLoginResponse(BaseModel):
-    user_exists: bool
-    access_token: str | None = None
-    email: str | None = None
-    full_name: str | None = None
-
-
-class GoogleRegisterRequest(BaseModel):
-    id_token: str
-    role: Literal["student", "teacher"]

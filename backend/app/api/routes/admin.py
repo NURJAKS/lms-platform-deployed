@@ -30,8 +30,10 @@ from app.models.notification import Notification
 from app.models.payment import Payment
 from app.models.user_purchase import UserPurchase
 from app.models.shop_item import ShopItem
+from app.models.student_profile import StudentProfile
 from datetime import datetime
 from app.schemas.user import UserCreate, UserUpdate, UserResponse, UserWithRelationsResponse, ChildInfo, CourseInfo
+from app.schemas.student_profile import StudentProfileMergedResponse, StudentProfileUpdate
 from app.schemas.course import (
     CourseCreate,
     CourseUpdate,
@@ -45,6 +47,8 @@ from app.schemas.course import (
 )
 from app.schemas.test import TestCreate, TestUpdate, TestResponse, TestQuestionCreate, TestQuestionUpdate, TestQuestionResponse
 from app.services.activity_log import log_activity
+from app.services.export_service import generate_csv_response, generate_xlsx_response
+# No fake profile imports
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -227,12 +231,11 @@ def approve_application(
         user.password_hash = get_password_hash(new_password)
 
     pay_msg = f"Оплатите {amount}₸ по курсу «{course.title}» для доступа к материалам. " if amount > 0 else ""
-    creds_msg = f" Логин: {user.email}, пароль: {new_password}." if new_password else ""
     notif = Notification(
         user_id=user.id,
         type="application_approved",
         title="Заявка одобрена",
-        message=f"Ваша заявка одобрена. {pay_msg}{creds_msg}".strip(),
+        message=f"Ваша заявка одобрена. {pay_msg}Войдите в систему для доступа к материалам.".strip(),
         link="/app",
     )
     db.add(notif)
@@ -697,26 +700,143 @@ def update_user(
     return user
 
 
+def _admin_get_last_login_dt(db: Session, user_id: int):
+    row = (
+        db.query(UserActivityLog)
+        .filter(UserActivityLog.user_id == user_id, UserActivityLog.action == "login")
+        .order_by(UserActivityLog.created_at.desc())
+        .first()
+    )
+    return row.created_at if row else None
+
+
+def _admin_ensure_student_profile(db: Session, user: User) -> StudentProfile | None:
+    sp = db.query(StudentProfile).filter(StudentProfile.user_id == user.id).first()
+    return sp
+
+
+@router.get("/users/{user_id}/student-profile", response_model=StudentProfileMergedResponse)
+def admin_get_student_profile(
+    user_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_admin_or_director)],
+):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    if user.role != "student":
+        raise HTTPException(status_code=400, detail="Профиль доступен только для студентов")
+    sp = _admin_ensure_student_profile(db, user)
+    last_login = _admin_get_last_login_dt(db, user_id)
+    return StudentProfileMergedResponse(
+        id=user.id,
+        email=user.email,
+        full_name=user.full_name,
+        photo_url=user.photo_url,
+        phone=user.phone,
+        birth_date=user.birth_date,
+        address=user.address,
+        city=user.city,
+        created_at=user.created_at,
+        gender=sp.gender,
+        nationality=sp.nationality,
+        identity_card=sp.identity_card,
+        iin=sp.iin,
+        phone_alternative=sp.phone_alternative,
+        postal_code=sp.postal_code,
+        country=sp.country,
+        student_id_card_number=sp.student_id_card_number,
+        specialty=sp.specialty,
+        course=sp.course,
+        group=sp.group,
+        study_form=sp.study_form,
+        admission_date=sp.admission_date,
+        graduation_date_planned=sp.graduation_date_planned,
+        status=sp.status,
+        interface_language=sp.interface_language,
+        timezone=sp.timezone,
+        last_login=last_login,
+    )
+
+
+@router.patch("/users/{user_id}/student-profile", response_model=StudentProfileMergedResponse)
+def admin_update_student_profile(
+    user_id: int,
+    data: StudentProfileUpdate,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_admin_or_director)],
+):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    if user.role != "student":
+        raise HTTPException(status_code=400, detail="Профиль доступен только для студентов")
+    sp = _admin_ensure_student_profile(db, user)
+    patch = data.model_dump(exclude_unset=True)
+    for k, v in patch.items():
+        if hasattr(sp, k):
+            setattr(sp, k, v)
+    db.commit()
+    db.refresh(sp)
+    log_activity(db, current_user.id, "student_profile_updated", "user", user_id, {"fields": list(patch.keys())})
+    last_login = _admin_get_last_login_dt(db, user_id)
+    return StudentProfileMergedResponse(
+        id=user.id,
+        email=user.email,
+        full_name=user.full_name,
+        photo_url=user.photo_url,
+        phone=user.phone,
+        birth_date=user.birth_date,
+        address=user.address,
+        city=user.city,
+        created_at=user.created_at,
+        gender=sp.gender,
+        nationality=sp.nationality,
+        identity_card=sp.identity_card,
+        iin=sp.iin,
+        phone_alternative=sp.phone_alternative,
+        postal_code=sp.postal_code,
+        country=sp.country,
+        student_id_card_number=sp.student_id_card_number,
+        specialty=sp.specialty,
+        course=sp.course,
+        group=sp.group,
+        study_form=sp.study_form,
+        admission_date=sp.admission_date,
+        graduation_date_planned=sp.graduation_date_planned,
+        status=sp.status,
+        interface_language=sp.interface_language,
+        timezone=sp.timezone,
+        last_login=last_login,
+    )
+
+
 @router.get("/users/export/csv")
 def export_users_csv(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_admin_or_director)],
 ):
-    import csv
-    import io
     users = db.query(User).order_by(User.id).all()
-    output = io.StringIO()
-    writer = csv.writer(output)
-    writer.writerow(["ID", "Email", "Full Name", "Role", "Created At"])
-    for u in users:
-        writer.writerow([u.id, u.email, u.full_name, u.role, u.created_at.isoformat() if u.created_at else ""])
-    output.seek(0)
-    csv_content = "\ufeff" + output.getvalue()  # UTF-8 BOM для корректного отображения в Excel
-    return StreamingResponse(
-        iter([csv_content]),
-        media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": "attachment; filename=users.csv"},
-    )
+    headers = ["ID", "Email", "Full Name", "Role", "Created At"]
+    rows = [
+        [u.id, u.email, u.full_name, u.role, u.created_at.isoformat() if u.created_at else ""]
+        for u in users
+    ]
+    return generate_csv_response(rows, "users", headers)
+
+
+@router.get("/users/export/excel")
+def export_users_excel(
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_admin_or_director)],
+):
+    users = db.query(User).order_by(User.id).all()
+    headers = ["ID", "Email", "Full Name", "Role", "Created At"]
+    rows = [
+        [u.id, u.email, u.full_name, u.role, u.created_at.isoformat() if u.created_at else ""]
+        for u in users
+    ]
+    return generate_xlsx_response(rows, "users", headers, sheet_name="Users")
 
 
 @router.delete("/users/{user_id}")

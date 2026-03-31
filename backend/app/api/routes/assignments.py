@@ -3,6 +3,7 @@ import json
 import uuid
 from pathlib import Path
 from typing import Annotated
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel
@@ -99,9 +100,13 @@ def list_my_assignments(
         if topic_ids:
             for t in db.query(CourseTopic).filter(CourseTopic.id.in_(topic_ids)).all():
                 topics[t.id] = t.title
+    now = datetime.now(timezone.utc)
     out = []
     for a in assignments:
         sub = submissions_by_assignment.get(a.id)
+        closed = (getattr(a, "closed_at", None) is not None) or (
+            a.deadline is not None and a.deadline < now
+        )
         out.append({
             "id": a.id,
             "title": a.title,
@@ -116,6 +121,7 @@ def list_my_assignments(
             "video_urls": json.loads(a.video_urls) if getattr(a, "video_urls", None) else [],
             "test_id": getattr(a, "test_id", None),
             "deadline": a.deadline.isoformat() if a.deadline else None,
+            "closed": closed,
             "submitted": sub is not None,
             "grade": float(sub.grade) if sub and sub.grade else None,
             "teacher_comment": sub.teacher_comment if sub else None,
@@ -134,6 +140,12 @@ def submit_assignment(
     a = db.query(TeacherAssignment).filter(TeacherAssignment.id == assignment_id).first()
     if not a:
         raise HTTPException(status_code=404, detail="Задание не найдено")
+    now = datetime.now(timezone.utc)
+    is_closed = (getattr(a, "closed_at", None) is not None) or (
+        a.deadline is not None and a.deadline < now
+    )
+    if is_closed:
+        raise HTTPException(status_code=400, detail="Задание закрыто для сдачи или дедлайн истёк")
     in_group = db.query(GroupStudent).filter(
         GroupStudent.student_id == current_user.id,
         GroupStudent.group_id == a.group_id,
@@ -223,6 +235,8 @@ def list_my_materials(
             "topic_id": m.topic_id,
             "video_urls": json.loads(m.video_urls) if m.video_urls else [],
             "image_urls": json.loads(m.image_urls) if m.image_urls else [],
+            "attachment_urls": json.loads(m.attachment_urls) if m.attachment_urls else [],
+            "attachment_links": json.loads(m.attachment_links) if m.attachment_links else [],
             "created_at": m.created_at.isoformat() if m.created_at else None,
         }
         for m in materials

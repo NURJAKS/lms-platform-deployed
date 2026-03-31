@@ -6,6 +6,7 @@ import { useLanguage } from "@/context/LanguageContext";
 import { useTheme } from "@/context/ThemeContext";
 import { getGlassCardStyle, getTextColors } from "@/utils/themeStyles";
 import type { Course } from "@/types";
+import { getLocalizedCourseTitle } from "@/lib/courseUtils";
 
 interface AiVsStudentButtonProps {
   course?: Course | { course_id: number; course?: Course };
@@ -21,11 +22,8 @@ export function AiVsStudentButton({ course, variant = "card", className = "" }: 
   const isDark = theme === "dark";
 
   const courseId = course ? ("id" in course ? course.id : course.course_id) : null;
-  const courseTitle = course
-    ? "title" in course
-      ? course.title
-      : course.course?.title ?? t("aiVsStudent")
-    : t("aiVsStudent");
+  const rawCourseTitle = course ? ("title" in course ? course.title : course.course?.title) : null;
+  const courseTitle = rawCourseTitle ? getLocalizedCourseTitle({ title: rawCourseTitle } as Course, t) : t("aiVsStudent");
 
   const href = courseId ? `/app/ai-challenge/${courseId}` : "#ai-challenge";
 

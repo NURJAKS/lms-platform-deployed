@@ -167,7 +167,7 @@ export function AdminDashboard() {
     setTriggerResult(null);
     try {
       const { data: res } = await api.post<{ awarded: number; message: string }>("/admin/trigger-daily-rewards");
-      setTriggerResult(res.message);
+      setTriggerResult(t("adminAwardsGivenCount").replace("{count}", String(res.awarded)));
       queryClient.invalidateQueries({ queryKey: ["leaderboard"] });
     } catch (e: unknown) {
       setTriggerResult((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? t("error"));
@@ -321,7 +321,7 @@ export function AdminDashboard() {
 
       {/* Заголовок дашборда */}
       <BlurFade delay={0} direction="scale" duration={0.8} blur="10px" scale={true}>
-        <div className="flex items-center justify-between flex-wrap gap-4">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold mb-2 flex items-center gap-3" style={{ color: textColors.primary }}>
               <BarChart3 className="w-8 h-8" />
@@ -573,6 +573,8 @@ export function AdminDashboard() {
                       padding: "8px 12px",
                     }}
                     labelStyle={{ color: textColors.primary, fontWeight: 600 }}
+                    formatter={(value: any) => [value ?? 0, t("adminCompleted")]}
+                    labelFormatter={(label) => label}
                   />
                   <Area
                     type="monotone"
@@ -672,6 +674,8 @@ export function AdminDashboard() {
                       padding: "8px 12px",
                     }}
                     labelStyle={{ color: textColors.primary, fontWeight: 600 }}
+                    formatter={(value: any) => [value ?? 0, t("adminNewUsers")]}
+                    labelFormatter={(label) => label}
                   />
                   <Bar 
                     dataKey="value" 
@@ -774,7 +778,19 @@ export function AdminDashboard() {
                         {log.user_name ?? t("adminSystem")}
                       </p>
                       <p className="text-xs truncate leading-tight mt-0.5" style={{ color: textColors.secondary }}>
-                        {log.action}
+                        {(() => {
+                          const actionMap: Record<string, string> = {
+                            login: t("actionLogin"),
+                            user_created: t("actionUserCreated"),
+                            user_updated: t("actionUserUpdated"),
+                            student_profile_updated: t("actionStudentProfileUpdated"),
+                            user_deleted: t("actionUserDeleted"),
+                            course_created: t("actionCourseCreated"),
+                            course_updated: t("actionCourseUpdated"),
+                            course_deleted: t("actionCourseDeleted"),
+                          };
+                          return actionMap[log.action] || log.action;
+                        })()}
                       </p>
                       {log.created_at && (
                         <p className="text-xs mt-0.5 leading-tight" style={{ color: textColors.secondary }}>
@@ -829,7 +845,7 @@ export function AdminDashboard() {
                 borderColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"
               }}>
                 <BarChart3 className="w-5 h-5 text-purple-500" />
-                <span className="font-medium" style={{ color: textColors.primary }}>{t("adminAnalyticsAndReports")}</span>
+                <span className="font-medium" style={{ color: textColors.primary }}>{t("adminAnalytics")}</span>
               </div>
             </Link>
           </div>

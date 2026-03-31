@@ -42,12 +42,12 @@ export function AppHeader() {
           type="button"
           onClick={() => setLangOpen(!langOpen)}
           className="flex items-center gap-1.5 min-h-[44px] px-3 py-2 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-all text-sm font-medium shadow-sm touch-manipulation"
-          title={t("language")}
-          aria-label={t("language")}
+          title={`${t("language")}: ${t(lang === "ru" ? "russian" : lang === "kk" ? "kazakh" : "english")}`}
+          aria-label={`${t("language")}: ${t(lang === "ru" ? "russian" : lang === "kk" ? "kazakh" : "english")}`}
         >
-          <Globe className="w-4 h-4" />
-          <span>{t(lang === "ru" ? "russian" : lang === "kk" ? "kazakh" : "english")}</span>
-          <ChevronDown className={`w-3.5 h-3.5 transition-transform ${langOpen ? "rotate-180" : ""}`} />
+          <Globe className="w-4 h-4 shrink-0" />
+          <span className="hidden xl:inline">{t(lang === "ru" ? "russian" : lang === "kk" ? "kazakh" : "english")}</span>
+          <ChevronDown className={`w-3.5 h-3.5 shrink-0 transition-transform ${langOpen ? "rotate-180" : ""}`} />
         </button>
         {langOpen && (
           <div className="absolute right-0 top-full mt-1 py-1 w-36 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50">

@@ -1,8 +1,11 @@
 "use client";
 
-import { useRef, useState, useEffect } from "react";
-import { Gauge } from "lucide-react";
+import { useRef, useState, useEffect, useCallback } from "react";
+import dynamic from "next/dynamic";
+import { Gauge, SkipForward } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
+
+const ReactPlayer = dynamic(() => import("react-player"), { ssr: false });
 
 interface VideoPlayerProps {
   src?: string;
@@ -14,111 +17,170 @@ interface VideoPlayerProps {
   isPremium?: boolean;
 }
 
-export function VideoPlayer({ src, duration, initialWatched, onProgress, onDurationLoaded, disabled = false, isPremium = false }: VideoPlayerProps) {
+export function VideoPlayer({ 
+  src, 
+  duration, 
+  initialWatched, 
+  onProgress, 
+  onDurationLoaded, 
+  disabled = false, 
+  isPremium = false 
+}: VideoPlayerProps) {
   const { t } = useLanguage();
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const playerRef = useRef<any>(null);
+  const [mounted, setMounted] = useState(false);
   const [watched, setWatched] = useState(initialWatched);
   const [playbackRate, setPlaybackRate] = useState(1.0);
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
+  const [showSkipWarning, setShowSkipWarning] = useState(false);
   const lastSent = useRef(0);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
+  const maxReached = useRef(initialWatched);
+  const skipFlagRef = useRef(false);
 
   useEffect(() => {
-    if (disabled) {
-      // Останавливаем видео при блокировке
-      if (videoRef.current) {
-        videoRef.current.pause();
-      }
-      return;
-    }
+    setMounted(true);
+  }, []);
 
-    intervalRef.current = setInterval(() => {
-      const el = videoRef.current;
-      if (!el || disabled) return;
-      const current = Math.floor(el.currentTime);
-      if (current > lastSent.current) {
-        lastSent.current = current;
-        setWatched(current);
-        onProgress(current);
-      }
-    }, 2000);
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
-  }, [onProgress, disabled]);
+  const videoSrc = src?.startsWith("http") ? src : src ? (src.startsWith("/") ? src : `/uploads/${src}`) : undefined;
+  
+  // Cast ReactPlayer to any for React 19 compatibility
+  const Player = ReactPlayer as any;
 
-  // Применяем скорость воспроизведения
+  // Synchronize initial progress when loaded asynchronously
+  const [hasSetInitialProgress, setHasSetInitialProgress] = useState(false);
+
+  // Reset state when the video URL changes
   useEffect(() => {
-    if (videoRef.current && isPremium) {
-      videoRef.current.playbackRate = playbackRate;
+    maxReached.current = initialWatched;
+    lastSent.current = initialWatched;
+    setWatched(initialWatched);
+    setHasSetInitialProgress(false);
+  }, [src]);
+
+  useEffect(() => {
+    if (initialWatched > 0 && !hasSetInitialProgress && playerRef.current) {
+      playerRef.current.seekTo(initialWatched, 'seconds');
+      maxReached.current = initialWatched;
+      lastSent.current = initialWatched;
+      setWatched(initialWatched);
+      setHasSetInitialProgress(true);
     }
-  }, [playbackRate, isPremium]);
+  }, [initialWatched, hasSetInitialProgress, mounted]);
+
+  const handleProgress = useCallback((state: { playedSeconds: number }) => {
+    if (disabled || skipFlagRef.current) return;
+    
+    const playedSeconds = state.playedSeconds;
+    const current = Math.floor(playedSeconds);
+
+    if (current > maxReached.current) {
+      maxReached.current = current;
+    }
+    
+    if (current > lastSent.current) {
+      lastSent.current = current;
+      setWatched(current);
+      onProgress(current);
+    }
+  }, [disabled, onProgress]);
+
+  const handleSeek = useCallback((seconds: number) => {
+    if (disabled) return;
+    
+    // Increased threshold to 15 to prevent false-positives caused by short buffering jumps
+    if (seconds > maxReached.current + 15) {
+      skipFlagRef.current = true;
+      if (playerRef.current) {
+        playerRef.current.seekTo(maxReached.current, 'seconds');
+      }
+      
+      setShowSkipWarning(true);
+      setTimeout(() => setShowSkipWarning(false), 2500);
+      setTimeout(() => { skipFlagRef.current = false; }, 500);
+    } else {
+      if (seconds > maxReached.current) {
+        maxReached.current = Math.floor(seconds);
+      }
+    }
+  }, [disabled]);
 
   const handleSpeedChange = (rate: number) => {
     setPlaybackRate(rate);
     setShowSpeedMenu(false);
-    if (videoRef.current) {
-      videoRef.current.playbackRate = rate;
-    }
   };
 
   const speedOptions = [1.0, 1.25, 1.5, 2.0];
   const speedMenuRef = useRef<HTMLDivElement>(null);
 
-  // Закрытие меню при клике вне его
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (speedMenuRef.current && !speedMenuRef.current.contains(event.target as Node)) {
         setShowSpeedMenu(false);
       }
     };
-
     if (showSpeedMenu) {
       document.addEventListener("mousedown", handleClickOutside);
-      return () => {
-        document.removeEventListener("mousedown", handleClickOutside);
-      };
+      return () => document.removeEventListener("mousedown", handleClickOutside);
     }
   }, [showSpeedMenu]);
 
-  const videoSrc = src?.startsWith("http") ? src : src ? (src.startsWith("/") ? src : `/uploads/${src}`) : undefined;
+  if (!mounted) {
+    return <div className="relative bg-black rounded-lg overflow-hidden aspect-video skeleton-pulse" />;
+  }
 
   return (
     <div className="relative bg-black rounded-lg overflow-hidden aspect-video">
       {videoSrc ? (
         <>
-          <video
-            ref={videoRef}
-            src={videoSrc}
-            controls={!disabled}
-            className={`w-full h-full ${disabled ? "opacity-50" : ""}`}
-            onLoadedMetadata={() => {
-              if (disabled) return;
-              const el = videoRef.current;
-              if (el && !isNaN(el.duration) && el.duration > 0 && onDurationLoaded) {
-                onDurationLoaded(Math.floor(el.duration));
-              }
-            }}
-            onTimeUpdate={() => {
-              if (disabled) return;
-              const el = videoRef.current;
-              if (el && el.currentTime > lastSent.current) {
-                const s = Math.floor(el.currentTime);
-                lastSent.current = s;
-                setWatched(s);
-                onProgress(s);
-              }
-            }}
-            onPlay={(e) => {
-              if (disabled) {
-                e.preventDefault();
-                videoRef.current?.pause();
-              }
-            }}
-          >
-            {t("videoNotSupported")}
-          </video>
-          {/* Speed controls для Premium */}
+          {/* No-skip warning overlay */}
+          {showSkipWarning && (
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 bg-black/80 text-white px-4 py-2 rounded-lg text-sm font-medium backdrop-blur-sm border border-white/20 animate-in fade-in slide-in-from-top-2">
+              <SkipForward className="w-4 h-4 text-amber-400" />
+              <span>{t("videoNoSkipWarning")}</span>
+            </div>
+          )}
+
+          <div className="w-full h-full">
+            <Player
+              ref={playerRef}
+              url={videoSrc}
+              controls={!disabled}
+              width="100%"
+              height="100%"
+              progressInterval={1000}
+              playbackRate={isPremium ? playbackRate : 1.0}
+              onProgress={handleProgress}
+              onSeek={handleSeek}
+              onDuration={(dur: number) => {
+                if (onDurationLoaded) onDurationLoaded(Math.floor(dur));
+              }}
+              onReady={() => {
+                if (initialWatched > 0 && playerRef.current && !hasSetInitialProgress) {
+                  playerRef.current.seekTo(initialWatched, 'seconds');
+                  maxReached.current = initialWatched;
+                  lastSent.current = initialWatched;
+                  setHasSetInitialProgress(true);
+                }
+              }}
+              config={{
+                youtube: {
+                  playerVars: { 
+                    showinfo: 0, 
+                    rel: 0, 
+                    modestbranding: 1,
+                    origin: typeof window !== 'undefined' ? window.location.origin : undefined
+                  }
+                },
+                file: {
+                  attributes: {
+                    controlsList: 'nodownload'
+                  }
+                }
+              }}
+            />
+          </div>
+
+          {/* Speed controls for Premium */}
           {isPremium && !disabled && (
             <div className="absolute top-4 right-4 z-10">
               <div className="relative" ref={speedMenuRef}>
@@ -153,19 +215,7 @@ export function VideoPlayer({ src, duration, initialWatched, onProgress, onDurat
         </>
       ) : (
         <div className="w-full h-full flex items-center justify-center text-gray-400 bg-gray-900">
-          <p>{t("noVideoFiles")} {Math.min(100, Math.round((watched / duration) * 100))}%</p>
-          <button
-            type="button"
-            className="ml-4 py-2 px-4 rounded text-white"
-            style={{ background: "var(--qit-primary)" }}
-            onClick={() => {
-              const s = Math.min(duration, watched + 30);
-              setWatched(s);
-              onProgress(s);
-            }}
-          >
-            {t("simulateSkip")}
-          </button>
+          <p>{t("noVideoFiles")}</p>
         </div>
       )}
     </div>

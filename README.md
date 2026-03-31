@@ -12,6 +12,8 @@
 
 ## Установка и запуск
 
+> **Подробная инструкция:** [HOW_TO_RUN.md](HOW_TO_RUN.md) — структура проекта, порты, какая БД где, чек-лист перед запуском (чтобы не запустить не ту БД).
+
 ### 1. Клонирование
 
 ```bash
@@ -21,20 +23,24 @@ cd LMS-Platform-client
 
 ### 2. Backend
 
+**Важно:** Бэкенд всегда использует базу `backend/education.db` (путь задаётся в `backend/.env` и не зависит от папки, из которой запущен uvicorn). Запускать можно из корня проекта или из `backend/`.
+
 ```bash
 cd backend
-python3 -m venv venv
-source venv/bin/activate   # Windows: venv\Scripts\activate
+python3 -m venv .venv
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-mkdir -p data
+cp .env.example .env       # при необходимости отредактировать
 python init_db.py
 python seed_data.py
 python seed_shop.py
 python seed_mock_progress.py
 python seed_real_students_progress.py
-cp .env.example .env   # при необходимости отредактировать
+# Запуск (из папки backend):
 python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
+
+Если пользователи уже есть, но нет курсов: `python seed_data.py --courses-only`.
 
 API: http://127.0.0.1:8000  
 Документация: http://127.0.0.1:8000/docs
@@ -51,13 +57,28 @@ npm run dev
 
 Приложение: http://localhost:3000
 
+### Быстрый запуск (из корня проекта)
+
+```bash
+./run-backend.sh    # в одном терминале
+./run-frontend.sh   # в другом терминале
+```
+
+Бэкенд будет использовать `backend/.venv` и базу **`backend/education.db`** независимо от того, из какой папки запущен.
+
 ## Тестовые пользователи
 
-| Роль          | Email           | Пароль    |
-|---------------|-----------------|-----------|
-| Менеджер      | admin@edu.kz    | admin123  |
-| Преподаватель | teacher1@edu.kz | teacher123 |
-| Студент       | student1@edu.kz | student123 |
+Создаются скриптом `seed_data.py`. Если при логине «Неверный email или пароль» или в каталоге нет курсов — **перезапустите бэкенд** из папки `backend` (или через `./run-backend.sh`), чтобы он использовал базу `backend/education.db`. Убедитесь, что выполнены `python init_db.py` и `python seed_data.py`.
+
+| Роль           | Email            | Пароль     |
+|----------------|------------------|------------|
+| Администратор  | admin@edu.kz     | admin123   |
+| Директор       | director@edu.kz   | director123 |
+| Куратор        | curator@edu.kz    | curator123  |
+| Преподаватель  | teacher1@edu.kz  | teacher123 |
+| Преподаватель  | teacher2@edu.kz  | teacher123 |
+| Родитель       | parent@edu.kz    | parent123  |
+| Студент        | student1@edu.kz … student5@edu.kz | student123 |
 
 ## Структура
 
@@ -75,5 +96,6 @@ Frontend: http://localhost:3000
 
 ## Важно
 
-- `.env` и база `backend/data/education.db` не коммитятся
-- Для сброса БД повторите команды из шага 2 (init_db, seed_*)
+- Файл `backend/.env` и база **`backend/education.db`** не коммитятся.
+- Для сброса БД повторите команды из шага 2 (init_db, seed_*).
+- **Локальный запуск без Docker:** бэкенд и фронт запускаются отдельно (см. шаги 2 и 3). Docker не обязателен.

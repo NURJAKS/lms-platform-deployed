@@ -4,7 +4,8 @@ import { useState, useMemo, useEffect } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 import { useTheme } from "@/context/ThemeContext";
-import { getLocalizedCourseTitle } from "@/lib/courseUtils";
+import { getLocalizedCourseTitle, getLocalizedTopicTitle } from "@/lib/courseUtils";
+import { getLocalizedAssignmentTitle } from "@/lib/assignmentUtils";
 
 const WD_KEYS = ["wdSun", "wdMon", "wdTue", "wdWed", "wdThu", "wdFri", "wdSat"] as const;
 const MONTH_KEYS = ["monthJan", "monthFeb", "monthMar", "monthApr", "monthMay", "monthJun", "monthJul", "monthAug", "monthSep", "monthOct", "monthNov", "monthDec"] as const;
@@ -122,7 +123,8 @@ export function TasksCalendar({ date, onDateChange, schedule, assignments, onEve
       
       daySchedule.forEach((item, idx) => {
         const courseTitle = item.course_title ? getLocalizedCourseTitle({ title: item.course_title } as any, t) : null;
-        const title = courseTitle || item.topic_title || item.notes || t("eventDefault");
+        const topicTitle = item.topic_title ? getLocalizedTopicTitle(item.topic_title, t) : null;
+        const title = courseTitle || topicTitle || item.notes || t("eventDefault");
         let time: string | undefined;
         if (item.notes) {
           const timeMatch = item.notes.match(/(\d{1,2}\.\d{2}(?:\s*-\s*\d{1,2}\.\d{2})?)/);
@@ -146,7 +148,7 @@ export function TasksCalendar({ date, onDateChange, schedule, assignments, onEve
       
       dayAssignments.forEach((assignment) => {
         dayEvents.push({
-          title: assignment.title,
+          title: getLocalizedAssignmentTitle(assignment.title, t),
           color: "rgba(239, 68, 68, 0.3)",
           item: assignment,
           type: "assignment",
@@ -170,7 +172,8 @@ export function TasksCalendar({ date, onDateChange, schedule, assignments, onEve
     
     daySchedule.forEach((item, idx) => {
       const courseTitle = item.course_title ? getLocalizedCourseTitle({ title: item.course_title } as any, t) : null;
-      const title = courseTitle || item.topic_title || item.notes || t("eventDefault");
+      const topicTitle = item.topic_title ? getLocalizedTopicTitle(item.topic_title, t) : null;
+      const title = courseTitle || topicTitle || item.notes || t("eventDefault");
       let time: string | undefined;
       if (item.notes) {
         const timeMatch = item.notes.match(/(\d{1,2}\.\d{2}(?:\s*-\s*\d{1,2}\.\d{2})?)/);
@@ -194,7 +197,7 @@ export function TasksCalendar({ date, onDateChange, schedule, assignments, onEve
     
     dayAssignments.forEach((assignment) => {
       events.push({
-        title: assignment.title,
+        title: getLocalizedAssignmentTitle(assignment.title, t),
         color: "rgba(239, 68, 68, 0.3)",
         item: assignment,
         type: "assignment",
@@ -242,7 +245,8 @@ export function TasksCalendar({ date, onDateChange, schedule, assignments, onEve
       // Add schedule items
       daySchedule.forEach((item, idx) => {
         const courseTitle = item.course_title ? getLocalizedCourseTitle({ title: item.course_title } as any, t) : null;
-        const title = courseTitle || item.topic_title || item.notes || t("eventDefault");
+        const topicTitle = item.topic_title ? getLocalizedTopicTitle(item.topic_title, t) : null;
+        const title = courseTitle || topicTitle || item.notes || t("eventDefault");
         // Try to extract time from notes
         let time: string | undefined;
         if (item.notes) {
@@ -272,7 +276,7 @@ export function TasksCalendar({ date, onDateChange, schedule, assignments, onEve
           "rgba(251, 191, 36, 0.3)", // Light yellow
         ];
         dayEvents.push({
-          title: assignment.title,
+          title: getLocalizedAssignmentTitle(assignment.title, t),
           color: colors[0],
           item: assignment,
           type: "assignment",
@@ -405,13 +409,13 @@ export function TasksCalendar({ date, onDateChange, schedule, assignments, onEve
       }}
     >
       {/* Top section with view tabs and navigation */}
-      <div className="p-4" style={{ background: isDark ? "rgba(17, 24, 39, 0.5)" : "#FFFFFF" }}>
+      <div className="p-3 sm:p-4" style={{ background: isDark ? "rgba(17, 24, 39, 0.5)" : "#FFFFFF" }}>
         {/* View tabs */}
-        <div className="flex gap-2 mb-4">
+        <div className="flex flex-wrap gap-2 mb-4">
           <button
             type="button"
             onClick={() => setView("month")}
-            className="px-4 py-2 rounded-full text-sm font-medium transition-all"
+            className="px-3 sm:px-4 py-2.5 rounded-full text-sm font-medium transition-all min-h-[2.5rem]"
             style={{
               background: view === "month" ? "#7C3AED" : (isDark ? "rgba(156, 163, 175, 0.2)" : "rgba(156, 163, 175, 0.15)"),
               color: view === "month" ? "#FFFFFF" : (isDark ? "#9CA3AF" : "#6B7280"),
@@ -422,7 +426,7 @@ export function TasksCalendar({ date, onDateChange, schedule, assignments, onEve
           <button
             type="button"
             onClick={() => setView("week")}
-            className="px-4 py-2 rounded-full text-sm font-medium transition-all"
+            className="px-3 sm:px-4 py-2.5 rounded-full text-sm font-medium transition-all min-h-[2.5rem]"
             style={{
               background: view === "week" ? "#7C3AED" : (isDark ? "rgba(156, 163, 175, 0.2)" : "rgba(156, 163, 175, 0.15)"),
               color: view === "week" ? "#FFFFFF" : (isDark ? "#9CA3AF" : "#6B7280"),
@@ -433,7 +437,7 @@ export function TasksCalendar({ date, onDateChange, schedule, assignments, onEve
           <button
             type="button"
             onClick={() => setView("day")}
-            className="px-4 py-2 rounded-full text-sm font-medium transition-all"
+            className="px-3 sm:px-4 py-2.5 rounded-full text-sm font-medium transition-all min-h-[2.5rem]"
             style={{
               background: view === "day" ? "#7C3AED" : (isDark ? "rgba(156, 163, 175, 0.2)" : "rgba(156, 163, 175, 0.15)"),
               color: view === "day" ? "#FFFFFF" : (isDark ? "#9CA3AF" : "#6B7280"),
@@ -444,10 +448,10 @@ export function TasksCalendar({ date, onDateChange, schedule, assignments, onEve
         </div>
 
           {/* Month/Week/Day navigation */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
               <h3 
-                className="font-semibold text-lg"
+                className="font-semibold text-base sm:text-lg truncate"
                 style={{ 
                   color: isDark ? "#F3F4F6" : "#1F2937",
                 }}
@@ -458,7 +462,7 @@ export function TasksCalendar({ date, onDateChange, schedule, assignments, onEve
                 <button
                   type="button"
                   onClick={() => navigateMonth("prev")}
-                  className="p-1.5 rounded-full hover:bg-opacity-20 transition-colors"
+                  className="p-2 rounded-full hover:bg-opacity-20 transition-colors min-h-[2.5rem] min-w-[2.5rem] flex items-center justify-center"
                   style={{
                     color: isDark ? "#E5E7EB" : "#374151",
                   }}
@@ -468,7 +472,7 @@ export function TasksCalendar({ date, onDateChange, schedule, assignments, onEve
                 <button
                   type="button"
                   onClick={() => navigateMonth("next")}
-                  className="p-1.5 rounded-full hover:bg-opacity-20 transition-colors"
+                  className="p-2 rounded-full hover:bg-opacity-20 transition-colors min-h-[2.5rem] min-w-[2.5rem] flex items-center justify-center"
                   style={{
                     color: isDark ? "#E5E7EB" : "#374151",
                   }}
@@ -481,7 +485,7 @@ export function TasksCalendar({ date, onDateChange, schedule, assignments, onEve
       </div>
 
       {/* Calendar body */}
-      <div className="p-4" style={{ background: isDark ? "rgba(17, 24, 39, 0.5)" : "#FFFFFF" }}>
+      <div className="p-3 sm:p-4" style={{ background: isDark ? "rgba(17, 24, 39, 0.5)" : "#FFFFFF" }}>
         {view === "day" ? (
           /* Day view */
           <div className="space-y-3">
@@ -549,7 +553,7 @@ export function TasksCalendar({ date, onDateChange, schedule, assignments, onEve
           /* Week view */
           <>
             {/* Weekday headers */}
-            <div className="grid grid-cols-7 gap-1.5 mb-2">
+            <div className="grid grid-cols-7 gap-1 mb-2">
               {WD_KEYS.map((key, idx) => {
                 const isWeekend = idx === 0 || idx === 6;
                 return (
@@ -579,7 +583,7 @@ export function TasksCalendar({ date, onDateChange, schedule, assignments, onEve
                 return (
                   <div
                     key={idx}
-                    className="relative min-h-[200px] p-2 rounded-lg border"
+                    className="relative min-h-[150px] sm:min-h-[200px] p-1.5 sm:p-2 rounded-lg border"
                     style={{
                       background: isSelected
                         ? "rgba(124, 58, 237, 0.1)"
@@ -593,7 +597,7 @@ export function TasksCalendar({ date, onDateChange, schedule, assignments, onEve
                       className="w-full flex flex-col items-start"
                     >
                       <div 
-                        className="flex items-center justify-center w-7 h-7 rounded-full mb-2 text-sm font-medium"
+                        className="flex items-center justify-center w-8 h-8 rounded-full mb-2 text-sm font-medium"
                         style={{
                           background: isSelected
                             ? "#7C3AED"
@@ -612,7 +616,7 @@ export function TasksCalendar({ date, onDateChange, schedule, assignments, onEve
                         {dayDate}
                       </div>
                     </button>
-                    <div className="w-full flex flex-col gap-1 mt-1 overflow-y-auto max-h-[150px]">
+                    <div className="w-full flex flex-col gap-1 mt-1 overflow-y-auto max-h-[112px] sm:max-h-[150px]">
                       {day.events.map((event, eventIdx) => {
                         const isCompleted = event.is_completed || false;
                         const isSchedule = event.type === "schedule";
@@ -628,7 +632,7 @@ export function TasksCalendar({ date, onDateChange, schedule, assignments, onEve
                                   onToggleComplete(scheduleItem.id, e.target.checked);
                                 }}
                                 onClick={(e) => e.stopPropagation()}
-                                className="w-3 h-3 rounded cursor-pointer shrink-0"
+                                className="w-4 h-4 rounded cursor-pointer shrink-0"
                                 style={{ accentColor: "#7C3AED" }}
                               />
                             )}
@@ -638,7 +642,7 @@ export function TasksCalendar({ date, onDateChange, schedule, assignments, onEve
                                 e.stopPropagation();
                                 onEventClick?.(event.item, event.type);
                               }}
-                              className={`text-[10px] px-2 py-1 rounded text-left truncate hover:opacity-80 transition-opacity cursor-pointer flex-1 ${
+                              className={`text-xs px-2 py-1.5 rounded text-left truncate hover:opacity-80 transition-opacity cursor-pointer flex-1 min-h-[2rem] ${
                                 isCompleted ? "line-through opacity-60" : ""
                               }`}
                               style={{
@@ -664,13 +668,13 @@ export function TasksCalendar({ date, onDateChange, schedule, assignments, onEve
           /* Month view */
           <>
             {/* Weekday headers */}
-            <div className="grid grid-cols-7 gap-1.5 mb-2">
+            <div className="grid grid-cols-7 gap-1 mb-2">
               {WD_KEYS.map((key, idx) => {
                 const isWeekend = idx === 0 || idx === 6;
                 return (
                   <div
                     key={key}
-                    className="text-[10px] font-semibold text-center py-1"
+                    className="text-[11px] font-semibold text-center py-1"
                     style={{
                       color: isWeekend 
                         ? (isDark ? "#F87171" : "#EF4444")
@@ -683,11 +687,11 @@ export function TasksCalendar({ date, onDateChange, schedule, assignments, onEve
               })}
             </div>
             {/* Calendar grid - компактный широкий */}
-            <div className="grid grid-cols-7 gap-1.5">
+            <div className="grid grid-cols-7 gap-1">
               {calendarDays.map((day, idx) => {
             // Пропускаем пустые ячейки (date === 0)
             if (day.date === 0) {
-              return <div key={idx} className="min-h-[70px] sm:min-h-[100px]" />;
+              return <div key={idx} className="min-h-[80px] sm:min-h-[100px]" />;
             }
             
             const weekend = isWeekend(day.date, day.isCurrentMonth);
@@ -697,7 +701,7 @@ export function TasksCalendar({ date, onDateChange, schedule, assignments, onEve
             return (
               <div
                 key={idx}
-                className="relative min-h-[70px] sm:min-h-[100px] p-1 rounded-lg transition-all"
+                className="relative min-h-[80px] sm:min-h-[100px] p-1 rounded-lg transition-all"
                 style={{
                   background: selected
                     ? "rgba(124, 58, 237, 0.1)"
@@ -724,7 +728,7 @@ export function TasksCalendar({ date, onDateChange, schedule, assignments, onEve
                   }}
                 >
                   {/* Date number */}
-                  <div className="flex items-center justify-center w-6 h-6 rounded-full mb-0.5 text-xs font-medium shrink-0"
+                  <div className="flex items-center justify-center w-7 h-7 rounded-full mb-1 text-xs font-medium shrink-0"
                     style={{
                       background: selected
                         ? "#7C3AED"
@@ -742,7 +746,7 @@ export function TasksCalendar({ date, onDateChange, schedule, assignments, onEve
                   </div>
 
                   {/* Events - прокручиваемый контейнер */}
-                  <div className="w-full flex flex-col gap-0.5 mt-0.5 flex-1 min-h-0 overflow-y-auto max-h-[44px] sm:max-h-[60px]">
+                  <div className="w-full flex flex-col gap-0.5 mt-0.5 flex-1 min-h-0 overflow-y-auto max-h-[52px] sm:max-h-[60px]">
                     {day.events.map((event, eventIdx) => {
                       const isCompleted = event.is_completed || false;
                       const isSchedule = event.type === "schedule";
@@ -761,7 +765,7 @@ export function TasksCalendar({ date, onDateChange, schedule, assignments, onEve
                                 onToggleComplete(scheduleItem.id, e.target.checked);
                               }}
                               onClick={(e) => e.stopPropagation()}
-                              className="w-3 h-3 rounded cursor-pointer shrink-0"
+                              className="w-4 h-4 rounded cursor-pointer shrink-0"
                               style={{
                                 accentColor: "#7C3AED",
                               }}
@@ -781,7 +785,7 @@ export function TasksCalendar({ date, onDateChange, schedule, assignments, onEve
                                 onEventClick?.(event.item, event.type);
                               }
                             }}
-                            className={`text-[10px] px-1.5 py-0.5 rounded text-left truncate hover:opacity-80 transition-opacity cursor-pointer flex-1 ${
+                            className={`text-[11px] px-1.5 py-1 rounded text-left truncate hover:opacity-80 transition-opacity cursor-pointer flex-1 min-h-[1.75rem] ${
                               isCompleted ? "line-through opacity-60" : ""
                             }`}
                             style={{

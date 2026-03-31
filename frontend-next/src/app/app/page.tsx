@@ -14,10 +14,9 @@ import { TeacherDashboard } from "@/components/dashboard/TeacherDashboard";
 import { ParentDashboard } from "@/components/dashboard/ParentDashboard";
 import { ContinueWatching } from "@/components/dashboard/ContinueWatching";
 import { DailyQuestWidget } from "@/components/dashboard/DailyQuestWidget";
-import { LearningActivityWidget } from "@/components/dashboard/LearningActivityWidget";
 import { RecentAchievementsWidget } from "@/components/dashboard/RecentAchievementsWidget";
 import { UpcomingDeadlinesWidget } from "@/components/dashboard/UpcomingDeadlinesWidget";
-import { StudyTimeWidget } from "@/components/dashboard/StudyTimeWidget";
+import { LeaderboardMotivationWidget } from "@/components/dashboard/LeaderboardMotivationWidget";
 import { AiChallengeCard } from "@/components/dashboard/AiChallengeCard";
 import { CommunityWidget } from "@/components/dashboard/CommunityWidget";
 import { getGlassCardStyle, getTextColors } from "@/utils/themeStyles";
@@ -148,7 +147,15 @@ export default function DashboardPage() {
   );
   const enrolledIds = new Set(enrollments.map((e) => e.course_id));
 
-  const roleLabel = isAdmin ? ` (${t("admin")})` : user?.role === "teacher" ? ` (${t("teacher")})` : user?.role === "parent" ? ` (${t("parent")})` : "";
+  const roleLabelMap: Record<string, string> = {
+    admin: t("roleAdmin"),
+    director: t("director"),
+    curator: t("curator"),
+    teacher: t("teacher"),
+    parent: t("parent"),
+    student: t("student"),
+  };
+  const roleLabel = user?.role && roleLabelMap[user.role] ? ` (${roleLabelMap[user.role]})` : "";
   const isApproved = user?.is_approved !== false;
 
   let content: React.ReactNode;
@@ -166,14 +173,14 @@ export default function DashboardPage() {
       content = <ParentDashboard />;
     } else {
       content = (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-5 md:space-y-6">
       {/* Row 1: KPI Cards - полная ширина */}
       <DashboardStatsCards />
       
       {/* Row 2: Welcome Banner - полная ширина */}
       <BlurFade direction="down" delay={0.1} offset={40} inView={true} duration={0.6} blur="8px">
         <div
-          className="relative rounded-xl overflow-hidden p-6 lg:p-8 text-white"
+          className="relative rounded-xl overflow-hidden p-4 sm:p-5 lg:p-8 text-white"
           style={{
             background: "linear-gradient(135deg, #14b8a6 0%, #3b82f6 100%)",
             boxShadow: "0 8px 24px rgba(20, 184, 166, 0.25)",
@@ -188,11 +195,11 @@ export default function DashboardPage() {
             </svg>
           </div>
           <div className="relative">
-            <h1 className="text-2xl lg:text-3xl font-bold mb-2">
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-1.5 sm:mb-2 leading-tight break-words">
               {t("dashboardGreeting")}
               {roleLabel && <span className="font-normal opacity-90"> {roleLabel}</span>}
             </h1>
-            <p className="text-white/90 text-sm lg:text-base">
+            <p className="text-white/90 text-sm lg:text-base break-words">
               {user?.full_name ? `${t("welcome")}, ${user.full_name}` : t("welcome")}
             </p>
           </div>
@@ -204,13 +211,13 @@ export default function DashboardPage() {
         <ContinueWatching />
       </BlurFade>
 
-      {/* Row 4: Learning Activity, AI Challenge, Daily Quest */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-        <BlurFade direction="left" delay={0.3} offset={30} inView={true} duration={0.6} blur="8px">
-          <div className="md:col-span-2 xl:col-span-2 h-full">
-            <LearningActivityWidget />
-          </div>
-        </BlurFade>
+      {/* Row 3.5: Leaderboard motivation - full width */}
+      <BlurFade direction="up" delay={0.25} offset={30} inView={true} duration={0.6} blur="8px">
+        <LeaderboardMotivationWidget />
+      </BlurFade>
+
+      {/* Row 4: AI Challenge, Daily Quest */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5">
         <BlurFade direction="down" delay={0.35} offset={30} inView={true} duration={0.6} blur="8px">
           <div className="xl:col-span-1 h-full">
             <AiChallengeCard />
@@ -223,13 +230,8 @@ export default function DashboardPage() {
         </BlurFade>
       </div>
 
-      {/* Row 5: Study Time, Upcoming Deadlines, Community */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-        <BlurFade direction="left" delay={0.45} offset={30} inView={true} duration={0.6} blur="8px">
-          <div className="xl:col-span-1 h-full">
-            <StudyTimeWidget />
-          </div>
-        </BlurFade>
+      {/* Row 5: Upcoming Deadlines, Community */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5">
         <BlurFade direction="down" delay={0.5} offset={30} inView={true} duration={0.6} blur="8px">
           <div className="xl:col-span-1 h-full">
             <UpcomingDeadlinesWidget />

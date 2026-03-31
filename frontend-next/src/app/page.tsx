@@ -213,81 +213,74 @@ export default function HomePage() {
         id="home"
         className="fixed top-0 left-0 right-0 z-50 bg-white/90 dark:bg-gray-900/90 backdrop-blur-md border-b border-gray-100 dark:border-gray-800"
       >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16 lg:h-20 gap-4 sm:gap-6 lg:gap-8">
+        <div className="w-full pl-3 pr-3 sm:pl-4 sm:pr-5 lg:pl-5 lg:pr-8">
+          <div className="flex items-center justify-between h-16 lg:h-20 gap-3 sm:gap-5 lg:gap-7 min-w-0">
             <Link href="/" className="flex items-center gap-2 shrink-0 min-w-0">
               <div
-                className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-lg animate-[spin_3s_linear_infinite] shrink-0"
+                className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-lg animate-[spin_3s_linear_infinite] shrink-0 aspect-square"
                 style={{ background: "var(--qit-gradient-1)" }}
               >
                 Q
               </div>
-              <span className="hidden sm:inline text-xl font-bold text-gray-900 dark:text-white font-montserrat truncate">
+              <span className="hidden xl:inline text-lg xl:text-xl font-bold text-gray-900 dark:text-white font-montserrat truncate">
                 Qazaq IT Academy
               </span>
             </Link>
-            <button
-              type="button"
-              onClick={() => setMobileMenuOpen(true)}
-              className="md:hidden flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors touch-manipulation"
-              aria-label={t("openMenu")}
-            >
-              <Menu className="w-6 h-6" />
-            </button>
-            <nav className="hidden md:flex items-center justify-center gap-4 lg:gap-6 flex-1">
+
+            <nav className="hidden md:flex items-center justify-center gap-1.5 md:gap-2 xl:gap-4 flex-1 min-w-0">
               <button
                 type="button"
                 onClick={() => scrollTo("home")}
-                className="shrink-0 py-2 text-gray-600 dark:text-gray-300 hover:text-[#1a237e] dark:hover:text-[#00b0ff] font-medium transition-colors whitespace-nowrap text-center"
+                className="shrink-0 py-2 text-xs md:text-sm xl:text-base text-gray-600 dark:text-gray-300 hover:text-[#1a237e] dark:hover:text-[#00b0ff] font-medium transition-colors whitespace-nowrap text-center"
               >
                 {t("navHome")}
               </button>
               <Link
                 href="/courses"
-                className="shrink-0 py-2 text-gray-600 dark:text-gray-300 hover:text-[#1a237e] dark:hover:text-[#00b0ff] font-medium transition-colors whitespace-nowrap text-center"
+                className="shrink-0 py-2 text-xs md:text-sm xl:text-base text-gray-600 dark:text-gray-300 hover:text-[#1a237e] dark:hover:text-[#00b0ff] font-medium transition-colors whitespace-nowrap text-center"
               >
                 {t("courseCatalog")}
               </Link>
               <button
                 type="button"
                 onClick={() => scrollTo("ai")}
-                className="shrink-0 py-2 text-gray-600 dark:text-gray-300 hover:text-[#1a237e] dark:hover:text-[#00b0ff] font-medium transition-colors whitespace-nowrap text-center"
+                className="shrink-0 py-2 text-xs md:text-sm xl:text-base text-gray-600 dark:text-gray-300 hover:text-[#1a237e] dark:hover:text-[#00b0ff] font-medium transition-colors whitespace-nowrap text-center"
               >
                 {t("navCoursePicker")}
               </button>
               <button
                 type="button"
                 onClick={() => scrollTo("ai")}
-                className="shrink-0 py-2 text-gray-600 dark:text-gray-300 hover:text-[#1a237e] dark:hover:text-[#00b0ff] font-medium transition-colors whitespace-nowrap text-center"
+                className="shrink-0 py-2 text-xs md:text-sm xl:text-base text-gray-600 dark:text-gray-300 hover:text-[#1a237e] dark:hover:text-[#00b0ff] font-medium transition-colors whitespace-nowrap text-center"
               >
                 {t("navAi")}
               </button>
               <button
                 type="button"
                 onClick={() => scrollTo("about")}
-                className="shrink-0 py-2 text-gray-600 dark:text-gray-300 hover:text-[#1a237e] dark:hover:text-[#00b0ff] font-medium transition-colors whitespace-nowrap text-center"
+                className="shrink-0 py-2 text-xs md:text-sm xl:text-base text-gray-600 dark:text-gray-300 hover:text-[#1a237e] dark:hover:text-[#00b0ff] font-medium transition-colors whitespace-nowrap text-center"
               >
                 {t("navAbout")}
               </button>
               <button
                 type="button"
                 onClick={() => scrollTo("reviews")}
-                className="shrink-0 py-2 text-gray-600 dark:text-gray-300 hover:text-[#1a237e] dark:hover:text-[#00b0ff] font-medium transition-colors whitespace-nowrap text-center"
+                className="shrink-0 py-2 text-xs md:text-sm xl:text-base text-gray-600 dark:text-gray-300 hover:text-[#1a237e] dark:hover:text-[#00b0ff] font-medium transition-colors whitespace-nowrap text-center"
               >
                 {t("navReviews")}
               </button>
               <button
                 type="button"
                 onClick={() => scrollTo("contact")}
-                className="shrink-0 py-2 text-gray-600 dark:text-gray-300 hover:text-[#1a237e] dark:hover:text-[#00b0ff] font-medium transition-colors whitespace-nowrap text-center"
+                className="shrink-0 py-2 text-xs md:text-sm xl:text-base text-gray-600 dark:text-gray-300 hover:text-[#1a237e] dark:hover:text-[#00b0ff] font-medium transition-colors whitespace-nowrap text-center"
               >
                 {t("navContact")}
               </button>
             </nav>
-            <div className="flex items-center gap-2 sm:gap-6 ml-auto shrink-0">
+            <div className="flex items-center gap-2 sm:gap-6 ml-auto shrink-0 min-w-0">
               <Link
                 href="/login"
-                className="px-4 sm:px-5 py-2.5 rounded-full font-semibold text-white transition-all hover:opacity-90 whitespace-nowrap text-sm sm:text-base"
+                className="hidden md:flex px-3 py-2 text-sm xl:px-5 xl:py-2.5 xl:text-base rounded-full font-semibold text-white transition-all hover:opacity-90 whitespace-nowrap"
                 style={{ background: "var(--qit-gradient-3)" }}
               >
                 {t("navPersonalCabinet")}
@@ -295,6 +288,14 @@ export default function HomePage() {
               <div className="hidden md:block">
                 <AppHeader />
               </div>
+              <button
+                type="button"
+                onClick={() => setMobileMenuOpen(true)}
+                className="md:hidden flex items-center justify-center min-h-[44px] min-w-[44px] rounded-xl text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all active-tap"
+                aria-label={t("openMenu")}
+              >
+                <Menu className="w-6 h-6" />
+              </button>
             </div>
           </div>
         </div>
@@ -499,8 +500,8 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
             {[
-              { target: 2000, suffix: "+", labelKey: "statsStudents", color: "text-[#1a237e]" },
-              { target: 50, suffix: "+", labelKey: "statsCourses", color: "text-[#00b0ff]" },
+              { target: 1000, suffix: "+", labelKey: "statsStudents", color: "text-[#1a237e]" },
+              { target: 24, suffix: "+", labelKey: "statsCourses", color: "text-[#00b0ff]" },
               { target: 40, suffix: "+", labelKey: "statsTeachers", color: "text-[#1a237e]" },
               { target: 95, suffix: "%", labelKey: "statsSatisfaction", color: "text-[#ff4081]" },
             ].map(({ target, suffix, labelKey, color }, i) => (
@@ -791,7 +792,7 @@ export default function HomePage() {
                 </ul>
               </div>
               <div className="relative flex items-center gap-4 mt-8 pt-6 border-t border-white/10">
-                <div className="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 bg-[#1a237e] text-white font-bold text-2xl shadow-lg" style={{ fontFamily: "var(--font-geist-sans)" }}>
+                <div className="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 bg-[#1a237e] text-white font-bold text-2xl shadow-lg aspect-square" style={{ fontFamily: "var(--font-geist-sans)" }}>
                   Q
                 </div>
                 <div>

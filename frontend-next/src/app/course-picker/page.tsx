@@ -109,7 +109,7 @@ export default function CoursePickerPage() {
                   <h3 className="text-xl font-bold mb-2">{t(recommended.fullTitleKey as TranslationKey)}</h3>
                   <p className="text-white/90 text-sm mb-4">{t(recommended.descKey as TranslationKey)}</p>
                   <p className="text-sm font-medium mb-4">{t("pickerMotivation")}</p>
-                  <Link href="/register" className="inline-flex items-center gap-2 px-6 py-3 rounded-full font-semibold bg-white text-gray-900 hover:bg-gray-100 transition-colors">
+                  <Link href="/courses" className="inline-flex items-center gap-2 px-6 py-3 rounded-full font-semibold bg-white text-gray-900 hover:bg-gray-100 transition-colors">
                     {t("pickerCta")} <ArrowRight className="w-5 h-5" />
                   </Link>
                 </div>

@@ -87,7 +87,7 @@ export function AppTopNav() {
             className="flex items-center gap-2 text-[var(--qit-primary)] dark:text-[var(--qit-secondary)] hover:opacity-90 transition-opacity shrink-0"
           >
             <div
-              className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-sm"
+              className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-sm shrink-0 aspect-square"
               style={{ background: "var(--qit-gradient-1)" }}
             >
               Q
@@ -209,7 +209,7 @@ export function AppTopNav() {
                 <div className="w-8 h-8 rounded-full bg-[var(--qit-primary)]/20 dark:bg-[var(--qit-secondary)]/20 flex items-center justify-center text-[var(--qit-primary)] dark:text-[var(--qit-secondary)] font-semibold text-sm">
                   {(user?.full_name || "U")[0].toUpperCase()}
                 </div>
-                <span className="hidden lg:inline text-sm font-medium max-w-[120px] truncate">
+                <span className="hidden lg:inline text-sm font-medium">
                   {user?.full_name || t("profile")}
                 </span>
                 <ChevronDown className={`hidden md:block w-4 h-4 transition-transform ${userMenuOpen ? "rotate-180" : ""}`} />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
@@ -24,6 +24,10 @@ type Form = z.infer<typeof schema>;
 
 export default function RegisterPage() {
   const router = useRouter();
+
+  useEffect(() => {
+    router.replace("/login");
+  }, [router]);
   const { t } = useLanguage();
   const setAuth = useAuthStore((s) => s.setAuth);
   const [error, setError] = useState("");

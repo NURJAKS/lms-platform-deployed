@@ -145,17 +145,36 @@ export default function ParentRatingPage() {
 
   const handleExportCsv = async () => {
     try {
-      const { data } = await api.get<Blob>("/analytics/leaderboard/csv", {
+      const { data } = await api.get<Blob>("/parent/children/leaderboard/csv", {
         responseType: "blob",
       });
       const url = URL.createObjectURL(data);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "leaderboard.csv";
+      a.download = "children-leaderboard.csv";
       a.click();
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error("Failed to export CSV:", error);
+      const err = error as { response?: { data?: { detail?: string }; status?: number }; message?: string };
+      const errorMessage = err?.response?.data?.detail || err?.message || t("csvExportError");
+      alert(errorMessage);
+    }
+  };
+
+  const handleExportExcel = async () => {
+    try {
+      const { data } = await api.get<Blob>("/parent/children/leaderboard/excel", {
+        responseType: "blob",
+      });
+      const url = URL.createObjectURL(data);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "children-leaderboard.xlsx";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Failed to export Excel:", error);
       const err = error as { response?: { data?: { detail?: string }; status?: number }; message?: string };
       const errorMessage = err?.response?.data?.detail || err?.message || t("csvExportError");
       alert(errorMessage);
@@ -307,16 +326,29 @@ export default function ParentRatingPage() {
       <div className="relative z-10">
         <div className="flex items-center justify-between flex-wrap gap-4 mb-4">
           <LeaderboardHeader lastReward={lastReward} />
-          <BlurFade delay={0.2} inView>
-            <ShimmerButton
-              onClick={handleExportCsv}
-              className="bg-gradient-to-r from-[var(--qit-primary)] to-purple-600 text-white border-0"
-              shimmerColor="#ffffff"
-              borderRadius="12px"
-            >
-              <Download className="w-4 h-4 mr-2" /> CSV
-            </ShimmerButton>
-          </BlurFade>
+          <div className="flex gap-2">
+            <BlurFade delay={0.2} inView>
+              <ShimmerButton
+                onClick={handleExportCsv}
+                background={theme === "dark" ? "rgba(255, 255, 255, 0.1)" : "rgba(243, 244, 246, 1)"}
+                shimmerColor={theme === "dark" ? "#ffffff" : "#000000"}
+                className="text-gray-900 dark:text-white border-0"
+                borderRadius="12px"
+              >
+                <Download className="w-4 h-4 mr-2" /> CSV
+              </ShimmerButton>
+            </BlurFade>
+            <BlurFade delay={0.25} inView>
+              <ShimmerButton
+                onClick={handleExportExcel}
+                className="bg-gradient-to-r from-[var(--qit-primary)] to-purple-600 text-white border-0"
+                shimmerColor="#ffffff"
+                borderRadius="12px"
+              >
+                <Download className="w-4 h-4 mr-2" /> Excel
+              </ShimmerButton>
+            </BlurFade>
+          </div>
         </div>
         
         {/* Поиск и фильтры */}

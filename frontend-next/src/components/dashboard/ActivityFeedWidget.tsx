@@ -1,16 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { Clock, BookOpen, UserPlus, CheckCircle2 } from "lucide-react";
+import { Clock, BookOpen, UserPlus, CheckCircle2, ChevronRight } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { useTheme } from "@/context/ThemeContext";
 import { getGlassCardStyle, getTextColors } from "@/utils/themeStyles";
-import { getLocalizedCourseTitle } from "@/lib/courseUtils";
+import { useAuthStore } from "@/store/authStore";
+import { motion, AnimatePresence } from "framer-motion";
 
-// Simple time formatter without date-fns dependency
-const formatTimeAgo = (dateStr: string, lang: string) => {
+const formatTimeAgo = (dateStr: string, t: any) => {
   const date = new Date(dateStr);
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
@@ -18,10 +18,10 @@ const formatTimeAgo = (dateStr: string, lang: string) => {
   const diffHours = Math.floor(diffMs / 3600000);
   const diffDays = Math.floor(diffMs / 86400000);
 
-  if (diffMins < 1) return lang === "ru" ? "только что" : lang === "kk" ? "дәл қазір" : "just now";
-  if (diffMins < 60) return `${diffMins} ${lang === "ru" ? "мин назад" : lang === "kk" ? "мин бұрын" : "min ago"}`;
-  if (diffHours < 24) return `${diffHours} ${lang === "ru" ? "ч назад" : lang === "kk" ? "сағ бұрын" : "h ago"}`;
-  return `${diffDays} ${lang === "ru" ? "дн назад" : lang === "kk" ? "күн бұрын" : "d ago"}`;
+  if (diffMins < 1) return t("timeJustNow");
+  if (diffMins < 60) return t("timeMinAgo").replace("{n}", diffMins.toString());
+  if (diffHours < 24) return t("timeHourAgo").replace("{n}", diffHours.toString());
+  return t("timeDayAgo").replace("{n}", diffDays.toString());
 };
 
 export function ActivityFeedWidget() {
@@ -29,27 +29,52 @@ export function ActivityFeedWidget() {
   const { theme } = useTheme();
   const glassStyle = getGlassCardStyle(theme);
   const textColors = getTextColors(theme);
+  const { isTeacher } = useAuthStore();
+  const teacherMode = isTeacher();
 
-  // Mock activity feed - в реальности это будет API endpoint
-  const { data: activities = [] } = useQuery({
-    queryKey: ["teacher-activity-feed"],
+  const { data: activities = [], isLoading } = useQuery({
+    queryKey: [teacherMode ? "teacher-recent-submissions" : "student-activity-feed", lang],
     queryFn: async () => {
       try {
-        // Пока используем события как источник активности
-        const { data } = await api.get<Array<{
-          id: number;
-          scheduled_date: string;
-          notes: string | null;
-          course_title: string | null;
-          topic_title: string | null;
-        }>>("/dashboard/events");
-        
-        return data.slice(0, 5).map((e, idx) => ({
-          id: e.id,
-          type: idx % 3 === 0 ? "submission" : idx % 3 === 1 ? "assignment" : "student",
-          message: e.notes || (e.course_title ? getLocalizedCourseTitle({ title: e.course_title } as any, t) : null) || e.topic_title || t("leaderboardActivity"),
-          time: e.scheduled_date,
-        }));
+        if (teacherMode) {
+          const { data } = await api.get<Array<{
+            id: number;
+            student_name: string;
+            assignment_id: number;
+            assignment_title: string;
+            group_name: string;
+            submitted_at: string;
+            grade: number | null;
+          }>>("/teacher/recent-submissions");
+          return data.map(s => ({
+            id: s.id,
+            type: "submission",
+            message: s.student_name,
+            subtext: `${t("activitySubtext_submitted")} ${s.assignment_title}`,
+            group: s.group_name,
+            time: s.submitted_at,
+            link: `/app/teacher/assignment/${s.assignment_id}`
+          }));
+        } else {
+          const { data } = await api.get<Array<any>>("/dashboard/events");
+          return data.slice(0, 10).map((e: any) => {
+            let type = "other";
+            const notes = (e.notes || "").toLowerCase();
+            if (notes.includes("сда") || notes.includes("work") || notes.includes("submission")) type = "submission";
+            else if (notes.includes("зада") || notes.includes("assign")) type = "assignment";
+            else if (notes.includes("студ") || notes.includes("stud")) type = "student";
+            
+            return {
+              id: e.id,
+              type: type,
+              message: e.notes || e.topic_title || t("leaderboardActivity"),
+              subtext: e.course_title || "",
+              time: e.scheduled_date,
+              link: "/app",
+              group: null
+            };
+          });
+        }
       } catch {
         return [];
       }
@@ -58,90 +83,122 @@ export function ActivityFeedWidget() {
 
   const getActivityIcon = (type: string) => {
     switch (type) {
-      case "submission":
-        return <CheckCircle2 className="w-4 h-4" />;
-      case "assignment":
-        return <BookOpen className="w-4 h-4" />;
-      case "student":
-        return <UserPlus className="w-4 h-4" />;
-      default:
-        return <Clock className="w-4 h-4" />;
+      case "submission": return <CheckCircle2 className="w-4 h-4" />;
+      case "assignment": return <BookOpen className="w-4 h-4" />;
+      case "student": return <UserPlus className="w-4 h-4" />;
+      default: return <Clock className="w-4 h-4" />;
     }
   };
 
   const getActivityColor = (type: string) => {
     switch (type) {
-      case "submission":
-        return "#10b981";
-      case "assignment":
-        return "#8B5CF6";
-      case "student":
-        return "#FF4181";
-      default:
-        return textColors.secondary;
+      case "submission": return "#10b981";
+      case "assignment": return "#8B5CF6";
+      case "student": return "#3B82F6";
+      default: return "#64748B";
     }
   };
 
   const isDark = theme === "dark";
 
   return (
-    <div className="rounded-unified-lg overflow-hidden backdrop-blur-xl card-glow-hover" style={glassStyle}>
-      <div className="p-4 text-white flex items-center justify-between relative overflow-hidden" style={{ background: "linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%)" }}>
-        {/* Decorative glow */}
-        <div className="absolute top-0 right-0 w-32 h-32 rounded-full opacity-20 blur-2xl bg-white dark:bg-gray-800" />
-        <h3 className="font-semibold text-sm relative z-10">{t("recentActivity")}</h3>
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="rounded-unified-lg overflow-hidden backdrop-blur-xl border border-white/10 shadow-2xl"
+      style={{
+        ...glassStyle,
+        background: isDark 
+          ? "linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.8) 100%)" 
+          : "linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(243, 244, 246, 0.8) 100%)",
+      }}
+    >
+      <div className="p-5 text-white flex items-center justify-between relative overflow-hidden" 
+           style={{ background: "linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%)" }}>
+        <div className="absolute inset-0 bg-black/10 mix-blend-overlay" />
+        <div className="absolute top-0 right-0 w-32 h-32 rounded-full opacity-30 blur-2xl bg-white" />
+        <div className="flex items-center gap-2 relative z-10">
+          <Clock className="w-5 h-5" />
+          <h3 className="font-bold text-base tracking-tight">{teacherMode ? t("recentActivity") : t("recentActivity")}</h3>
+        </div>
+        {isLoading && <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }} className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full relative z-10" />}
       </div>
 
       <div className="p-4">
-        {activities.length === 0 ? (
-          <p className="text-sm py-6 text-center" style={{ color: textColors.secondary }}>
-            {t("noActivity")}
-          </p>
-        ) : (
-          <div className="space-y-3">
-            {activities.map((activity) => {
-              const color = getActivityColor(activity.type);
-              const timeAgo = formatTimeAgo(activity.time, lang);
+        <AnimatePresence mode="popLayout">
+          {activities.length === 0 && !isLoading ? (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="flex flex-col items-center justify-center py-10 text-center"
+            >
+              <div className="w-16 h-16 rounded-full bg-gray-500/10 flex items-center justify-center mb-3">
+                <Clock className="w-8 h-8 opacity-20" />
+              </div>
+              <p className="text-sm font-medium" style={{ color: textColors.secondary }}>
+                {t("noActivity")}
+              </p>
+            </motion.div>
+          ) : (
+            <div className="space-y-3">
+              {activities.map((activity, idx) => {
+                const color = getActivityColor(activity.type);
+                const timeAgo = formatTimeAgo(activity.time, t);
 
-              return (
-                <div
-                  key={activity.id}
-                  className="flex items-start gap-3 p-3.5 rounded-xl hover:scale-[1.02] transition-all group"
-                  style={{
-                    background: isDark 
-                      ? "rgba(30, 41, 59, 0.4)" 
-                      : "rgba(0, 0, 0, 0.04)",
-                    border: `1px solid ${isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)"}`,
-                  }}
-                >
-                  <div
-                    className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 text-white"
-                    style={{ background: color }}
-                  >
-                    {getActivityIcon(activity.type)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium line-clamp-2 group-hover:text-[#3B82F6] transition-colors" style={{ color: textColors.primary }}>
-                      {activity.message}
-                    </p>
-                    <p className="text-xs mt-1" style={{ color: textColors.secondary }}>
-                      {timeAgo}
-                    </p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+                return (
+                  <Link key={activity.id + "-" + idx} href={activity.link}>
+                    <motion.div
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: idx * 0.05 }}
+                      whileHover={{ scale: 1.02, x: 5 }}
+                      className="flex items-start gap-3 p-3.5 rounded-2xl transition-all cursor-pointer group mb-3"
+                      style={{
+                        background: isDark ? "rgba(255, 255, 255, 0.03)" : "rgba(0, 0, 0, 0.02)",
+                        border: `1px solid ${isDark ? "rgba(255, 255, 255, 0.05)" : "rgba(0, 0, 0, 0.05)"}`,
+                      }}
+                    >
+                      <div
+                        className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-white shadow-lg shadow-blue-500/10"
+                        style={{ background: `linear-gradient(135deg, ${color}, ${color}dd)` }}
+                      >
+                        {getActivityIcon(activity.type)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline justify-between gap-2">
+                          <p className="text-sm font-bold truncate leading-tight mb-0.5" style={{ color: textColors.primary }}>
+                            {activity.message}
+                          </p>
+                          <span className="text-[10px] font-medium whitespace-nowrap opacity-60" style={{ color: textColors.secondary }}>
+                            {timeAgo}
+                          </span>
+                        </div>
+                        <p className="text-xs opacity-70 truncate line-clamp-1 mb-0.5" style={{ color: textColors.secondary }}>
+                          {activity.subtext}
+                        </p>
+                        {activity.group && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-white/5 border border-white/10" style={{ color: textColors.secondary }}>
+                            {activity.group}
+                          </span>
+                        )}
+                      </div>
+                      <ChevronRight className="w-4 h-4 opacity-0 group-hover:opacity-40 transition-opacity self-center" />
+                    </motion.div>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </AnimatePresence>
 
         <Link
-          href="/app/teacher"
-          className="mt-4 flex items-center justify-center w-full py-2.5 rounded-xl font-medium text-sm transition-all hover:bg-blue-50 dark:hover:bg-blue-500/10"
-          style={{ color: "#3B82F6" }}
+          href={teacherMode ? "/app/teacher" : "/app"}
+          className="mt-4 flex items-center justify-center w-full py-3 rounded-2xl font-bold text-sm transition-all bg-blue-500/10 hover:bg-blue-500/20 text-blue-500 group"
         >
           {t("viewAll")}
+          <ChevronRight className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" />
         </Link>
       </div>
-    </div>
+    </motion.div>
   );
 }

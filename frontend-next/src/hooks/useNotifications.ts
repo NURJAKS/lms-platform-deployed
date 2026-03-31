@@ -1,10 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
+import { useAuthStore } from "../store/authStore";
 
 export function useNotifications() {
+  const user = useAuthStore((s) => s.user);
+
   return useQuery({
-    queryKey: ["notifications"],
+    queryKey: ["notifications", user?.id],
     queryFn: async () => {
+      if (!user?.id) return [];
       const { data } = await api.get<
         Array<{
           id: number;
@@ -19,5 +23,6 @@ export function useNotifications() {
       return data;
     },
     refetchInterval: 30_000,
+    enabled: !!user?.id,
   });
 }

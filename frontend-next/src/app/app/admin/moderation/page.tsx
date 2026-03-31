@@ -70,14 +70,17 @@ export default function ModerationPage() {
                 <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-1 mb-2">
                   {c.description || "—"}
                 </p>
-                <div className="flex items-center gap-3">
-                  <span className="text-xs text-gray-500 dark:text-gray-500">ID: {c.id}</span>
-                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${
+                <div className="flex flex-wrap items-center gap-2 mt-2">
+                  <span className="text-xs text-gray-500 dark:text-gray-400">ID: {c.id}</span>
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium border ${
                     c.is_active 
                       ? "bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-300 border-green-300 dark:border-green-500/30" 
                       : "bg-gray-100 dark:bg-gray-500/20 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-500/30"
                   }`}>
                     {c.is_active ? t("adminActive") : t("adminInactive")}
+                  </span>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium border bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-500/30">
+                    {t("adminStatusPending")}
                   </span>
                 </div>
               </div>

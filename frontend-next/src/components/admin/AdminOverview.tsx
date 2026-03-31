@@ -357,135 +357,67 @@ export function AdminOverview() {
           </div>
         </BlurFade>
 
-        {/* Быстрые действия */}
-        <BlurFade delay={0.55} direction="up" offset={20}>
-          <div className="rounded-xl p-6" style={glassStyle}>
-            <h2 className="text-xl font-bold mb-4 flex items-center gap-2" style={{ color: textColors.primary }}>
-              <Activity className="w-5 h-5 text-purple-500" />
-              {t("adminQuickActions")}
+        {/* Недавние действия */}
+        <BlurFade delay={0.65} direction="up" offset={20} className="lg:col-span-2">
+          <div className="rounded-xl p-6 h-full flex flex-col" style={glassStyle}>
+            <h2 className="text-xl font-bold mb-6 flex items-center gap-2" style={{ color: textColors.primary }}>
+              <Activity className="w-5 h-5 text-blue-500" />
+              {t("adminRecentActions")}
             </h2>
-            <div className="space-y-2">
-              <Link href="/app/admin/users">
-                <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-opacity-50 transition-colors cursor-pointer" style={{ background: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.03)" }}>
-                  <UserPlus className="w-5 h-5 text-blue-500" />
-                  <span className="text-sm font-medium" style={{ color: textColors.primary }}>{t("adminAddUser")}</span>
-                </div>
-              </Link>
-              <Link href="/app/admin/courses">
-                <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-opacity-50 transition-colors cursor-pointer" style={{ background: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.03)" }}>
-                  <BookPlus className="w-5 h-5 text-green-500" />
-                  <span className="text-sm font-medium" style={{ color: textColors.primary }}>{t("adminCreateCourse")}</span>
-                </div>
-              </Link>
-              <Link href="/app/admin/analytics">
-                <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-opacity-50 transition-colors cursor-pointer" style={{ background: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.03)" }}>
-                  <Activity className="w-5 h-5 text-purple-500" />
-                  <span className="text-sm font-medium" style={{ color: textColors.primary }}>{t("adminAnalytics")}</span>
-                </div>
-              </Link>
-            </div>
-          </div>
-        </BlurFade>
-
-        {/* Статистика за неделю */}
-        <BlurFade delay={0.6} direction="left" offset={20}>
-          <div className="rounded-xl p-6" style={glassStyle}>
-            <h2 className="text-xl font-bold mb-4 flex items-center gap-2" style={{ color: textColors.primary }}>
-              <TrendingUp className="w-5 h-5 text-green-500" />
-              {t("adminLastWeek")}
-            </h2>
-            <div className="space-y-4">
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm" style={{ color: textColors.secondary }}>{t("adminNewUsers")}</span>
-                  <span className="text-2xl font-bold text-green-500">{newUsersWeek}</span>
-                </div>
+            {logs.length === 0 ? (
+              <div className="text-center py-12">
+                <Activity className="w-16 h-16 mx-auto mb-4 opacity-20" style={{ color: textColors.secondary }} />
+                <p style={{ color: textColors.secondary }}>{t("adminActivityLogEmpty")}</p>
               </div>
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm" style={{ color: textColors.secondary }}>{t("adminNewEnrollments")}</span>
-                  <span className="text-2xl font-bold text-blue-500">{newEnrollmentsWeek}</span>
-                </div>
+            ) : (
+              <div className="overflow-x-auto overflow-y-auto max-h-[250px] custom-scrollbar flex-1 pr-2">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 z-10" style={{ background: isDark ? "rgba(30, 41, 59, 0.95)" : "rgba(255, 255, 255, 0.95)", backdropFilter: "blur(8px)" }}>
+                    <tr style={{ borderBottom: isDark ? "1px solid rgba(255,255,255,0.1)" : "1px solid rgba(0,0,0,0.1)" }}>
+                      <th className="text-left py-3 px-4 font-semibold" style={{ color: textColors.secondary }}>
+                        {t("adminUser")}
+                      </th>
+                      <th className="text-left py-3 px-4 font-semibold" style={{ color: textColors.secondary }}>
+                        {t("adminAction")}
+                      </th>
+                      <th className="text-left py-3 px-4 font-semibold" style={{ color: textColors.secondary }}>
+                        {t("adminTime")}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {logs.map((l, index) => (
+                      <motion.tr
+                        key={l.id}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: index * 0.05 }}
+                        className="border-b hover:bg-opacity-50 transition-colors"
+                        style={{
+                          borderColor: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)",
+                          background: isDark ? "transparent" : "transparent",
+                        }}
+                      >
+                        <td className="py-3 px-4 font-medium" style={{ color: textColors.primary }}>
+                          {l.user_name ?? "—"}
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium bg-blue-500/20 text-blue-600 dark:text-blue-400">
+                            {formatAction(l.action)}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4" style={{ color: textColors.secondary }}>
+                          {l.created_at ? formatDateTimeLocalized(l.created_at, lang, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—"}
+                        </td>
+                      </motion.tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-              {pendingUsers > 0 && (
-                <div className="pt-3 border-t" style={{ borderColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)" }}>
-                  <div className="flex items-center gap-2 text-amber-500">
-                    <Clock className="w-4 h-4" />
-                    <span className="text-sm font-medium">{t("adminPendingApproval").replace("{count}", pendingUsers.toString())}</span>
-                  </div>
-                </div>
-              )}
-              {pendingCourses > 0 && (
-                <div className="flex items-center gap-2 text-amber-500">
-                  <Clock className="w-4 h-4" />
-                  <span className="text-sm font-medium">{t("adminPendingCourses").replace("{count}", pendingCourses.toString())}</span>
-                </div>
-              )}
-            </div>
+            )}
           </div>
         </BlurFade>
       </div>
-
-      {/* Недавние действия */}
-      <BlurFade delay={0.65} direction="up" offset={20}>
-        <div className="rounded-xl p-6" style={glassStyle}>
-          <h2 className="text-xl font-bold mb-6 flex items-center gap-2" style={{ color: textColors.primary }}>
-            <Activity className="w-5 h-5 text-blue-500" />
-            {t("adminRecentActions")}
-          </h2>
-          {logs.length === 0 ? (
-            <div className="text-center py-12">
-              <Activity className="w-16 h-16 mx-auto mb-4 opacity-20" style={{ color: textColors.secondary }} />
-              <p style={{ color: textColors.secondary }}>{t("adminActivityLogEmpty")}</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr style={{ borderBottom: isDark ? "1px solid rgba(255,255,255,0.1)" : "1px solid rgba(0,0,0,0.1)" }}>
-                    <th className="text-left py-3 px-4 font-semibold" style={{ color: textColors.secondary }}>
-                      {t("adminUser")}
-                    </th>
-                    <th className="text-left py-3 px-4 font-semibold" style={{ color: textColors.secondary }}>
-                      {t("adminAction")}
-                    </th>
-                    <th className="text-left py-3 px-4 font-semibold" style={{ color: textColors.secondary }}>
-                      {t("adminTime")}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {logs.map((l, index) => (
-                    <motion.tr
-                      key={l.id}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: index * 0.05 }}
-                      className="border-b hover:bg-opacity-50 transition-colors"
-                      style={{
-                        borderColor: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)",
-                        background: isDark ? "transparent" : "transparent",
-                      }}
-                    >
-                      <td className="py-3 px-4 font-medium" style={{ color: textColors.primary }}>
-                        {l.user_name ?? "—"}
-                      </td>
-                      <td className="py-3 px-4">
-                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium bg-blue-500/20 text-blue-600 dark:text-blue-400">
-                          {formatAction(l.action)}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4" style={{ color: textColors.secondary }}>
-                        {l.created_at ? formatDateTimeLocalized(l.created_at, lang, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—"}
-                      </td>
-                    </motion.tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </BlurFade>
     </div>
   );
 }

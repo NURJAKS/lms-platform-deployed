@@ -105,22 +105,22 @@ export function CourseStatsChart({ courseStats }: CourseStatsChartProps) {
           <p className={`text-sm font-medium mb-2 ${isDark ? "text-gray-300" : "text-gray-600"}`}>
             {data.name}
           </p>
-          <div className="flex items-center gap-3">
-            <p className={`text-2xl font-bold ${isDark ? "text-white" : "text-gray-900"}`}>
-              {enrollments.toLocaleString()}
+          <div className="space-y-1">
+            <p className={`text-xs ${isDark ? "text-blue-300" : "text-blue-600"}`}>
+              {t("adminEnrollments")}: {enrollments.toLocaleString()}
             </p>
-            {change > 0 && (
-              <span
-                className="px-2 py-1 rounded-lg text-xs font-semibold"
-                style={{ background: "rgba(16, 185, 129, 0.2)", color: "#10B981" }}
-              >
-                +{change}%
-              </span>
-            )}
+            <p className={`text-xs ${isDark ? "text-purple-300" : "text-purple-600"}`}>
+              {t("adminCompletedTopics")}: {completed.toLocaleString()}
+              {change > 0 && (
+                <span
+                  className="ml-2 px-2 py-0.5 rounded-lg text-xs font-semibold"
+                  style={{ background: "rgba(16, 185, 129, 0.2)", color: "#10B981" }}
+                >
+                  {change}%
+                </span>
+              )}
+            </p>
           </div>
-          <p className={`text-xs mt-1 ${isDark ? "text-gray-400" : "text-gray-500"}`}>
-            {completed} {t("adminCompleted")}
-          </p>
         </div>
       );
     }
@@ -251,8 +251,17 @@ export function CourseStatsChart({ courseStats }: CourseStatsChartProps) {
                 tickFormatter={formatYAxis}
                 domain={[0, Math.ceil(maxValue * 1.1)]}
               />
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip 
+                content={<CustomTooltip />}
+                formatter={(value: any, name: any) => {
+                  if (name === "enrollments") return [value ?? 0, t("adminEnrollments")];
+                  if (name === "completed" || name === "completed_topics") return [value ?? 0, t("adminCompletedTopics")];
+                  if (name === "count") return [value ?? 0, t("adminCount")];
+                  return [value ?? 0, name];
+                }}
+              />
               <Area
+                name={t("adminEnrollments")}
                 type="monotone"
                 dataKey="enrollments"
                 stroke="#3B82F6"
@@ -262,6 +271,7 @@ export function CourseStatsChart({ courseStats }: CourseStatsChartProps) {
                 activeDot={{ r: 6, fill: "#3B82F6" }}
               />
               <Area
+                name={t("adminCompleted")}
                 type="monotone"
                 dataKey="completed"
                 stroke="#8B5CF6"

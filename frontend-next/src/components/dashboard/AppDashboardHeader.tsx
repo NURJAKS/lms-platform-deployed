@@ -66,7 +66,7 @@ export function AppDashboardHeader() {
   };
 
   return (
-    <header className="sticky top-0 z-30 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-b border-gray-200/80 dark:border-gray-700">
+    <header className="hidden lg:block sticky top-0 z-30 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-b border-gray-200/80 dark:border-gray-700">
       <div className="flex items-center justify-between h-14 px-4 lg:px-6">
         <SearchHeader />
 
@@ -166,7 +166,7 @@ export function AppDashboardHeader() {
               >
                 {(user?.full_name || "U")[0].toUpperCase()}
               </div>
-              <span className="hidden md:inline text-sm font-medium text-gray-700 dark:text-gray-200 max-w-[120px] truncate">
+              <span className="hidden md:inline text-sm font-medium text-gray-700 dark:text-gray-200">
                 {user?.full_name || t("profile")}
               </span>
               <ChevronDown className={`hidden md:block w-4 h-4 text-gray-500 transition-transform ${userMenuOpen ? "rotate-180" : ""}`} />

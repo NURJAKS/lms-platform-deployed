@@ -508,10 +508,10 @@ function AddQuestionForm({
         <div>
           <label className="block text-sm mb-1" style={{ color: textColors.secondary }}>{t("adminTestCorrectAnswer")}</label>
           <select value={correctAnswer} onChange={(e) => setCorrectAnswer(e.target.value)} className="border rounded-lg px-3 py-2 dark:bg-gray-700 dark:border-gray-600">
-            <option value="a">A</option>
-            <option value="b">B</option>
-            <option value="c">C</option>
-            <option value="d">D</option>
+              <option value="a">A</option>
+              <option value="b">B</option>
+              <option value="c">C</option>
+              <option value="d">D</option>
           </select>
         </div>
         <div className="flex gap-2">

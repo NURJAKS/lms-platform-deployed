@@ -8,6 +8,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { Zap } from "lucide-react";
 import type { Course } from "@/types";
+import { getLocalizedCourseTitle } from "@/lib/courseUtils";
 
 export function AiChallengeCard() {
   const { theme } = useTheme();
@@ -57,7 +58,7 @@ export function AiChallengeCard() {
           
           {/* Course name */}
           <p className="text-base font-semibold mb-4" style={{ color: textColors.primary }}>
-            {pythonCourse.title}
+            {getLocalizedCourseTitle(pythonCourse, t)}
           </p>
           
           {/* Start button */}

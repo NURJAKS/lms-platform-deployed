@@ -38,10 +38,17 @@ export const useAuthStore = create<AuthState>()(
       token: null,
       setAuth: (user, token) => {
         safeStorage.setItem("token", token);
+        // Set cookies for middleware access
+        const expires = new Date(Date.now() + 24 * 60 * 60 * 1000).toUTCString();
+        document.cookie = `auth-token=${token}; path=/; expires=${expires}; SameSite=Lax`;
+        document.cookie = `user-role=${user.role}; path=/; expires=${expires}; SameSite=Lax`;
         set({ user, token });
       },
       logout: () => {
         safeStorage.removeItem("token");
+        // Clear cookies
+        document.cookie = "auth-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+        document.cookie = "user-role=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
         set({ user: null, token: null });
       },
       isAdmin: () =>

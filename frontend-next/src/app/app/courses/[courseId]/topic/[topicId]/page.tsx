@@ -3,7 +3,7 @@
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { api } from "@/api/client";
 import { useLanguage } from "@/context/LanguageContext";
 import { useAuthStore } from "@/store/authStore";
@@ -14,25 +14,15 @@ import { TopicTheoryContent } from "@/components/courses/TopicTheoryContent";
 import { ChevronLeft, Lock, Sparkles, Coins, CheckCircle2 } from "lucide-react";
 import { getLocalizedTopicTitle } from "@/lib/courseUtils";
 
-const VIDEO_TOPIC_TITLES = ["Python дегеніміз не?", "HTML тегтері"];
-const PYTHON_INTRO_CACHE_BUST = "?v=2";
-
 function hasVideo(topic: { title: string; video_url?: string | null }): boolean {
-  return VIDEO_TOPIC_TITLES.includes(topic.title) && !!topic.video_url;
+  return !!topic.video_url;
 }
 
 function buildVideoSrc(
   videoUrl: string | undefined | null,
-  courseId: string,
-  topicId: string,
-  topicTitle: string
 ): string | undefined {
   if (!videoUrl) return undefined;
-  const base =
-    videoUrl.startsWith("http") ? videoUrl : videoUrl.startsWith("/") ? videoUrl : `/uploads/${videoUrl}`;
-  const isFirstPythonLesson =
-    (courseId === "1" && topicId === "1") || topicTitle === "Python дегеніміз не?";
-  return base + (isFirstPythonLesson ? PYTHON_INTRO_CACHE_BUST : "");
+  return videoUrl.startsWith("http") ? videoUrl : videoUrl.startsWith("/") ? videoUrl : `/uploads/${videoUrl}`;
 }
 
 export default function TopicViewPage() {
@@ -50,6 +40,7 @@ export default function TopicViewPage() {
   const [coinsToastMessage, setCoinsToastMessage] = useState<string>("");
   const [actualVideoDuration, setActualVideoDuration] = useState<number | null>(null);
   const [hasShownTheoryCoinsToast, setHasShownTheoryCoinsToast] = useState(false);
+  const [localWatchedSeconds, setLocalWatchedSeconds] = useState<number>(0);
   const isPremium = user?.is_premium === 1;
 
   const { data: topic } = useQuery({
@@ -82,6 +73,14 @@ export default function TopicViewPage() {
   // Compute isVideoTopic BEFORE it's used in the dailyVideoLimit query to avoid TDZ error
   const isVideoTopic = topic && hasVideo(topic);
 
+  // Sync local watched seconds when progress data loads
+  useEffect(() => {
+    const progress = progressList.find((p) => p.topic_id === tId);
+    if (progress) {
+      setLocalWatchedSeconds(progress.video_watched_seconds ?? 0);
+    }
+  }, [progressList, tId]);
+
   const { data: dailyVideoLimit } = useQuery({
     queryKey: ["daily-video-limit"],
     queryFn: async () => {
@@ -102,7 +101,7 @@ export default function TopicViewPage() {
   const videoWatched = progress?.video_watched_seconds ?? 0;
   const dbDuration = topic?.video_duration ?? 300;
   const duration = actualVideoDuration ?? dbDuration;
-  const watchedPercent = duration ? Math.min(100, (videoWatched / duration) * 100) : 0;
+  const watchedPercent = duration ? Math.min(100, (localWatchedSeconds / duration) * 100) : 0;
   const canTakeTest = isVideoTopic ? watchedPercent >= 90 || !!progress?.is_completed : true;
 
   const { data: topicTest } = useQuery({
@@ -123,33 +122,45 @@ export default function TopicViewPage() {
     setHasShownTheoryCoinsToast(false);
   }, [tId]);
 
+  const lastSavedSeconds = useRef<number>(0);
+
   const onVideoProgress = (seconds: number) => {
-    api.post("/progress/video", { topic_id: tId, video_watched_seconds: seconds })
-      .then(() => {
-        queryClient.invalidateQueries({ queryKey: ["progress", cId] });
-        queryClient.invalidateQueries({ queryKey: ["daily-video-limit"] });
-        queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
-        
-        // Проверяем, достиг ли пользователь 90% просмотра для начисления coins за теорию
-        if (topic && topic.video_duration && topic.video_duration > 0) {
-          const currentPercent = (seconds / topic.video_duration) * 100;
-          if (currentPercent >= 90 && !hasShownTheoryCoinsToast && !progress?.is_completed) {
-            setCoinsToastMessage(
-              t("topicCoinsTheory")
-                .replace("{coins}", "25")
-            );
-            setShowCoinsToast(true);
-            setHasShownTheoryCoinsToast(true);
-            setTimeout(() => setShowCoinsToast(false), 4000);
-          }
-        }
-      })
-      .catch((error) => {
-        // Если достигнут лимит, показываем сообщение
-        if (error?.response?.status === 429) {
+    // Обновляем локальное состояние сразу для плавности UI
+    setLocalWatchedSeconds(seconds);
+    
+    // Сохраняем в базу только раз в 5 секунд или если видео почти закончено (90%+)
+    // Это существенно уменьшает количество ре-рендеров и сетевую нагрузку
+    const isMajorMilestone = topic?.video_duration ? (seconds / topic.video_duration) >= 0.9 : false;
+    const shouldSave = Math.abs(seconds - lastSavedSeconds.current) >= 5 || isMajorMilestone;
+
+    if (shouldSave) {
+      lastSavedSeconds.current = seconds;
+      api.post("/progress/video", { topic_id: tId, video_watched_seconds: seconds })
+        .then(() => {
+          queryClient.invalidateQueries({ queryKey: ["progress", cId] });
           queryClient.invalidateQueries({ queryKey: ["daily-video-limit"] });
-        }
-      });
+          queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+          
+          // Проверяем, достиг ли пользователь 90% просмотра для начисления coins за теорию
+          if (topic && topic.video_duration && topic.video_duration > 0) {
+            const currentPercent = (seconds / topic.video_duration) * 100;
+            if (currentPercent >= 90 && !hasShownTheoryCoinsToast && !progress?.is_completed) {
+              setCoinsToastMessage(
+                t("topicCoinsTheory")
+                  .replace("{coins}", "25")
+              );
+              setShowCoinsToast(true);
+              setHasShownTheoryCoinsToast(true);
+              setTimeout(() => setShowCoinsToast(false), 4000);
+            }
+          }
+        })
+        .catch((error) => {
+          if (error?.response?.status === 429) {
+            queryClient.invalidateQueries({ queryKey: ["daily-video-limit"] });
+          }
+        });
+    }
   };
 
   const onTestPassed = () => {
@@ -307,7 +318,8 @@ export default function TopicViewPage() {
                   </div>
                 )}
                 <VideoPlayer
-                  src={buildVideoSrc(topic.video_url, courseId, topicId, topic.title)}
+                  key={`video-${tId}`}
+                  src={buildVideoSrc(topic.video_url)}
                   duration={topic.video_duration ?? 300}
                   initialWatched={videoWatched}
                   onProgress={onVideoProgress}

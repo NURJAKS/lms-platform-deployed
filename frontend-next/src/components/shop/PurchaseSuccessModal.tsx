@@ -8,6 +8,9 @@ import { useTheme } from "@/context/ThemeContext";
 import { getModalStyle, getTextColors } from "@/utils/themeStyles";
 import { cn } from "@/lib/utils";
 
+import { useLanguage } from "@/context/LanguageContext";
+import { getLocaleForLang } from "@/lib/dateUtils";
+
 interface PurchaseSuccessModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -21,6 +24,7 @@ export function PurchaseSuccessModal({
   itemTitle,
   estimatedDeliveryDate,
 }: PurchaseSuccessModalProps) {
+  const { t, lang } = useLanguage();
   const { theme } = useTheme();
   const textColors = getTextColors(theme);
   const modalStyle = getModalStyle(theme);
@@ -40,7 +44,7 @@ export function PurchaseSuccessModal({
   }, [isOpen]);
 
   const deliveryDate = estimatedDeliveryDate
-    ? new Date(estimatedDeliveryDate).toLocaleDateString("ru-RU", {
+    ? new Date(estimatedDeliveryDate).toLocaleDateString(getLocaleForLang(lang), {
         day: "numeric",
         month: "long",
         year: "numeric",
@@ -82,7 +86,7 @@ export function PurchaseSuccessModal({
                   >
                     <CheckCircle className="w-12 h-12 text-white" />
                   </motion.div>
-
+2
                   <motion.h2
                     initial={{ y: 20, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
@@ -90,7 +94,7 @@ export function PurchaseSuccessModal({
                     className="text-2xl font-bold mb-2"
                     style={{ color: textColors.primary }}
                   >
-                    Спасибо за покупку!
+                    {t("shopPurchaseSuccess")}
                   </motion.h2>
 
                   <motion.p
@@ -114,13 +118,13 @@ export function PurchaseSuccessModal({
                     }}
                   >
                     <p className="text-sm text-center mb-3" style={{ color: textColors.secondary }}>
-                      Курьер прибудет с вашей доставкой уже через 6-7 дней
+                      {t("shopDeliveryEstimated")}
                     </p>
                     {deliveryDate && (
                       <div className="flex items-center gap-2 justify-center">
                         <Calendar className="w-4 h-4" style={{ color: "#06B6D4" }} />
                         <p className="text-sm" style={{ color: textColors.secondary }}>
-                          Ожидаемая дата доставки: {deliveryDate}
+                          {t("shopDeliveryDateLabel")} {deliveryDate}
                         </p>
                       </div>
                     )}
@@ -136,7 +140,7 @@ export function PurchaseSuccessModal({
                     )}
                     style={{ background: "linear-gradient(135deg, #FF4181 0%, #B938EB 100%)" }}
                   >
-                    Отлично!
+                    {t("shopGreat")}
                   </motion.button>
                 </div>
               </motion.div>

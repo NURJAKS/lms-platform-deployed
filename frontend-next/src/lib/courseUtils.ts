@@ -23,6 +23,8 @@ export const COURSE_TITLE_KEYS: Record<string, string> = {
   "Блокчейн технологиясы": "courseBlockchainTitle",
   "Agile және Scrum": "courseAgileTitle",
   "Тестілеу және QA": "courseQATitle",
+  "1С:Предприятие 8": "course1CTitle",
+  "1С:Кәсіпорын 8": "course1CTitle",
   // Russian variants
   "Python для начинающих": "coursePythonTitle",
   "Web разработка": "courseWebTitle",
@@ -63,6 +65,8 @@ export const COURSE_DESC_KEYS: Record<string, string> = {
   "Блокчейн технологиясы": "courseBlockchainDesc",
   "Agile және Scrum": "courseAgileDesc",
   "Тестілеу және QA": "courseQADesc",
+  "1С:Предприятие 8": "course1CDesc",
+  "1С:Кәсіпорын 8": "course1CDesc",
   // Russian-only course names (mapped to shared descriptions)
   "Веб-дизайнер": "courseWebDesignerDesc",
   "C++ разработчик": "courseCPPDeveloperDesc",
@@ -77,10 +81,41 @@ export const TOPIC_TITLE_KEYS: Record<string, string> = {
   "Python дегеніміз не?": "topicPythonWhatIsTitle",
   "Что такое Python?": "topicPythonWhatIsTitle",
   "What is Python?": "topicPythonWhatIsTitle",
+  "Айнымалылар және деректер түрлері": "topicPythonVariablesTitle",
+  "Переменные и типы данных": "topicPythonVariablesTitle",
+  "Variables and Data Types": "topicPythonVariablesTitle",
+  "Операторлар": "topicPythonOperatorsTitle",
+  "Операторы": "topicPythonOperatorsTitle",
+  "Operators": "topicPythonOperatorsTitle",
+  "Шартты операторлар": "topicPythonConditionalOperatorsTitle",
+  "Условные операторы": "topicPythonConditionalOperatorsTitle",
+  "Conditional Operators": "topicPythonConditionalOperatorsTitle",
+  "Циклдар": "topicPythonLoopsTitle",
+  "Циклы": "topicPythonLoopsTitle",
+  "Loops": "topicPythonLoopsTitle",
   // Web course — HTML tags
   "HTML тегтері": "topicHtmlTagsTitle",
   "HTML‑теги": "topicHtmlTagsTitle",
   "HTML tags": "topicHtmlTagsTitle",
+  "Формалар": "topicHtmlFormsTitle",
+  "Формы": "topicHtmlFormsTitle",
+  "Forms": "topicHtmlFormsTitle",
+  "Семантикалық HTML": "topicHtmlSemanticTitle",
+  "Семантический HTML": "topicHtmlSemanticTitle",
+  "Semantic HTML": "topicHtmlSemanticTitle",
+  "CSS селекторлары": "topicCssSelectorsTitle",
+  "CSS селекторы": "topicCssSelectorsTitle",
+  "CSS Selectors": "topicCssSelectorsTitle",
+  "Flexbox": "topicFlexboxTitle",
+  "Responsive дизайн": "topicResponsiveDesignTitle",
+  "Адаптивный дизайн": "topicResponsiveDesignTitle",
+  "Responsive Design": "topicResponsiveDesignTitle",
+  "JavaScript айнымалылары": "topicJsVariablesTitle",
+  "Переменные JavaScript": "topicJsVariablesTitle",
+  "JavaScript Variables": "topicJsVariablesTitle",
+  "DOM манипуляциясы": "topicDomManipulationTitle",
+  "Манипуляции DOM": "topicDomManipulationTitle",
+  "DOM Manipulation": "topicDomManipulationTitle",
 };
 
 /** Maps module titles to translation keys (for Units on topic pages) */
@@ -167,15 +202,17 @@ export function getLocalizedCourseTitle<K extends string>(
   course: Course,
   t: (key: K) => string
 ): string {
-  const key = COURSE_TITLE_KEYS[course.title];
-  return key ? (t as (key: string) => string)(key) : course.title;
+  const apiTitle = (course.title ?? "").trim();
+  const key = COURSE_TITLE_KEYS[apiTitle];
+  return key ? (t as (key: string) => string)(key) : apiTitle || course.title;
 }
 
 export function getLocalizedCourseDesc<K extends string>(
   course: Course,
   t: (key: K) => string
 ): string {
-  const key = COURSE_DESC_KEYS[course.title];
+  const apiTitle = (course.title ?? "").trim();
+  const key = COURSE_DESC_KEYS[apiTitle];
   return key ? (t as (key: string) => string)(key) : (course.description ?? "");
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useEffect, useRef } from "react";
@@ -8,14 +8,16 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { useLanguage } from "@/context/LanguageContext";
 import { useTheme } from "@/context/ThemeContext";
-import { ChevronLeft, Trophy, Zap, User, Bot, Clock, Layers, Brain, Star, Sparkles } from "lucide-react";
+import { ChevronLeft, Trophy, Zap, User, Bot, Clock, Layers, Brain, Star, Sparkles, Bug, Code, Terminal } from "lucide-react";
 import { BlurFade } from "@/components/ui/blur-fade";
 import { Particles } from "@/components/ui/particles";
 import { getLocalizedCourseTitle } from "@/lib/courseUtils";
+import { useAuthStore } from "@/store/authStore";
 
-type Screen = "intro" | "playing" | "results" | "memory" | "memoryComplete";
+type Screen = "intro" | "playing" | "results" | "memory" | "memoryComplete" | "newModePlaying" | "newModeResults";
 type AILevel = "beginner" | "intermediate" | "expert";
-type GameMode = "quiz" | "flashcard" | "memory";
+type GameMode = "quiz" | "flashcard" | "memory" | "find_bug" | "guess_output" | "speed_code";
+type ChallengeCategory = "all" | "python" | "javascript" | "html_css" | "algorithms" | "cs_general";
 
 interface Question {
   id: number;
@@ -47,6 +49,7 @@ interface MemoryCard {
 }
 
 interface ResultsResponse {
+  total_questions: number;
   user_correct: number;
   ai_correct: number;
   user_time: number;
@@ -57,9 +60,16 @@ interface ResultsResponse {
   ai_total_score: number;
   user_wins: boolean;
   overtime: boolean;
-  recommendations: string;
+  recommendations?: string;
   round_time_limit: number;
   wrong_topics?: WrongTopic[];
+  details?: Array<{
+    question_id: string;
+    correct: boolean;
+    user_answer: string;
+    correct_answer: string;
+    explanation?: string;
+  }>;
   metrics?: {
     user_speed_avg_sec: number;
     user_accuracy_pct: number;
@@ -70,10 +80,49 @@ interface ResultsResponse {
   };
 }
 
+interface NewModeQuestion {
+  id: string;
+  category: string;
+  level: string;
+  code?: string;
+  total_lines?: number;
+  options?: string[];
+  task?: string;
+}
+
+interface NewModeStartResponse {
+  challenge_id: number;
+  game_mode: string;
+  questions: NewModeQuestion[];
+  ai_times_per_question: number[];
+  round_time_limit_seconds: number;
+  ai_correct_count: number;
+  ai_bonus_points: number;
+  total_questions: number;
+}
+
+const CATEGORY_ICONS: Record<string, string> = {
+  all: "🎯",
+  python: "🐍",
+  javascript: "⚡",
+  html_css: "🎨",
+  algorithms: "🧩",
+  cs_general: "💻",
+};
+
+const CATEGORY_TO_COURSE_ID: Record<string, number> = {
+  python: 1,
+  javascript: 2,
+  html_css: 2,
+  algorithms: 2,
+  cs_general: 7,
+};
+
 // LEVEL_LABELS will be created using translations inside the component
 
 export default function AIChallengePage() {
   const params = useParams();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const courseId = params.courseId as string;
   const cId = Number(courseId);
@@ -81,6 +130,7 @@ export default function AIChallengePage() {
   const { t, lang } = useLanguage();
   const { theme } = useTheme();
   const isDark = theme === "dark";
+  const isTeacher = useAuthStore((s) => s.isTeacher());
   
   // Получаем параметры из URL
   const urlMode = searchParams.get("mode") as GameMode | null;
@@ -104,11 +154,23 @@ export default function AIChallengePage() {
   const [memoryCards, setMemoryCards] = useState<MemoryCard[]>([]);
   const [memoryFlipped, setMemoryFlipped] = useState<number[]>([]);
   const [memoryMatched, setMemoryMatched] = useState<Set<string>>(new Set());
+  // New game modes state
+  const [challengeCategory, setChallengeCategory] = useState<ChallengeCategory>("all");
+  const targetCourseId = (challengeCategory !== "all" && CATEGORY_TO_COURSE_ID[challengeCategory as string]) || cId;
+  const [newModeQuestions, setNewModeQuestions] = useState<NewModeQuestion[]>([]);
+  const [newModeCurrentQ, setNewModeCurrentQ] = useState(0);
+  const [newModeAnswers, setNewModeAnswers] = useState<Array<{ question_id: string; answer: string; time_seconds: number }>>([]);
+  const [newModeQStartTime, setNewModeQStartTime] = useState<number>(0);
+  const [newModeTimeLeft, setNewModeTimeLeft] = useState(100);
+  const [newModeAiTimes, setNewModeAiTimes] = useState<number[]>([]);
+  const [newModeAiAnswered, setNewModeAiAnswered] = useState(0);
   const roundStartRef = useRef<number>(0);
   const aiTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const answersRef = useRef(answers);
   const submittedRef = useRef(false);
+  const newModeAnswersRef = useRef(newModeAnswers);
   answersRef.current = answers;
+  newModeAnswersRef.current = newModeAnswers;
 
   const { data: course } = useQuery({
     queryKey: ["course", cId],
@@ -154,6 +216,45 @@ export default function AIChallengePage() {
         submittedRef.current = false;
         setScreen("playing");
       }
+    },
+  });
+
+  // New game mode start mutation
+  const newModeStartMutation = useMutation({
+    mutationFn: async () => {
+      const { data } = await api.post<NewModeStartResponse>(
+        `/challenge/new-game/start?game_mode=${gameMode}&ai_level=${aiLevel}&category=${challengeCategory === "all" ? "" : challengeCategory}&lang=${lang}`
+      );
+      return data;
+    },
+    onSuccess: (data) => {
+      setChallengeId(data.challenge_id);
+      setNewModeQuestions(data.questions);
+      setNewModeAiTimes(data.ai_times_per_question || []);
+      setRoundTimeLimit(data.round_time_limit_seconds ?? 100);
+      setAiBonusPoints(data.ai_bonus_points ?? 0);
+      setNewModeCurrentQ(0);
+      setNewModeAnswers([]);
+      setNewModeAiAnswered(0);
+      setNewModeTimeLeft(data.round_time_limit_seconds ?? 100);
+      setNewModeQStartTime(Date.now());
+      roundStartRef.current = Date.now();
+      submittedRef.current = false;
+      setScreen("newModePlaying");
+    },
+  });
+
+  // New game mode submit mutation
+  const newModeSubmitMutation = useMutation({
+    mutationFn: async (body: { answers: Array<{ question_id: string; answer: string; time_seconds: number }> }) => {
+      if (!challengeId) throw new Error("Challenge ID not found");
+      const { data } = await api.post<ResultsResponse>(`/challenge/new-game/${challengeId}/submit`, body);
+      return data;
+    },
+    onSuccess: (data) => {
+      submittedRef.current = true;
+      setResults(data);
+      setScreen("newModeResults");
     },
   });
 
@@ -216,6 +317,69 @@ export default function AIChallengePage() {
     });
     return () => aiTimersRef.current.forEach((t) => clearTimeout(t));
   }, [screen, questions.length, aiTimes, gameMode, currentQ]);
+
+  // AI Timers for new modes
+  useEffect(() => {
+    if (screen !== "newModePlaying" || newModeQuestions.length === 0 || newModeAiTimes.length === 0) return;
+    
+    // Clear any existing timers
+    aiTimersRef.current.forEach((t) => clearTimeout(t));
+    aiTimersRef.current = [];
+    
+    let elapsed = 0;
+    newModeAiTimes.forEach((t, i) => {
+      const id = setTimeout(() => {
+        setNewModeAiAnswered((c) => Math.min(c + 1, i + 1));
+      }, (elapsed + t) * 1000);
+      elapsed += t;
+      aiTimersRef.current.push(id);
+    });
+    
+    return () => aiTimersRef.current.forEach((t) => clearTimeout(t));
+  }, [screen, newModeQuestions.length, newModeAiTimes]);
+
+  // Global Timer for new modes
+  useEffect(() => {
+    if (screen !== "newModePlaying" || newModeQuestions.length === 0) return;
+    
+    if (newModeTimeLeft <= 0) {
+      if (!submittedRef.current) {
+        const currentAnswers = newModeAnswersRef.current;
+        if (currentAnswers.length < newModeQuestions.length) {
+          const remaining = newModeQuestions.slice(currentAnswers.length);
+          const autoAnswers = [
+            ...currentAnswers,
+            ...remaining.map((r) => ({ question_id: r.id, answer: "", time_seconds: 0 })),
+          ];
+          submittedRef.current = true;
+          newModeSubmitMutation.mutate({ answers: autoAnswers });
+        }
+      }
+      return;
+    }
+    
+    const id = setInterval(() => {
+      setNewModeTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(id);
+          if (!submittedRef.current) {
+            const currentAnswers = newModeAnswersRef.current;
+            const remaining = newModeQuestions.slice(currentAnswers.length);
+            const autoAnswers = [
+              ...currentAnswers,
+              ...remaining.map((r) => ({ question_id: r.id, answer: "", time_seconds: 0 })),
+            ];
+            submittedRef.current = true;
+            newModeSubmitMutation.mutate({ answers: autoAnswers });
+          }
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    
+    return () => clearInterval(id);
+  }, [screen, newModeTimeLeft, newModeQuestions.length]);
 
   useEffect(() => {
     if (screen !== "playing" || gameMode === "flashcard" || questions.length === 0) return;
@@ -285,6 +449,21 @@ export default function AIChallengePage() {
     setCardResult(userWins ? "user" : "ai");
     aiTimersRef.current.forEach((t) => clearTimeout(t));
     aiTimersRef.current = [];
+  };
+
+  const handleNewModeAnswer = (answer: string) => {
+    if (submittedRef.current || !newModeQuestions[newModeCurrentQ]) return;
+    const timeSec = (Date.now() - newModeQStartTime) / 1000;
+    const q = newModeQuestions[newModeCurrentQ];
+    const newAnswers = [...newModeAnswers, { question_id: q.id, answer, time_seconds: timeSec }];
+    setNewModeAnswers(newAnswers);
+    if (newModeCurrentQ + 1 >= newModeQuestions.length) {
+      submittedRef.current = true;
+      newModeSubmitMutation.mutate({ answers: newAnswers });
+    } else {
+      setNewModeCurrentQ(newModeCurrentQ + 1);
+      setNewModeQStartTime(Date.now());
+    }
   };
 
   const getPairKey = (id1: string, id2: string) => [id1, id2].sort().join("-");
@@ -413,10 +592,10 @@ export default function AIChallengePage() {
         </div>
       )}
       
-      <div className="relative max-w-2xl mx-auto z-10">
+      <div className="relative max-w-4xl mx-auto z-10 px-1 sm:px-0">
         {shouldShowIntro && (
           <BlurFade delay={0.05}>
-            <Link href="/app/ai-challenge" className="inline-flex items-center gap-1 text-gray-600 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 mb-6 transition-colors">
+            <Link href="/app/ai-challenge/1" className="inline-flex items-center gap-1 text-gray-600 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 mb-6 transition-colors">
               <ChevronLeft className="w-4 h-4" /> {t("back")}
             </Link>
           </BlurFade>
@@ -443,7 +622,7 @@ export default function AIChallengePage() {
             {startMutation.isError && (
               <div className="mt-4 space-y-2">
                 <Link
-                  href={`/app/courses/${cId}`}
+                  href={`/app/courses/${targetCourseId}`}
                   className="block px-4 py-2 rounded-lg text-white text-center bg-purple-600 hover:bg-purple-700 transition-colors"
                 >
                   {t("aiGoToCourse")}
@@ -465,7 +644,7 @@ export default function AIChallengePage() {
         <>
       {shouldShowIntro && (
         <BlurFade delay={0.1}>
-          <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-8 text-center overflow-hidden border-2 border-purple-200/50 dark:border-purple-800/50">
+          <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-5 sm:p-8 lg:p-12 text-center overflow-hidden border-2 border-purple-200/50 dark:border-purple-800/50">
             {/* Декоративные элементы внутри карточки */}
             <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/5 dark:bg-purple-400/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
             <div className="absolute bottom-0 left-0 w-48 h-48 bg-blue-500/5 dark:bg-blue-400/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
@@ -488,15 +667,21 @@ export default function AIChallengePage() {
                   <Star className="w-full h-full text-blue-400 fill-current" />
                 </div>
               </div>
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent mb-2">
-                AI vs Student
+              <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent mb-2">
+                {t("aiVsStudent")}
               </h1>
               <p className="text-gray-600 dark:text-gray-400 mb-6">
                 {gameMode === "flashcard"
                   ? t("aiGameDescriptionFlashcard").replace("{course}", getLocalizedCourseTitle(course as any, t))
                   : gameMode === "memory"
                     ? t("aiGameDescriptionMemory").replace("{course}", getLocalizedCourseTitle(course as any, t))
-                    : t("aiGameDescriptionQuiz").replace("{course}", getLocalizedCourseTitle(course as any, t))}
+                    : gameMode === "find_bug"
+                      ? t("aiGameDescriptionFindBug")
+                      : gameMode === "guess_output"
+                        ? t("aiGameDescriptionGuessOutput")
+                        : gameMode === "speed_code"
+                          ? t("aiGameDescriptionSpeedCode")
+                          : t("aiGameDescriptionQuiz").replace("{course}", getLocalizedCourseTitle(course as any, t))}
               </p>
               <div className="mb-6">
                 <div className="flex items-center justify-center gap-2 mb-3">
@@ -504,6 +689,7 @@ export default function AIChallengePage() {
                   <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{t("gameMode")}:</p>
                 </div>
                 <div className="flex gap-2 justify-center flex-wrap mb-4">
+                  <p className="w-full text-xs text-gray-400 dark:text-gray-500 mb-1">{t("aiClassicModes")}:</p>
                   <button
                     type="button"
                     onClick={() => setGameMode("quiz")}
@@ -541,6 +727,75 @@ export default function AIChallengePage() {
                     {t("memoryGame")}
                   </button>
                 </div>
+                <div className="flex gap-2 justify-center flex-wrap mb-4">
+                  <p className="w-full text-xs text-gray-400 dark:text-gray-500 mb-1">{t("aiNewGameModes")}:</p>
+                  <button
+                    type="button"
+                    onClick={() => setGameMode("find_bug")}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                      gameMode === "find_bug"
+                        ? "bg-gradient-to-r from-red-500 to-orange-500 text-white shadow-lg"
+                        : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+                    }`}
+                  >
+                    <Bug className="w-4 h-4" />
+                    {t("findBugGame")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setGameMode("guess_output")}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                      gameMode === "guess_output"
+                        ? "bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-lg"
+                        : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+                    }`}
+                  >
+                    <Terminal className="w-4 h-4" />
+                    {t("guessOutputGame")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setGameMode("speed_code")}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                      gameMode === "speed_code"
+                        ? "bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg"
+                        : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+                    }`}
+                  >
+                    <Code className="w-4 h-4" />
+                    {t("speedCodeGame")}
+                  </button>
+                </div>
+                {/* Category selector for new modes */}
+                {["find_bug", "guess_output", "speed_code"].includes(gameMode) && (
+                  <div className="mb-4">
+                    <div className="flex items-center justify-center gap-2 mb-3">
+                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{t("aiCategoryLabel")}:</p>
+                    </div>
+                    <div className="flex gap-2 justify-center flex-wrap">
+                      {(["all", "python", "javascript", "html_css", "algorithms", "cs_general"] as const).map((cat) => (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => setChallengeCategory(cat)}
+                          className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                            challengeCategory === cat
+                              ? "bg-purple-600 text-white"
+                              : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+                          }`}
+                        >
+                          <span>{CATEGORY_ICONS[cat]}</span>
+                          {cat === "all" ? t("aiCategoryAll")
+                            : cat === "python" ? t("aiCategoryPython")
+                            : cat === "javascript" ? t("aiCategoryJavascript")
+                            : cat === "html_css" ? t("aiCategoryHtmlCss")
+                            : cat === "algorithms" ? t("aiCategoryAlgorithms")
+                            : t("aiCategoryCsGeneral")}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 {gameMode !== "memory" && (
                   <>
                     <div className="flex items-center justify-center gap-2 mb-3 mt-4">
@@ -569,24 +824,30 @@ export default function AIChallengePage() {
               <div className="relative">
                 <button
                   type="button"
-                  onClick={() => startMutation.mutate()}
-                  disabled={startMutation.isPending}
-                  className="relative py-4 px-10 rounded-xl text-white disabled:opacity-50 font-semibold text-lg bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 transition-all shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 overflow-hidden group"
+                  onClick={() => {
+                    if (["find_bug", "guess_output", "speed_code"].includes(gameMode)) {
+                      newModeStartMutation.mutate();
+                    } else {
+                      startMutation.mutate();
+                    }
+                  }}
+                  disabled={startMutation.isPending || newModeStartMutation.isPending}
+                  className="relative py-4 sm:py-5 px-8 sm:px-14 rounded-xl text-white disabled:opacity-50 font-semibold text-lg sm:text-xl bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 transition-all shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 overflow-hidden group min-h-[3rem]"
                 >
                   {/* Блестящий эффект при hover */}
                   <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
                   <span className="relative z-10 flex items-center gap-2">
                     <Zap className="w-5 h-5" />
-                    {startMutation.isPending ? t("aiJoining") : t("aiStarting")}
+                    {startMutation.isPending || newModeStartMutation.isPending ? t("aiJoining") : t("aiStarting")}
                   </span>
                 </button>
                 {/* Декоративные элементы вокруг кнопки */}
                 <div className="absolute -top-1 -right-1 w-3 h-3 bg-yellow-400 rounded-full animate-ping" />
                 <div className="absolute -bottom-1 -left-1 w-2 h-2 bg-blue-400 rounded-full animate-pulse" />
               </div>
-              {startMutation.isError && (
+              {(startMutation.isError || newModeStartMutation.isError) && (
                 <div className="mt-4 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
-                  <p className="text-red-600 dark:text-red-400 text-sm">{(startMutation.error as Error).message}</p>
+                  <p className="text-red-600 dark:text-red-400 text-sm">{((startMutation.error || newModeStartMutation.error) as Error)?.message}</p>
                 </div>
               )}
             </div>
@@ -595,8 +856,8 @@ export default function AIChallengePage() {
       )}
 
       {screen === "playing" && questions[currentQ] && gameMode === "flashcard" && (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <div className="grid grid-cols-2 gap-4 mb-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-6">
             <div className="flex items-center gap-2 p-3 rounded-lg bg-purple-100 dark:bg-purple-900">
               <User className="w-5 h-5 text-purple-600 dark:text-purple-400" />
               <div className="flex gap-1">
@@ -662,7 +923,7 @@ export default function AIChallengePage() {
       )}
 
       {screen === "memory" && memoryCards.length > 0 && (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6">
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">{t("aiMemoryFindPairs")}</p>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {memoryCards.map((card, idx) => {
@@ -708,22 +969,24 @@ export default function AIChallengePage() {
             >
               {t("aiRetry")}
             </button>
-            <Link href={`/app/courses/${cId}`} className="py-2 px-4 rounded-lg text-white bg-purple-600 hover:bg-purple-700 transition-colors">
-              {t("aiBackToCourse")}
-            </Link>
+            {!isTeacher && (
+              <Link href={`/app/courses/${targetCourseId}`} className="py-2 px-4 rounded-lg text-white bg-purple-600 hover:bg-purple-700 transition-colors">
+                {t("aiBackToCourse")}
+              </Link>
+            )}
           </div>
         </div>
       )}
 
       {screen === "playing" && questions[currentQ] && gameMode === "quiz" && (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
               <Clock className="w-5 h-5" />
               <span className="font-bold text-lg">{timeLeft}с</span>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-6">
             <div className="flex items-center gap-2 p-3 rounded-lg bg-purple-100 dark:bg-purple-900">
               <User className="w-5 h-5 text-purple-600 dark:text-purple-400" />
               <div className="flex-1">
@@ -775,33 +1038,159 @@ export default function AIChallengePage() {
         </div>
       )}
 
-      {screen === "results" && results && (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-8 text-center">
+      {/* ═══════════ NEW MODE: PLAYING SCREEN ═══════════ */}
+      {screen === "newModePlaying" && newModeQuestions[newModeCurrentQ] && (() => {
+        const q = newModeQuestions[newModeCurrentQ];
+        const codeLines = q.code ? q.code.split("\n") : [];
+        const progress = ((newModeCurrentQ) / newModeQuestions.length) * 100;
+
+        const handleNewModeAnswerInternal = (answer: string) => {
+          handleNewModeAnswer(answer);
+        };
+
+        return (
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-4 sm:p-6 border border-gray-200 dark:border-gray-700">
+            {/* Header: progress + timer + AI status */}
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
+                  {newModeCurrentQ + 1}/{newModeQuestions.length}
+                </span>
+                <div className="w-32 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-purple-500 to-blue-500 rounded-full transition-all duration-500"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800">
+                  <Clock className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                  <span className={`text-sm font-mono font-bold ${newModeTimeLeft < 10 ? "text-red-500 animate-pulse" : "text-blue-700 dark:text-blue-300"}`}>
+                    {newModeTimeLeft}s
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800">
+                  <Bot className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                  <span className="text-sm font-bold text-amber-700 dark:text-amber-300">{newModeAiAnswered}/{newModeQuestions.length}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Category + Level badge */}
+            <div className="flex items-center justify-center gap-2 mb-4">
+              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300">
+                {CATEGORY_ICONS[q.category] || "📝"} {q.category}
+              </span>
+              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300">
+                {q.level}
+              </span>
+            </div>
+
+            {/* Game mode hint */}
+            <p className="text-center font-semibold text-gray-700 dark:text-gray-200 mb-4">
+              {gameMode === "find_bug" ? t("aiFindBugHint")
+                : gameMode === "guess_output" ? t("aiGuessOutputHint")
+                : t("aiSpeedCodeHint")}
+            </p>
+
+            {/* Task description for speed_code */}
+            {gameMode === "speed_code" && q.task && (
+              <div className="mb-4 p-4 rounded-xl bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/30 dark:to-emerald-900/30 border border-green-200 dark:border-green-800">
+                <p className="text-sm font-medium text-green-800 dark:text-green-200">{q.task}</p>
+              </div>
+            )}
+
+            {/* Code display (for find_bug and guess_output) */}
+            {(gameMode === "find_bug" || gameMode === "guess_output") && codeLines.length > 0 && (
+              <div className="mb-4 rounded-xl overflow-hidden border border-gray-300 dark:border-gray-600">
+                <div className="bg-gray-900 p-1 flex items-center gap-1.5">
+                  <div className="w-3 h-3 rounded-full bg-red-500" />
+                  <div className="w-3 h-3 rounded-full bg-yellow-500" />
+                  <div className="w-3 h-3 rounded-full bg-green-500" />
+                  <span className="ml-2 text-xs text-gray-400">{q.category}.{gameMode === "find_bug" ? "bug" : "py"}</span>
+                </div>
+                <div className="bg-gray-950 p-3 overflow-x-auto">
+                  {codeLines.map((line, idx) => (
+                    <div
+                      key={idx}
+                      onClick={() => gameMode === "find_bug" ? handleNewModeAnswerInternal(String(idx + 1)) : undefined}
+                      className={`flex items-start gap-3 px-2 py-0.5 rounded transition-all ${
+                        gameMode === "find_bug"
+                          ? "cursor-pointer hover:bg-red-500/20 hover:border-l-2 hover:border-red-500 active:bg-red-500/30"
+                          : ""
+                      }`}
+                    >
+                      <span className="text-gray-500 text-xs font-mono w-6 text-right select-none shrink-0">{idx + 1}</span>
+                      <pre className="text-green-400 text-sm font-mono whitespace-pre-wrap break-all">{line || " "}</pre>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Options (for guess_output and speed_code) */}
+            {(gameMode === "guess_output" || gameMode === "speed_code") && q.options && (
+              <div className="grid grid-cols-1 gap-3">
+                {q.options.map((opt, idx) => {
+                  const key = String.fromCharCode(97 + idx); // a, b, c, d
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => handleNewModeAnswerInternal(key)}
+                      className="text-left p-3 rounded-xl border-2 border-gray-200 dark:border-gray-600 hover:border-purple-400 dark:hover:border-purple-500 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-all group"
+                    >
+                      <div className="flex items-start gap-3">
+                        <span className="shrink-0 w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-sm font-bold text-gray-600 dark:text-gray-300 group-hover:bg-purple-100 dark:group-hover:bg-purple-800 group-hover:text-purple-700 dark:group-hover:text-purple-300 transition-colors">
+                          {key.toUpperCase()}
+                        </span>
+                        <pre className="text-sm font-mono text-gray-700 dark:text-gray-200 whitespace-pre-wrap break-all flex-1">{opt}</pre>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {newModeSubmitMutation.isPending && (
+              <div className="flex items-center justify-center mt-4">
+                <div className="w-8 h-8 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin" />
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* ═══════════ RESULTS SCREEN (both classic and new modes) ═══════════ */}
+      {(screen === "results" || screen === "newModeResults") && results && (
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-5 sm:p-8 text-center">
           <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 ${results.user_wins ? "bg-green-100 dark:bg-green-900" : "bg-amber-100 dark:bg-amber-900"}`}>
             <Trophy className={`w-10 h-10 ${results.user_wins ? "text-green-600 dark:text-green-400" : "text-amber-600 dark:text-amber-400"}`} />
           </div>
           <h1 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">
             {results.overtime ? t("aiTimeUp") : results.user_wins ? t("aiCongratulations") : `${t("aiWon")}. ${t("tryAgain")}`}
           </h1>
-          <div className="grid grid-cols-2 gap-4 my-6 text-left">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 my-6 text-left">
             <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
               <p className="font-medium text-gray-700 dark:text-gray-300">{t("aiUser")}</p>
-              <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">{results.user_correct}/5</p>
+              <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">{results.user_correct}/{results.total_questions}</p>
               <p className="text-sm text-gray-500 dark:text-gray-400">{t("aiThinkingSpeed")}: {results.user_time.toFixed(1)}с</p>
               {results.user_bonus_points > 0 && <p className="text-sm text-green-600 dark:text-green-400">{t("bonus")}: +{results.user_bonus_points}</p>}
               <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mt-1">{t("aiTotal")}: {results.user_total_score}</p>
             </div>
             <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
               <p className="font-medium text-gray-700 dark:text-gray-300">{t("aiBot")}</p>
-              <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{results.ai_correct}/5</p>
+              <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{results.ai_correct}/{results.total_questions}</p>
               <p className="text-sm text-gray-500 dark:text-gray-400">{t("aiThinkingSpeed")}: {results.ai_time.toFixed(1)}с</p>
               {results.ai_bonus_points > 0 && <p className="text-sm text-green-600 dark:text-green-400">{t("bonus")}: +{results.ai_bonus_points}</p>}
               <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mt-1">{t("aiTotal")}: {results.ai_total_score}</p>
             </div>
           </div>
           {results.metrics && (
-            <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg text-left overflow-x-auto">
+            <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg text-left">
               <p className="font-medium text-gray-700 dark:text-gray-300 mb-3">{t("aiStudentVsAiMetrics")}</p>
+              <div className="hidden sm:block overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-200 dark:border-gray-600">
@@ -828,6 +1217,24 @@ export default function AIChallengePage() {
                   </tr>
                 </tbody>
               </table>
+              </div>
+              <div className="sm:hidden space-y-2">
+                <div className="rounded-lg bg-white/70 dark:bg-gray-800/60 p-3">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">{t("aiThinkingSpeed")} ({t("aiSpeedUnit")})</p>
+                  <p className="text-sm text-gray-700 dark:text-gray-300">{t("aiUser")}: {results.metrics.user_speed_avg_sec}</p>
+                  <p className="text-sm text-gray-700 dark:text-gray-300">{t("aiBot")}: {results.metrics.ai_speed_avg_sec ?? "-"}</p>
+                </div>
+                <div className="rounded-lg bg-white/70 dark:bg-gray-800/60 p-3">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">{t("aiMemoryAccuracy")}</p>
+                  <p className="text-sm text-gray-700 dark:text-gray-300">{t("aiUser")}: {results.metrics.user_accuracy_pct}</p>
+                  <p className="text-sm text-gray-700 dark:text-gray-300">{t("aiBot")}: {results.metrics.ai_accuracy_pct ?? "-"}</p>
+                </div>
+                <div className="rounded-lg bg-white/70 dark:bg-gray-800/60 p-3">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">{t("aiStrategyBonus")}</p>
+                  <p className="text-sm text-gray-700 dark:text-gray-300">{t("aiUser")}: +{results.metrics.user_strategy_bonus}</p>
+                  <p className="text-sm text-gray-700 dark:text-gray-300">{t("aiBot")}: +{results.metrics.ai_strategy_bonus ?? 0}</p>
+                </div>
+              </div>
             </div>
           ) }
           {results.recommendations && (
@@ -839,7 +1246,7 @@ export default function AIChallengePage() {
                   {results.wrong_topics.map((t) => (
                     <Link
                       key={t.id}
-                      href={`/app/courses/${cId}/topic/${t.id}`}
+                      href={`/app/courses/${targetCourseId}/topic/${t.id}`}
                       className="text-xs px-3 py-1.5 rounded-lg bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-400 hover:bg-purple-200 dark:hover:bg-purple-800 transition-colors"
                     >
                       {t.title}
@@ -849,13 +1256,69 @@ export default function AIChallengePage() {
               )}
             </div>
           )}
+          
+          {results.details && results.details.length > 0 && (
+            <div className="mb-6 text-left">
+              <p className="font-medium text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+                <Bug className="w-4 h-4 text-red-500" />
+                {t("aiRecommendations")}
+              </p>
+              <div className="space-y-3">
+                {results.details.map((detail, idx) => (
+                  <div key={idx} className={`p-4 rounded-xl border ${detail.correct ? "bg-green-50/50 dark:bg-green-900/10 border-green-200 dark:border-green-800" : "bg-red-50/50 dark:bg-red-900/10 border-red-200 dark:border-red-800"}`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-bold uppercase tracking-wider text-gray-400">Question {idx + 1}</span>
+                      {detail.correct ? (
+                        <span className="text-xs font-bold text-green-600 dark:text-green-400 flex items-center gap-1">
+                          <Zap className="w-3 h-3" /> CORRECT
+                        </span>
+                      ) : (
+                        <span className="text-xs font-bold text-red-600 dark:text-red-400 flex items-center gap-1">
+                          <Bug className="w-3 h-3" /> WRONG
+                        </span>
+                      )}
+                    </div>
+                    {gameMode === "find_bug" ? (
+                      <p className="text-sm text-gray-700 dark:text-gray-300 mb-1">
+                        {t("aiCorrectLine")}: <span className="font-mono font-bold text-purple-600 dark:text-purple-400">{detail.correct_answer}</span>
+                      </p>
+                    ) : (
+                      <p className="text-sm text-gray-700 dark:text-gray-300 mb-1">
+                        {t("aiAnswer")}: <span className="font-mono font-bold text-purple-600 dark:text-purple-400">{detail.correct_answer}</span>
+                      </p>
+                    )}
+                    {detail.explanation && (
+                      <p className="text-xs text-gray-600 dark:text-gray-400 italic mt-2">
+                        <span className="font-bold not-italic">{t("aiExplanation")}:</span> {detail.explanation}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="flex gap-3 justify-center">
-            <button type="button" onClick={() => { setScreen("intro"); setResults(null); setCardResult(null); }} className="py-2 px-4 rounded-lg border border-purple-500 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors">
+            <button
+              type="button"
+              onClick={() => {
+                // Сбросить состояние и вернуться на экран выбора игры
+                router.replace(`/app/ai-challenge/${cId}`);
+                setScreen("intro");
+                setResults(null);
+                setCardResult(null);
+                setQuestions([]);
+                setAiTimes([]);
+                setAiAnsweredCount(0);
+              }}
+              className="py-2 px-4 rounded-lg border border-purple-500 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors"
+            >
               {t("aiViewAgain")}
             </button>
-            <Link href={`/app/courses/${cId}`} className="py-2 px-4 rounded-lg text-white bg-purple-600 hover:bg-purple-700 transition-colors">
-              {t("aiBackToCourse")}
-            </Link>
+            {!isTeacher && (
+              <Link href={`/app/courses/${targetCourseId}`} className="py-2 px-4 rounded-lg text-white bg-purple-600 hover:bg-purple-700 transition-colors">
+                {t("aiBackToCourse")}
+              </Link>
+            )}
           </div>
         </div>
       )}

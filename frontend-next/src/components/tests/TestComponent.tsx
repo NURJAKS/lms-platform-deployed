@@ -98,24 +98,24 @@ export function TestComponent({ testId, onComplete, onCancel }: TestComponentPro
   ];
 
   return (
-    <div className="max-w-2xl mx-auto bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-xl shadow p-6">
+    <div className="max-w-2xl mx-auto bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-xl shadow p-4 sm:p-6">
       <p className="text-sm text-gray-500 mb-2">{t("testQuestion")} {step + 1} / {questions.length}</p>
-      <h3 className="text-lg font-medium text-gray-800 dark:text-white mb-4">{q.question_text}</h3>
+      <h3 className="text-base sm:text-lg font-medium text-gray-800 dark:text-white mb-4 mobile-safe-text">{q.question_text}</h3>
       <ul className="space-y-2 mb-6">
         {options.map((opt) => (
           <li key={opt.key}>
-            <label className="flex items-center gap-2 p-3 border dark:border-gray-600 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 has-[:checked]:bg-[var(--qit-primary)]/10 has-[:checked]:border-[var(--qit-primary)]">
-              <input type="radio" name={`q-${q.id}`} value={opt.key} checked={answers[q.id] === opt.key} onChange={() => setAnswers((a) => ({ ...a, [q.id]: opt.key }))} className="w-4 h-4" style={{ accentColor: "var(--qit-primary)" }} />
-              <span>{opt.label}</span>
+            <label className="flex items-center gap-2 p-3 sm:p-3.5 border dark:border-gray-600 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 has-[:checked]:bg-[var(--qit-primary)]/10 has-[:checked]:border-[var(--qit-primary)] min-h-[2.75rem]">
+              <input type="radio" name={`q-${q.id}`} value={opt.key} checked={answers[q.id] === opt.key} onChange={() => setAnswers((a) => ({ ...a, [q.id]: opt.key }))} className="w-4 h-4 shrink-0" style={{ accentColor: "var(--qit-primary)" }} />
+              <span className="mobile-safe-text">{opt.label}</span>
             </label>
           </li>
         ))}
       </ul>
-      <div className="flex justify-between">
-        <button type="button" onClick={handlePrev} disabled={step === 0} className="py-2 px-4 rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50">
+      <div className="flex flex-wrap justify-between gap-2">
+        <button type="button" onClick={handlePrev} disabled={step === 0} className="py-2.5 px-4 rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 min-h-[2.5rem]">
           {t("testBack")}
         </button>
-        <button type="button" onClick={handleNext} disabled={!answers[q.id]} className="py-2 px-4 rounded-lg text-white disabled:opacity-50" style={{ background: "var(--qit-primary)" }}>
+        <button type="button" onClick={handleNext} disabled={!answers[q.id]} className="py-2.5 px-4 rounded-lg text-white disabled:opacity-50 min-h-[2.5rem]" style={{ background: "var(--qit-primary)" }}>
           {isLast ? t("testSubmit") : t("testNext")}
         </button>
       </div>

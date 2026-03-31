@@ -8,10 +8,13 @@ import { useAuthStore } from "@/store/authStore";
 import { useLanguage } from "@/context/LanguageContext";
 import { useTheme } from "@/context/ThemeContext";
 import { Download, Pencil, Plus, Trash2, UserPlus, ClipboardList, Info } from "lucide-react";
+import { useSidebar } from "@/context/SidebarContext";
 import { getGlassCardStyle, getModalStyle, getInputStyle, getTextColors } from "@/utils/themeStyles";
 import { BlurFade } from "@/components/ui/blur-fade";
+import { DeleteConfirmButton } from "@/components/ui/DeleteConfirmButton";
 import { getLocalizedCourseTitle } from "@/lib/courseUtils";
 import { formatDateTimeLocalized, formatDateLocalized } from "@/lib/dateUtils";
+import { ShimmerButton } from "@/components/ui/shimmer-button";
 
 type UserRow = {
   id: number;
@@ -62,6 +65,7 @@ type TeacherGroupOption = {
 export function UserManagement() {
   const { t, lang } = useLanguage();
   const { theme } = useTheme();
+  const { collapsed } = useSidebar();
   const isDark = theme === "dark";
   const modalStyle = getModalStyle(theme);
   const inputStyle = getInputStyle(theme);
@@ -75,7 +79,6 @@ export function UserManagement() {
   const [statusFilter, setStatusFilter] = useState<string>("paid");
   const [editing, setEditing] = useState<UserRow | null>(null);
   const [addUserOpen, setAddUserOpen] = useState(false);
-  const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
   const [assignModal, setAssignModal] = useState<StudentWithoutGroup | null>(null);
   const queryClient = useQueryClient();
 
@@ -132,7 +135,6 @@ export function UserManagement() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-users"] });
-      setDeleteConfirm(null);
     },
   });
 
@@ -149,6 +151,25 @@ export function UserManagement() {
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error("Failed to export CSV:", error);
+      const err = error as { response?: { data?: { detail?: string }; status?: number }; message?: string };
+      const errorMessage = err?.response?.data?.detail || err?.message || t("csvExportError");
+      alert(errorMessage);
+    }
+  };
+
+  const handleExportExcel = async () => {
+    try {
+      const { data } = await api.get<Blob>("/admin/users/export/excel", {
+        responseType: "blob",
+      });
+      const url = URL.createObjectURL(data);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "users.xlsx";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Failed to export Excel:", error);
       const err = error as { response?: { data?: { detail?: string }; status?: number }; message?: string };
       const errorMessage = err?.response?.data?.detail || err?.message || t("csvExportError");
       alert(errorMessage);
@@ -225,7 +246,7 @@ export function UserManagement() {
           </div>
         </BlurFade>
       )}
-      <div className="flex gap-2 mb-6 border-b border-gray-200 dark:border-white/10 pb-2 w-full">
+      <div className="flex flex-wrap gap-2 mb-6 border-b border-gray-200 dark:border-white/10 pb-2 w-full">
         <BlurFade delay={0.15} duration={0.4} blur="4px" offset={10}>
           <button
             type="button"
@@ -270,20 +291,20 @@ export function UserManagement() {
         </BlurFade>
       </div>
       <BlurFade delay={0.2} duration={0.4} blur="4px" offset={10}>
-        <div className="flex gap-3 mb-6 w-full justify-between items-center">
-          <div className="flex gap-3 flex-1">
+        <div className="flex flex-col md:flex-row gap-4 mb-6 w-full justify-between items-start md:items-center">
+          <div className="flex flex-wrap gap-3 flex-1 w-full">
             {activeTab === "users" && (
               <input
                 type="text"
                 placeholder={t("adminSearch")}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="border-0 rounded-xl px-4 py-2.5 w-64 transition-all backdrop-blur-sm"
+                className="border-0 rounded-xl px-4 py-2.5 w-full md:w-64 transition-all backdrop-blur-sm"
                 style={getInputStyle(theme)}
               />
             )}
             {activeTab === "applications" && (
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 {["paid", "pending", "approved", "rejected"].map((s, index) => (
                   <BlurFade key={s} delay={0.25 + index * 0.05} duration={0.4} blur="4px" offset={10}>
                     <button
@@ -304,23 +325,32 @@ export function UserManagement() {
             )}
           </div>
           {canManageUsers && activeTab === "users" && (
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2 w-full md:w-auto">
               <button
                 type="button"
                 onClick={() => setAddUserOpen(true)}
-                className="flex items-center gap-2 py-2.5 px-5 rounded-xl text-white hover:opacity-90 transition-all font-medium shadow-lg"
+                className="flex items-center gap-2 py-2.5 px-5 rounded-xl text-white hover:opacity-90 transition-all font-medium shadow-lg whitespace-nowrap"
                 style={{ background: "linear-gradient(135deg, #FF4181 0%, #B938EB 100%)", boxShadow: "0 4px 14px rgba(255, 65, 129, 0.4)" }}
               >
-                <Plus className="w-4 h-4" /> {t("adminAddUser")}
+                <Plus className="w-4 h-4 shrink-0" /> {t("adminAddUser")}
               </button>
-              <button
-                type="button"
-                onClick={handleExportCsv}
-                className="flex items-center gap-2 py-2.5 px-5 rounded-xl hover:opacity-90 transition-all font-medium backdrop-blur-sm"
-                style={getGlassCardStyle(theme)}
-              >
-                <Download className="w-4 h-4" /> CSV
-              </button>
+              <div className="flex gap-2">
+                <ShimmerButton
+                  onClick={handleExportCsv}
+                  background={isDark ? "rgba(255, 255, 255, 0.1)" : "rgba(243, 244, 246, 1)"}
+                  shimmerColor={isDark ? "#ffffff" : "#000000"}
+                  className="flex items-center gap-2 py-2.5 px-5 rounded-xl border-0 font-medium text-gray-900 dark:text-white"
+                >
+                  <Download className="w-4 h-4 shrink-0" /> CSV
+                </ShimmerButton>
+                <ShimmerButton
+                  onClick={handleExportExcel}
+                  className="flex items-center gap-2 py-2.5 px-5 rounded-xl text-white border-0 font-medium shadow-lg bg-gradient-to-r from-[#FF4181] to-[#B938EB]"
+                  shimmerColor="#ffffff"
+                >
+                  <Download className="w-4 h-4 shrink-0" /> Excel
+                </ShimmerButton>
+              </div>
             </div>
           )}
         </div>
@@ -336,7 +366,7 @@ export function UserManagement() {
                   {t("adminFullName")}
                 </th>
                 <th className="text-left py-4 px-6 font-semibold text-sm" style={{ color: textColors.primary }}>
-                  Email
+                  {t("email")}
                 </th>
                 <th className="text-left py-4 px-6 font-semibold text-sm" style={{ color: textColors.primary }}>
                   {t("role")}
@@ -363,7 +393,7 @@ export function UserManagement() {
                     <div>
                       <Link
                         href={`/app/profile/${u.id}`}
-                        className="font-medium transition-colors hover:text-[#8B5CF6]"
+                        className="font-medium transition-colors hover:text-[#8B5CF6] truncate max-w-[150px] inline-block"
                         style={{ color: textColors.primary }}
                       >
                         {u.full_name}
@@ -373,7 +403,7 @@ export function UserManagement() {
                   </div>
                 </td>
                 <td className="py-4 px-6">
-                  <span style={{ color: textColors.primary }}>{u.email}</span>
+                  <span className="truncate max-w-[180px] inline-block" style={{ color: textColors.primary }} title={u.email}>{u.email}</span>
                 </td>
                 <td className="py-4 px-6">
                   <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${getRoleBadgeColor(u.role)}`}>
@@ -392,15 +422,16 @@ export function UserManagement() {
                       >
                         <Pencil className="w-4 h-4" />
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => setDeleteConfirm(u.id)}
-                        className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-                        style={{ color: "#FF4181" }}
-                        title={t("adminDelete")}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <DeleteConfirmButton
+                        onDelete={() => deleteMutation.mutate(u.id)}
+                        isLoading={deleteMutation.isPending && deleteMutation.variables === u.id}
+                        hideText={!collapsed}
+                        size="sm"
+                        variant="ghost"
+                        className="p-1"
+                        title={`${t("adminDelete")} ${u.full_name}?`}
+                        description={t("adminUserDeleteConfirm")}
+                      />
                     </div>
                   </td>
                   )}
@@ -418,7 +449,7 @@ export function UserManagement() {
                   {t("adminFullName")}
                 </th>
                 <th className="text-left py-4 px-6 font-semibold text-sm" style={{ color: textColors.primary }}>
-                  Email
+                  {t("email")}
                 </th>
                 <th className="text-left py-4 px-6 font-semibold text-sm" style={{ color: textColors.primary }}>
                   {t("phone")}
@@ -488,7 +519,7 @@ export function UserManagement() {
                   {t("date")}
                 </th>
                 <th className="text-left py-4 px-6 font-semibold text-sm" style={{ color: textColors.primary }}>
-                  Email
+                  {t("email")}
                 </th>
                 <th className="text-left py-4 px-6 font-semibold text-sm" style={{ color: textColors.primary }}>
                   {t("fullName")}
@@ -585,38 +616,6 @@ export function UserManagement() {
           }
           isPending={updateMutation.isPending}
         />
-      )}
-
-      {deleteConfirm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="rounded-xl shadow-xl p-6 max-w-md mx-4 border-0 backdrop-blur-xl" style={modalStyle}>
-            <h3 className="font-semibold mb-2" style={{ color: textColors.primary }}>
-              {t("adminUserDelete")}
-            </h3>
-            <p className="mb-4" style={{ color: textColors.secondary }}>
-              {t("adminUserDeleteConfirm")}
-            </p>
-            <div className="flex gap-2 justify-end">
-              <button
-                type="button"
-                onClick={() => setDeleteConfirm(null)}
-                className="py-2 px-4 rounded-lg hover:opacity-90"
-                style={{ background: isDark ? "rgba(30, 41, 59, 0.7)" : "rgba(0, 0, 0, 0.05)", border: isDark ? "1px solid rgba(255, 255, 255, 0.1)" : "1px solid rgba(0, 0, 0, 0.12)", color: textColors.primary }}
-              >
-                {t("cancel")}
-              </button>
-              <button
-                type="button"
-                onClick={() => deleteMutation.mutate(deleteConfirm)}
-                disabled={deleteMutation.isPending}
-                className="py-2 px-4 rounded-lg text-white hover:opacity-90"
-                style={{ background: "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)" }}
-              >
-                {t("adminDelete")}
-              </button>
-            </div>
-          </div>
-        </div>
       )}
     </div>
   );
@@ -721,7 +720,7 @@ function AddUserModal({
             {/* Левая колонка */}
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-1" style={{ color: textColors.secondary }}>Email *</label>
+                <label className="block text-sm font-medium mb-1" style={{ color: textColors.secondary }}>{t("email")} *</label>
                 <input
                   type="email"
                   value={email}
@@ -1035,7 +1034,7 @@ function UserDetailModal({
           <section>
             <h4 className="text-sm font-medium mb-2" style={{ color: "#94A3B8" }}>{t("adminUserProfile")}</h4>
             <dl className="grid grid-cols-2 gap-2 text-sm">
-              <dt style={{ color: textColors.secondary }}>Email</dt>
+              <dt style={{ color: textColors.secondary }}>{t("email")}</dt>
               <dd style={{ color: textColors.primary }}>{user.email}</dd>
               <dt style={{ color: textColors.secondary }}>{t("adminFullName")}</dt>
               <dd style={{ color: textColors.primary }}>{user.full_name}</dd>
@@ -1054,7 +1053,7 @@ function UserDetailModal({
             <section>
               <h4 className="text-sm font-medium mb-2" style={{ color: "#94A3B8" }}>{t("parentDataSection")}</h4>
               <dl className="grid grid-cols-2 gap-2 text-sm">
-                <dt style={{ color: textColors.secondary }}>Email</dt>
+                <dt style={{ color: textColors.secondary }}>{t("email")}</dt>
                 <dd style={{ color: textColors.primary }}>{parent.email}</dd>
                 <dt style={{ color: textColors.secondary }}>{t("adminFullName")}</dt>
                 <dd style={{ color: textColors.primary }}>{parent.full_name}</dd>
@@ -1082,7 +1081,7 @@ function UserDetailModal({
                       {(app.course_title ? getLocalizedCourseTitle({ title: app.course_title } as any, t) : null) || "—"} — {t("status")}: {app.status}
                     </div>
                     <dl className="grid grid-cols-2 gap-1 text-xs">
-                      <dt style={{ color: textColors.secondary }}>Email</dt>
+                      <dt style={{ color: textColors.secondary }}>{t("email")}</dt>
                       <dd style={{ color: textColors.primary }}>{app.email}</dd>
                       <dt style={{ color: textColors.secondary }}>{t("adminFullName")}</dt>
                       <dd style={{ color: textColors.primary }}>{app.full_name}</dd>
@@ -1205,7 +1204,7 @@ function UserEditModal({
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium mb-1" style={{ color: textColors.secondary }}>
-                  Email
+                  {t("email")}
                 </label>
                 <input
                   type="text"
