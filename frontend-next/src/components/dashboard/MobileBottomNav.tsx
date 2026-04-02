@@ -22,6 +22,11 @@ export function MobileBottomNav() {
         href: "/app/teacher",
         icon: Users,
         label: t("teacher"),
+      },
+      {
+        href: "/app/teacher/courses",
+        icon: BookOpen,
+        label: t("teacherCoursesTab"),
       }
     ] : [
       {

@@ -142,6 +142,7 @@ export function AppDashboardSidebar() {
           ...(isTeacher() ? [] : [
             { href: "/app/courses", icon: BookOpen, label: t("myCourses") },
             { href: "/courses", icon: Library, label: t("courseCatalog") },
+            { href: "/app/analytics", icon: BarChart3, label: t("studentAnalytics") },
             { href: "/app/materials", icon: FileText, label: t("studentMaterials") },
           ]),
           { href: "/app/ai-challenge/1", icon: Zap, label: t("aiVsStudent") },
@@ -161,6 +162,7 @@ export function AppDashboardSidebar() {
         // Premium показывается только для студентов (не для учителей, директора, админа, куратора, родителя)
         ...(user?.role === "student" ? [{ href: "/app/premium", icon: Sparkles, label: t("premiumTab"), isPremium: true }] : []),
         ...(isTeacher() ? [{ href: "/app/teacher", icon: Users, label: t("teacher") }] : []),
+        ...(isTeacher() ? [{ href: "/app/teacher/courses", icon: BookOpen, label: t("teacherCoursesTab") }] : []),
         ...(isParent ? [] : isAdmin() ? [{ href: "/app/parent-dashboard", icon: Baby, label: t("parent") }] : []),
         ...(isAdmin() || isTeacher() || user?.role === "curator" ? [{ href: "/app/people", icon: Users, label: t("peopleList") }] : []),
         ...(user?.role === "curator" ? [
