@@ -763,7 +763,7 @@ export default function TeacherCourseGroupPage() {
                       {tp.title}
                     </span>
                     <span className="text-xs px-2 py-1 rounded-lg" style={{ background: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)", color: textColors.secondary }}>
-                      {localAssignments.filter((a) => a.topic_id === tp.id).length} работ
+                      {localAssignments.filter((a) => a.topic_id === tp.id).length} {t("tasksCount")}
                     </span>
                   </div>
                 ))}
