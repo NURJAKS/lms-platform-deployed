@@ -99,6 +99,13 @@ powershell -ExecutionPolicy Bypass -File .\start-frontend-windows.ps1
 
 ---
 
+## VPS (Linux-сервер, Docker)
+
+Пошаговая инструкция: **[deploy/VPS.md](deploy/VPS.md)** — Docker, `.env.deploy`, Nginx, Certbot, файрвол, обновление.  
+Кратко: `cp env.deploy.example .env.deploy` → правки → `docker compose --env-file .env.deploy -f docker-compose.vps.yml up -d --build` или `./deploy/bootstrap-vps.sh`.
+
+---
+
 ## Важно
 
 - **`backend/.env`** в репозиторий не добавляйте.
