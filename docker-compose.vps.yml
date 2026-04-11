@@ -2,7 +2,7 @@
 # Перед запуском: cp env.deploy.example .env.deploy && отредактируйте секреты и URL.
 # Запуск: docker compose --env-file .env.deploy -f docker-compose.vps.yml up -d --build
 #
-# Сайт: http://<IP>:3000  ·  API/Swagger: http://<IP>:8000/docs
+# Сайт (Next.js): порт 3000 · API (FastAPI): 8000, Swagger: :8000/docs — см. также deploy/nginx-qazaqitacademy.example.conf
 # Данные сохраняются в именованных томах Docker (БД и uploads).
 
 services:
