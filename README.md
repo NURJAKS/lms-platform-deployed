@@ -1,107 +1,84 @@
 # LMS Platform
 
-Образовательная платформа (MVP) с AI-помощником и геймификацией.
+Образовательная платформа (MVP). **Автор учебного проекта:** Жандос Сахиев.
 
-**Автор учебного проекта:** Жандос Сахиев.
+В репозитории уже есть демо-БД (`backend/education.db`) и `backend/uploads/`. Файл `backend/.env` в git не входит — при первом запуске копируется из `backend/.env.example`.
 
-**Готовая коробка для проверки:** в репозитории уже есть демо-БД (`backend/education.db`) и `backend/uploads/`; секретный `backend/.env` не в git — при первом запуске копируется из `backend/.env.example`. Достаточно установить Python и Node, затем запустить проект (см. ниже) — отдельно поднимать БД и долгий `seed_*` не обязательно.
-
-**Стек:** Backend — Python (FastAPI, SQLAlchemy, SQLite). Frontend — Next.js 16, React 19, TypeScript, Tailwind CSS.
+**Стек:** FastAPI, SQLite · Next.js, TypeScript, Tailwind.
 
 ---
 
-## Запуск на Windows с нуля
+## Запуск на Windows
 
-### 1. Что подготовить на компьютере
+### 1. Что установить
 
-| Что | Зачем | Где взять |
-|-----|--------|-----------|
-| **Python 3.12+** | бэкенд, виртуальное окружение | [python.org/downloads](https://www.python.org/downloads/) — при установке включите **Add python.exe to PATH** |
-| **Node.js 20.9+** | фронтенд (npm) | [nodejs.org](https://nodejs.org/) (LTS) |
-| **Git** (по желанию) | клонирование репозитория | [git-scm.com/download/win](https://git-scm.com/download/win) |
+| Что | Зачем |
+|-----|--------|
+| **Python 3.12+** | бэкенд ([python.org/downloads](https://www.python.org/downloads/) — включите **Add python.exe to PATH**) |
+| **Node.js 20.9+** | фронтенд ([nodejs.org](https://nodejs.org/) LTS) |
+| **Git** (по желанию) | клонирование ([git-scm.com/download/win](https://git-scm.com/download/win)) |
 
-Проверка в **PowerShell** (`Win + X` → Терминал / PowerShell):
+В PowerShell: `python --version` и `node --version`. Если нет `python`, попробуйте `py -3 --version`.
 
-```powershell
-python --version
-node --version
-```
+Распакуйте или клонируйте проект в **короткий путь на латинице** (например `C:\dev\lms-platform`), в корне должны лежать папки **`backend`** и **`frontend-next`**.
 
-Если команды `python` нет, попробуйте `py -3 --version` (стандартный launcher Windows).
-
-**Папка проекта:** распакуйте или клонируйте в **короткий путь на латинице**, например `C:\dev\lms-platform`. Избегайте очень длинных путей и «архива внутри архива» — в корне должны лежать папки **`backend`** и **`frontend-next`** рядом с файлами `start-windows.cmd`, `start-windows.ps1`.
-
-**Порты:** освободите **8000** (API) и **3000** (сайт). При первом запуске брандмауэр Windows может спросить доступ для Python/Node — разрешите для частной сети.
-
----
+Освободите порты **8000** и **3000**. Брандмауэр может запросить доступ для Python и Node — разрешите для частной сети.
 
 ### 2. Получить код
 
-**Вариант A — Git**
-
 ```powershell
 cd C:\dev
-git clone https://github.com/NURJAKS/lms-platfrom-done.git
-cd lms-platfrom-done
+git clone https://github.com/NURJAKS/lms-platfrom-localversion.git
+cd lms-platfrom-localversion
 ```
 
-**Вариант B — ZIP**  
-Скачайте архив с GitHub, распакуйте так же, чтобы внутри был корень проекта с `backend` и `frontend-next`.
+Или скачайте ZIP с GitHub и распакуйте так же.
 
----
+### 3. Запуск одной командой
 
-### 3. Запуск одной командой (рекомендуется)
+1. PowerShell в **корне** проекта (рядом с `start-windows.ps1`, папками `backend` и `frontend-next`).
 
-1. Откройте **PowerShell** в **корне** проекта (там, где лежат `start-windows.cmd` и папки `backend`, `frontend-next`).
-
-2. Если PowerShell ругается на политику скриптов (один раз на пользователя):
+2. При ошибке политики скриптов (один раз):
 
    ```powershell
    Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
    ```
 
-3. Запустите:
+3. Запуск:
 
    ```powershell
    powershell -ExecutionPolicy Bypass -File .\start-windows.ps1
    ```
 
-   Или **двойной щелчок** по файлу **`start-windows.cmd`**.
+   Либо двойной щелчок по **`start-windows.cmd`**.
 
-Скрипт сам: создаст `backend\.venv`, установит зависимости Python и npm, при отсутствии файла скопирует **`backend\.env.example` → `backend\.env`**, поднимет API и фронт.
+Скрипт создаст `backend\.venv`, установит зависимости, при необходимости скопирует **`backend\.env.example` → `backend\.env`**, запустит API и фронт.
 
-4. Откройте в браузере:
+4. В браузере: **http://localhost:3000** · Swagger: **http://127.0.0.1:8000/docs**
 
-   - приложение: **http://localhost:3000**
-   - Swagger API: **http://127.0.0.1:8000/docs**
+Остановка: **Ctrl+C** в том же окне.
 
-Остановка: в окне терминала **Ctrl+C** (скрипт также завершит процесс бэкенда).
+### 4. Два окна (отдельный лог бэкенда)
 
----
-
-### 4. Запуск в двух окнах (если нужен отдельный лог бэкенда)
-
-**Окно 1 — только API**
+**Окно 1 — API**
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\start-backend-windows.ps1
 ```
 
-**Окно 2 — только фронт**
+**Окно 2 — фронт**
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\start-frontend-windows.ps1
 ```
 
-Из папки `scripts` можно вызывать **`start-backend.bat`** и **`start-frontend.bat`** (то же самое).
+В `scripts\` есть **`start-backend.bat`** и **`start-frontend.bat`** (то же самое).
 
----
+### 5. Секреты и база
 
-### 5. Секреты, ИИ и база
-
-- **`backend\.env`** в git **не входит**; при первом запуске он создаётся из **`backend\.env.example`**.
-- **ИИ (чат):** в `backend\.env` при необходимости укажите **`OPENAI_API_KEY`** и/или **`GEMINI_API_KEY`**. Без ключей приложение **не падает** — показывается демо-сообщение.
-- **База SQLite:** один файл **`backend\education.db`**. В репозитории он уже может быть — тогда отдельно ничего не запускайте. Если файл удалён или повреждён:
+- **`backend\.env`** — не коммитится; шаблон: **`backend\.env.example`**.
+- **ИИ (чат):** при необходимости укажите **`OPENAI_API_KEY`** и/или **`GEMINI_API_KEY`**. Без ключей приложение работает в демо-режиме.
+- **SQLite:** файл **`backend\education.db`**. Если файл удалён или повреждён:
 
   ```powershell
   cd backend
@@ -109,72 +86,7 @@ powershell -ExecutionPolicy Bypass -File .\start-frontend-windows.ps1
   .\.venv\Scripts\python.exe seed_data.py
   ```
 
-  Дополнительные скрипты при необходимости: `seed_shop.py`, `seed_mock_progress.py`, `seed_real_students_progress.py` (из папки `backend`, тот же Python из `.venv`).
-
-Подробнее: [docs/WINDOWS_SETUP.md](docs/WINDOWS_SETUP.md).
-
----
-
-### 6. Тестовые входы (после `seed_data.py`)
-
-| Роль | Email | Пароль |
-|------|--------|--------|
-| Администратор | admin@edu.kz | admin123 |
-| Преподаватель | teacher1@edu.kz | teacher123 |
-| Студент | student1@edu.kz | student123 |
-
-(полный список см. ниже в разделе «Тестовые пользователи»)
-
----
-
-## Linux / macOS
-
-Из корня репозитория:
-
-```bash
-cp backend/.env.example backend/.env   # при необходимости
-bash start.sh
-```
-
-Или два терминала: `./run-backend.sh` и `./run-frontend.sh`.
-
----
-
-## Установка вручную (все ОС)
-
-**Backend** (из папки `backend`):
-
-```bash
-python3 -m venv .venv
-# Windows: .venv\Scripts\activate
-source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
-python init_db.py
-python seed_data.py
-python seed_shop.py
-python seed_mock_progress.py
-python seed_real_students_progress.py
-python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
-```
-
-**Frontend** (второй терминал, папка `frontend-next`):
-
-```bash
-npm install
-npm run dev
-```
-
-API: http://127.0.0.1:8000 — документация: http://127.0.0.1:8000/docs  
-Приложение: http://localhost:3000
-
-Если курсов нет: `python seed_data.py --courses-only`.
-
----
-
-## Тестовые пользователи
-
-Создаются `seed_data.py`. Если логин не проходит — убедитесь, что бэкенд запущен и использует `backend/education.db`.
+### 6. Тестовые входы
 
 | Роль | Email | Пароль |
 |------|--------|--------|
@@ -187,41 +99,7 @@ API: http://127.0.0.1:8000 — документация: http://127.0.0.1:8000/d
 
 ---
 
-## Структура репозитория
-
-- `backend/` — FastAPI, модели, API, SQLite, скрипты БД  
-- `frontend-next/` — Next.js: страницы, компоненты, прокси `/api` на бэкенд  
-- `start-windows.cmd` / `start-windows.ps1` — быстрый старт на Windows  
-- `docs/WINDOWS_SETUP.md` — доп. детали (zip, порты, ошибки)  
-- [HOW_TO_RUN.md](HOW_TO_RUN.md) — порты, Docker, где какая БД  
-- [docs/VPS_DEPLOY.md](docs/VPS_DEPLOY.md) — развёртывание на VPS с демо-БД
-
----
-
-## Docker (необязательно)
-
-**PostgreSQL** (поднимается вместе с приложением):
-
-```bash
-docker compose up -d --build
-```
-
-Backend: http://localhost:8000 — Frontend: http://localhost:3000  
-
-**VPS / продакшен с той же SQLite и файлами, что в репозитории** (`education.db` + `uploads`): см. **[docs/VPS_DEPLOY.md](docs/VPS_DEPLOY.md)** и файл **`docker-compose.vps.yml`**. Кратко:
-
-```bash
-cp env.deploy.example .env.deploy
-# отредактируйте SECRET_KEY, ALLOWED_ORIGINS, FRONTEND_PUBLIC_URL
-docker compose --env-file .env.deploy -f docker-compose.vps.yml up -d --build
-```
-
-Для обычного демо на Windows Docker **не нужен**.
-
----
-
 ## Важно
 
-- **`backend/.env` не коммитится** — только шаблон `backend/.env.example`.
-- После **`git clone`** у вас те же **`education.db`** и **`uploads`**, что в последнем коммите (если они в репозитории); ваши личные ключи в git не попадают.
-- Полный сброс БД: снова выполните `init_db.py` и `seed_*.py` из раздела «вручную».
+- **`backend/.env`** в репозиторий не добавляйте.
+- После **`git clone`** приходят те же **`education.db`** и **`uploads`**, что в коммите (если они в репозитории).

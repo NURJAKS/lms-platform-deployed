@@ -1,4 +1,3 @@
-# Стек с PostgreSQL. Для VPS с демо SQLite и данными из репозитория см. docker-compose.vps.yml и docs/VPS_DEPLOY.md.
 services:
   db:
     image: postgres:15-alpine
