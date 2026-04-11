@@ -1,12 +1,38 @@
 #!/bin/sh
 set -e
 
-# Wait for database to be ready
-echo "Waiting for postgres..."
-python << END
+# --- SQLite (демо-БД из образа, тома на VPS) ---
+if echo "${DATABASE_URL:-}" | grep -qi 'sqlite'; then
+  echo "SQLite mode: Postgres wait skipped."
+  if [ -n "${LMS_DATA_DIR:-}" ]; then
+    mkdir -p "$LMS_DATA_DIR" /app/uploads
+    if [ ! -f "$LMS_DATA_DIR/education.db" ]; then
+      if [ -f /opt/lms-bundled/education.db ]; then
+        echo "Initializing $LMS_DATA_DIR/education.db from bundled demo database."
+        cp /opt/lms-bundled/education.db "$LMS_DATA_DIR/education.db"
+      else
+        echo "No bundled education.db; creating schema and minimal seed."
+        python init_db.py
+        python seed_data.py 2>/dev/null || true
+        python seed_shop.py 2>/dev/null || true
+      fi
+    fi
+    if [ -z "$(ls -A /app/uploads 2>/dev/null)" ]; then
+      if [ -d /opt/lms-bundled/uploads ]; then
+        echo "Populating /app/uploads from bundle."
+        cp -a /opt/lms-bundled/uploads/. /app/uploads/
+      fi
+    fi
+  fi
+  exec uvicorn app.main:app --host 0.0.0.0 --port 8000
+fi
+
+# --- PostgreSQL (docker-compose.yml с сервисом db) ---
+echo "Waiting for Postgres..."
+python << 'END'
+import os
 import socket
 import time
-import os
 from urllib.parse import urlparse
 
 db_url = os.environ.get("DATABASE_URL", "postgresql://postgres:postgres@db:5432/education_platform")
@@ -23,12 +49,10 @@ while True:
 END
 echo "Postgres is up!"
 
-# Create tables and seed demo data (each seed skips if data exists)
 python init_db.py
 python seed_data.py 2>/dev/null || true
 python seed_shop.py 2>/dev/null || true
 python seed_mock_progress.py 2>/dev/null || true
 python seed_real_students_progress.py 2>/dev/null || true
-# seed_leaderboard_students.py отключен - моковые студенты создаются только для ручного тестирования
-exec uvicorn app.main:app --host 0.0.0.0 --port 8000
 
+exec uvicorn app.main:app --host 0.0.0.0 --port 8000

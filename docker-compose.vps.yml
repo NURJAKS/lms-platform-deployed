@@ -1,0 +1,41 @@
+# VPS / production: демо SQLite + файлы uploads из образа (первый старт копируются в тома).
+# Перед запуском: cp env.deploy.example .env.deploy && отредактируйте секреты и URL.
+# Запуск: docker compose --env-file .env.deploy -f docker-compose.vps.yml up -d --build
+#
+# Сайт: http://<IP>:3000  ·  API/Swagger: http://<IP>:8000/docs
+# Данные сохраняются в именованных томах Docker (БД и uploads).
+
+services:
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: sqlite:////data/education.db
+      LMS_DATA_DIR: /data
+      DEBUG: "false"
+      SECRET_KEY: ${SECRET_KEY}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
+      FRONTEND_PUBLIC_URL: ${FRONTEND_PUBLIC_URL}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    volumes:
+      - lms_sqlite_data:/data
+      - lms_uploads:/app/uploads
+
+  frontend:
+    build:
+      context: ./frontend-next
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      BACKEND_URL: http://backend:8000
+    depends_on:
+      - backend
+
+volumes:
+  lms_sqlite_data:
+  lms_uploads:

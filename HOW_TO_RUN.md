@@ -35,7 +35,8 @@ LMS platform - order/
 │   ├── package.json
 │   └── run-frontend.sh         # Скрипт запуска фронтенда
 │
-├── docker-compose.yml          # Docker: backend (8000) + frontend (3000), своя SQLite в volume
+├── docker-compose.yml          # Docker: Postgres + backend + frontend
+├── docker-compose.vps.yml      # Docker: SQLite из образа + тома (VPS), см. docs/VPS_DEPLOY.md
 ├── run-backend.sh              # Запуск бэкенда из корня (рекомендуется)
 ├── run-frontend.sh             # Запуск фронтенда из корня
 ├── start.sh                    # Запуск обоих серверов одной командой (использует .venv)
@@ -87,16 +88,22 @@ DATABASE_URL=postgresql://postgres:postgres@localhost:5432/education_platform
 
 ### 2. Запуск через Docker
 
-- **База:** тоже **SQLite**, но лежит **внутри Docker volume** `backend_db`, в контейнере по пути `/app/data/education.db`.
-- В `docker-compose.yml` задано: `DATABASE_URL: sqlite:///./data/education.db` и `volumes: backend_db:/app/data`.
-- Это **отдельная** база от вашей локальной `backend/education.db`. Данные в Docker не пересекаются с локальной разработкой.
+**`docker compose` (файл `docker-compose.yml`):**
+
+- **База:** **PostgreSQL** в контейнере `db`, строка подключения в `environment` сервиса `backend`.
+- Entrypoint бэкенда ждёт Postgres, затем `init_db.py` и seed-скрипты. Это **отдельная** БД от локального `backend/education.db`.
+
+**VPS / демо из репозитория (`docker-compose.vps.yml`):**
+
+- **База:** **SQLite** в томе `lms_sqlite_data`, путь в контейнере `/data/education.db`. При первом запуске файл и `uploads` копируются из образа (см. [docs/VPS_DEPLOY.md](docs/VPS_DEPLOY.md)).
 
 Итого:
 
 | Режим        | Где БД                          | Файл / том              |
 |-------------|----------------------------------|--------------------------|
 | Локально    | На хосте, в папке backend        | `backend/education.db`   |
-| Docker      | В контейнере backend, volume     | volume `backend_db`      |
+| Docker (compose.yml) | PostgreSQL в контейнере   | volume `postgres_data`   |
+| Docker (vps) | SQLite в томе бэкенда        | volume `lms_sqlite_data` |
 
 ---
 
@@ -139,7 +146,8 @@ DATABASE_URL=postgresql://postgres:postgres@localhost:5432/education_platform
    - Проверьте: `DATABASE_URL=sqlite:///./education.db` (без postgresql).
    - Убедитесь, что используете виртуальное окружение **`backend/.venv`** (см. ниже).
 3. **Docker:**
-   - Не трогайте `backend/.env` для БД — в Docker используется переменная из `docker-compose.yml`.
+   - Для `docker-compose.yml`: переменные БД задаются в compose (Postgres), не из `backend/.env`.
+   - Для `docker-compose.vps.yml`: SQLite и секреты — через `.env.deploy` (шаблон `env.deploy.example`).
 4. После смены `DATABASE_URL` или первого клонирования в backend выполните:
    - `python init_db.py`
    - при необходимости `python seed_data.py` (и остальные seed-скрипты по желанию).
@@ -192,7 +200,7 @@ npm run dev
 
 Скрипт запускает backend через **`backend/.venv`** и фронтенд через `npm run dev`. Остановка: Ctrl+C (скрипт остановит оба процесса).
 
-### Вариант C: Docker
+### Вариант C: Docker (PostgreSQL)
 
 ```bash
 docker compose up -d --build
@@ -200,7 +208,17 @@ docker compose up -d --build
 
 - Backend: http://localhost:8000  
 - Frontend: http://localhost:3000  
-- БД — своя, в volume (не `backend/education.db`).
+- БД — PostgreSQL в Docker volume.
+
+### Вариант D: Docker (VPS, демо SQLite как в git)
+
+```bash
+cp env.deploy.example .env.deploy
+# отредактируйте .env.deploy
+docker compose --env-file .env.deploy -f docker-compose.vps.yml up -d --build
+```
+
+Подробнее: [docs/VPS_DEPLOY.md](docs/VPS_DEPLOY.md).
 
 ---
 

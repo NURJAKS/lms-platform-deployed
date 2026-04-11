@@ -34,6 +34,7 @@ frontend-next/.turbo/
 .env
 .env.*
 !.env.example
+.env.deploy
 !**/.env.example
 *.log
 .DS_Store

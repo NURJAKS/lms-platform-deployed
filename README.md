@@ -193,17 +193,28 @@ API: http://127.0.0.1:8000 — документация: http://127.0.0.1:8000/d
 - `frontend-next/` — Next.js: страницы, компоненты, прокси `/api` на бэкенд  
 - `start-windows.cmd` / `start-windows.ps1` — быстрый старт на Windows  
 - `docs/WINDOWS_SETUP.md` — доп. детали (zip, порты, ошибки)  
-- [HOW_TO_RUN.md](HOW_TO_RUN.md) — порты, Docker, где какая БД
+- [HOW_TO_RUN.md](HOW_TO_RUN.md) — порты, Docker, где какая БД  
+- [docs/VPS_DEPLOY.md](docs/VPS_DEPLOY.md) — развёртывание на VPS с демо-БД
 
 ---
 
 ## Docker (необязательно)
+
+**PostgreSQL** (поднимается вместе с приложением):
 
 ```bash
 docker compose up -d --build
 ```
 
 Backend: http://localhost:8000 — Frontend: http://localhost:3000  
+
+**VPS / продакшен с той же SQLite и файлами, что в репозитории** (`education.db` + `uploads`): см. **[docs/VPS_DEPLOY.md](docs/VPS_DEPLOY.md)** и файл **`docker-compose.vps.yml`**. Кратко:
+
+```bash
+cp env.deploy.example .env.deploy
+# отредактируйте SECRET_KEY, ALLOWED_ORIGINS, FRONTEND_PUBLIC_URL
+docker compose --env-file .env.deploy -f docker-compose.vps.yml up -d --build
+```
 
 Для обычного демо на Windows Docker **не нужен**.
 
