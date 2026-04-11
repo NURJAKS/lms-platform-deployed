@@ -16,6 +16,7 @@ import { TopicSynopsisSection } from "@/components/courses/TopicSynopsisSection"
 import { TopicAssignmentsInlineSection } from "@/components/courses/TopicAssignmentsInlineSection";
 import { ChevronLeft, Lock, Sparkles, Coins, CheckCircle2 } from "lucide-react";
 import { getLocalizedTopicTitle } from "@/lib/courseUtils";
+import type { TranslationKey } from "@/i18n/translations";
 
 interface Structure {
   course_id: number;
@@ -52,8 +53,8 @@ function isWebCourseTitle(title: string | undefined | null): boolean {
   );
 }
 
-function topicFlowBlockMessage(reason: string, t: (key: string) => string): string {
-  const keys: Record<string, string> = {
+function topicFlowBlockMessage(reason: string, t: (key: TranslationKey) => string): string {
+  const keys: Record<string, TranslationKey> = {
     no_groups: "topicFlowNoGroups",
     video: "topicFlowTheoryLockedUntilVideo",
     synopsis: "topicFlowSynopsisRequired",
@@ -326,6 +327,10 @@ export default function TopicViewPage() {
   };
 
   const onNextTopic = () => {
+    if (!structure?.modules?.length) {
+      router.push(`/app/courses/${cId}`);
+      return;
+    }
     const flattened: number[] = [];
     const sortedModules = [...structure.modules].sort((a, b) => (a.order_number ?? 0) - (b.order_number ?? 0));
     for (const mod of sortedModules) {
@@ -580,7 +585,7 @@ export default function TopicViewPage() {
               </div>
               {isPremium && <TopicNotes topicId={tId} />}
               {(flow == null || flow.has_course_groups) && (
-                <TopicSynopsisSection topicId={tId} userId={userId} />
+                <TopicSynopsisSection topicId={tId} courseId={cId} />
               )}
               {(flow == null || flow.has_course_groups) && (
                 <TopicAssignmentsInlineSection courseId={cId} topicId={tId} />

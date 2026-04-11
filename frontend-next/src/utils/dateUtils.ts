@@ -79,7 +79,7 @@ export function formatLocalizedDate(
     }
 
     return result;
-  } catch (e) {
+  } catch {
     return iso;
   }
 }

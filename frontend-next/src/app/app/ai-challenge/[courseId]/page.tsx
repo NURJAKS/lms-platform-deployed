@@ -13,6 +13,7 @@ import { Particles } from "@/components/ui/particles";
 import { getLocalizedCourseTitle } from "@/lib/courseUtils";
 import { getApiErrorMessage } from "@/lib/apiError";
 import { useAuthStore } from "@/store/authStore";
+import type { TranslationKey } from "@/i18n/translations";
 
 type Screen = "intro" | "playing" | "results" | "memory" | "memoryComplete" | "newModePlaying" | "newModeResults";
 type AILevel = "beginner" | "intermediate" | "expert";
@@ -165,9 +166,9 @@ function getAllowedTopicsForMode(mode: GameMode): ChallengeTopic[] {
   return ["python", "web", "informatics", "cybersecurity"];
 }
 
-function localizeNewModeCategory(category: string, t: (key: string) => string): string {
+function localizeNewModeCategory(category: string, t: (key: TranslationKey) => string): string {
   const normalized = category.trim().toLowerCase();
-  const keyMap: Record<string, string> = {
+  const keyMap: Partial<Record<string, TranslationKey>> = {
     all: "aiCategoryAll",
     python: "aiCategoryPython",
     javascript: "aiCategoryJavascript",
@@ -181,9 +182,9 @@ function localizeNewModeCategory(category: string, t: (key: string) => string): 
   return key ? t(key) : category;
 }
 
-function localizeNewModeLevel(level: string, t: (key: string) => string): string {
+function localizeNewModeLevel(level: string, t: (key: TranslationKey) => string): string {
   const normalized = level.trim().toLowerCase();
-  const keyMap: Record<string, string> = {
+  const keyMap: Partial<Record<string, TranslationKey>> = {
     beginner: "aiLevelBeginner",
     intermediate: "aiLevelIntermediate",
     expert: "aiLevelExpert",

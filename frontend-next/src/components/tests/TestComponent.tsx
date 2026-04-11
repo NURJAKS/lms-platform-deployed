@@ -30,7 +30,22 @@ export function TestComponent({ testId, onComplete, onCancel }: TestComponentPro
     enabled: !!testId,
   });
 
-
+  const submitMutation = useMutation({
+    mutationFn: async () => {
+      const timeSeconds = (Date.now() - timeStart) / 1000;
+      const res = await api.post<{ score: number; passed: boolean; correct_count: number; total_count: number }>(
+        `/tests/${testId}/submit?lang=${lang}`,
+        {
+          answers: Object.entries(answers).map(([question_id, answer]) => ({ question_id: Number(question_id), answer })),
+          time_seconds: timeSeconds,
+        }
+      );
+      return res.data;
+    },
+    onSuccess: (data) => {
+      setStep(data.passed ? 1 : 2);
+    },
+  });
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -130,23 +145,6 @@ export function TestComponent({ testId, onComplete, onCancel }: TestComponentPro
       onConfirm: () => submitMutation.mutate(),
     });
   };
-
-  const submitMutation = useMutation({
-    mutationFn: async () => {
-      const timeSeconds = (Date.now() - timeStart) / 1000;
-      const res = await api.post<{ score: number; passed: boolean; correct_count: number; total_count: number }>(
-        `/tests/${testId}/submit?lang=${lang}`,
-        {
-          answers: Object.entries(answers).map(([question_id, answer]) => ({ question_id: Number(question_id), answer })),
-          time_seconds: timeSeconds,
-        }
-      );
-      return res.data;
-    },
-    onSuccess: (data) => {
-      setStep(data.passed ? 1 : 2);
-    },
-  });
 
   const current = questions[step];
   const isLast = step === questions.length - 1;

@@ -20,7 +20,7 @@ type SupportTicketItem = {
 };
 
 export default function StudentSupportPage() {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
   const [message, setMessage] = useState("");

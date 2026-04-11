@@ -73,8 +73,8 @@ function apiErrorDetail(err: unknown): string | null {
   return null;
 }
 
-function fileNameFromUrl(url: string, idx: number): string {
-  return url.split("/").pop()?.split("?")[0] || `${t("fileTypeFile")} ${idx + 1}`;
+function fileNameFromUrl(url: string, idx: number, fileLabel: string): string {
+  return url.split("/").pop()?.split("?")[0] || `${fileLabel} ${idx + 1}`;
 }
 
 function TopicAssignmentCard({
@@ -177,7 +177,7 @@ function TopicAssignmentCard({
       if (!url) return;
       setAttachments((prev) => {
         if (prev.length >= 5) return prev;
-        return [...prev, { kind: "file", url }].slice(0, 5);
+        return [...prev, { kind: "file" as const, url }].slice(0, 5);
       });
       setActionError(null);
       queryClient.invalidateQueries({ queryKey: ["topic-flow", topicId] });
@@ -254,7 +254,7 @@ function TopicAssignmentCard({
                 rel="noopener noreferrer"
                 className="block rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-2 text-sm hover:underline truncate"
               >
-                {fileNameFromUrl(url, idx)}
+                {fileNameFromUrl(url, idx, t("fileTypeFile"))}
               </a>
             ))}
             {(assignment.attachment_links ?? []).map((url, idx) => (
@@ -313,7 +313,7 @@ function TopicAssignmentCard({
               <div className="min-w-0 flex items-center gap-2">
                 {att.kind === "link" ? <Globe className="w-4 h-4 shrink-0 text-sky-600 dark:text-sky-400" /> : <FileText className="w-4 h-4 shrink-0 text-blue-600 dark:text-blue-400" />}
                 <a href={att.url} target="_blank" rel="noopener noreferrer" className="truncate text-sm hover:underline">
-                  {att.kind === "link" ? att.url : fileNameFromUrl(att.url, idx)}
+                  {att.kind === "link" ? att.url : fileNameFromUrl(att.url, idx, t("fileTypeFile"))}
                 </a>
               </div>
               {!assignment.submitted && !assignment.closed && (

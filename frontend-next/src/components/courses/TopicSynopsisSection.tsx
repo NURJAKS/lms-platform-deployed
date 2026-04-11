@@ -39,8 +39,8 @@ function classifySubmissionAttachment(url: string): "link" | "file" {
   return /^https?:\/\//i.test(url.trim()) ? "link" : "file";
 }
 
-function fileNameFromUrl(url: string, idx: number): string {
-  return url.split("/").pop()?.split("?")[0] || `${t("fileTypeFile")} ${idx + 1}`;
+function fileNameFromUrl(url: string, idx: number, fileLabel: string): string {
+  return url.split("/").pop()?.split("?")[0] || `${fileLabel} ${idx + 1}`;
 }
 
 function apiErrorDetail(err: unknown): string | null {
@@ -112,7 +112,7 @@ export function TopicSynopsisSection({ topicId, courseId }: Props) {
     },
     onSuccess: (url) => {
       if (!url) return;
-      setAttachments((prev) => [...prev, { kind: "file", url }].slice(0, 5));
+      setAttachments((prev) => [...prev, { kind: "file" as const, url }].slice(0, 5));
       setActionError(null);
     },
     onError: (err) => {
@@ -219,7 +219,7 @@ export function TopicSynopsisSection({ topicId, courseId }: Props) {
                   rel="noopener noreferrer"
                   className="truncate font-medium text-teal-700 hover:underline dark:text-teal-300"
                 >
-                  {fileNameFromUrl(att.url, idx)}
+                  {fileNameFromUrl(att.url, idx, t("fileTypeFile"))}
                 </a>
               </div>
               {!synopsis.submitted && !isLocked && (

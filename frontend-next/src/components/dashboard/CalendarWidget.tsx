@@ -238,8 +238,7 @@ export function CalendarWidget() {
       end.setDate(start.getDate() + 6);
       return `${start.getDate()} ${t(MONTH_KEYS[start.getMonth()]).slice(0, 3)} - ${end.getDate()} ${t(MONTH_KEYS[end.getMonth()]).slice(0, 3)} ${end.getFullYear()}`;
     } else {
-      return formatLocalizedDate(currentDate, lang as any, t);
-
+      return formatLocalizedDate(currentDate.toISOString(), lang, t);
     }
   };
 

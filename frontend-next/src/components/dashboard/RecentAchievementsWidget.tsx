@@ -7,7 +7,7 @@ import { getDashboardCardStyle, getTextColors } from "@/utils/themeStyles";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { formatLocalizedDate } from "@/utils/dateUtils";
-
+import type { Lang, TranslationKey } from "@/i18n/translations";
 
 type Achievement = {
   id: number;
@@ -35,16 +35,18 @@ const getIcon = (icon: Achievement["icon"]) => {
   }
 };
 
-function formatDate<K extends string>(dateStr: string, t: (k: K) => string, lang: string): string {
+function formatAchievementDate(
+  dateStr: string,
+  translate: (key: TranslationKey) => string,
+  lang: Lang,
+): string {
   const date = new Date(dateStr);
   const now = new Date();
   const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
-  const T = t as (k: string) => string;
-  if (diffDays === 0) return T("today");
-  if (diffDays === 1) return T("yesterday");
-  if (diffDays < 7) return T("daysAgo").replace("{count}", String(diffDays));
-  return formatLocalizedDate(dateStr, lang as any, t);
-
+  if (diffDays === 0) return translate("today");
+  if (diffDays === 1) return translate("yesterday");
+  if (diffDays < 7) return translate("daysAgo").replace("{count}", String(diffDays));
+  return formatLocalizedDate(dateStr, lang, translate);
 }
 
 export function RecentAchievementsWidget() {
@@ -119,7 +121,7 @@ export function RecentAchievementsWidget() {
                   {achievement.description}
                 </p>
                 <p className="text-xs" style={{ color: textColors.secondary }}>
-                  {formatDate(achievement.date, t, lang)}
+                  {formatAchievementDate(achievement.date, t, lang)}
                 </p>
               </div>
             </div>

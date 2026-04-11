@@ -223,7 +223,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5">
         <BlurFade direction="right" delay={0.4} offset={30} inView={true} duration={0.6} blur="8px">
           <div className="xl:col-span-1 h-full">
-            <DailyQuestWidget quests={[]} />
+            <DailyQuestWidget />
           </div>
         </BlurFade>
         <BlurFade direction="down" delay={0.5} offset={30} inView={true} duration={0.6} blur="8px">
