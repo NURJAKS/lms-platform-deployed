@@ -78,6 +78,14 @@ curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:3000/
 
 ## 4. Nginx (reverse proxy)
 
+Если при `nginx -t` ошибка **`could not build server_names_hash`**, в **`/etc/nginx/nginx.conf`** внутри блока **`http {`** добавьте (сразу после открывающей скобки):
+
+```nginx
+    server_names_hash_bucket_size 64;
+```
+
+(при необходимости **128** — для очень длинных доменов и многих `server_name`.)
+
 ```bash
 apt install -y nginx
 cp deploy/nginx-qazaqitacademy.example.conf /etc/nginx/sites-available/qazaqitacademy-edu.pp.ua
