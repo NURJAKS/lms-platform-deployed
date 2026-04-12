@@ -656,9 +656,9 @@ export function CreateAssignmentFullPageModal({
               title: cleanedTitle,
               description: instructionsHtml || undefined,
               topic_id: resolvedTopic,
-              attachment_urls,
-              attachment_links,
-              video_urls,
+              attachment_urls: attachmentUrls.length ? attachmentUrls : undefined,
+              attachment_links: attachmentLinks.length ? attachmentLinks : undefined,
+              video_urls: videoUrls.length ? videoUrls : undefined,
             });
           } else {
             await createMaterialMutation.mutateAsync({
@@ -682,9 +682,9 @@ export function CreateAssignmentFullPageModal({
               options: questionType === "multiple_choice" ? questionOptions.filter(o => o.trim()) : undefined,
               deadline: deadlineIso,
               max_points: payloadMaxPoints,
-              attachment_urls,
-              attachment_links,
-              video_urls,
+              attachment_urls: attachmentUrls.length ? attachmentUrls : undefined,
+              attachment_links: attachmentLinks.length ? attachmentLinks : undefined,
+              video_urls: videoUrls.length ? videoUrls : undefined,
               can_comment: canComment,
               can_edit: canEdit,
             });
@@ -719,9 +719,9 @@ export function CreateAssignmentFullPageModal({
               topic_id: resolvedTopic,
               deadline: deadlineIso,
               max_points: payloadMaxPoints,
-              attachment_urls,
-              attachment_links,
-              video_urls,
+              attachment_urls: attachmentUrls.length ? attachmentUrls : undefined,
+              attachment_links: attachmentLinks.length ? attachmentLinks : undefined,
+              video_urls: videoUrls.length ? videoUrls : undefined,
               rubric: rubricToSend,
               reject_submissions_after_deadline: rejectPayload,
               is_synopsis: mainIsSynopsis,

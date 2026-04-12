@@ -9,6 +9,7 @@ import { api } from "@/api/client";
 import { useAuthStore } from "@/store/authStore";
 import { useLanguage } from "@/context/LanguageContext";
 import type { Lang } from "@/i18n/translations";
+import { toast } from "@/store/notificationStore";
 import { useTheme } from "@/context/ThemeContext";
 import { getGlassCardStyle, getTextColors, getInputStyle, getModalStyle } from "@/utils/themeStyles";
 import { formatLocalizedDate, formatRelativeDate } from "@/utils/dateUtils";
@@ -473,7 +474,6 @@ export default function TeacherCourseGroupPage() {
         setIsRenamingUncategorized(false);
         const uncategorizedItems = localAssignments.filter(a => !a.topic_id);
         if (uncategorizedItems.length > 0) {
-          const toastId = toast.loading(t("teacherSaving"));
           try {
             await Promise.all(uncategorizedItems.map(item => {
               const endpoint = item.type === "material"
@@ -483,10 +483,10 @@ export default function TeacherCourseGroupPage() {
                   : `/teacher/assignments/${item.id}`;
               return api.patch(endpoint, { topic_id: newTopic.id });
             }));
-            toast.success(t("teacherWorkCreated"), { id: toastId });
+            toast.success(t("teacherWorkCreated"));
             queryClient.invalidateQueries({ queryKey: ["teacher-assignments", groupId] });
-          } catch (err) {
-            toast.error(t("error"), { id: toastId });
+          } catch {
+            toast.error(t("error"));
           }
         }
       }
@@ -552,7 +552,6 @@ export default function TeacherCourseGroupPage() {
       return;
     }
 
-    const toastId = toast.loading(t("teacherSaving"));
     try {
       await Promise.all(uncategorizedItems.map(item => {
         const endpoint = item.type === "material"
@@ -562,11 +561,11 @@ export default function TeacherCourseGroupPage() {
             : `/teacher/assignments/${item.id}`;
         return api.delete(endpoint);
       }));
-      toast.success(t("teacherWorkDeleted") || "Success", { id: toastId });
+      toast.success(t("teacherWorkDeleted") || "Success");
       queryClient.invalidateQueries({ queryKey: ["teacher-assignments", groupId] });
       setIsDeletingUncategorized(false);
-    } catch (err) {
-      toast.error(t("error"), { id: toastId });
+    } catch {
+      toast.error(t("error"));
     }
   };
 
@@ -2164,7 +2163,7 @@ export default function TeacherCourseGroupPage() {
                 {t("confirmDelete")}
               </h3>
               <p className="text-sm mb-8 px-4 leading-relaxed" style={{ color: textColors.secondary }}>
-                {t("teacherDeleteTopicConfirm")} ({t("teacherDeleteUncategorizedConfirm").replace("{count}", String(sections.find(s => !s.topicId)?.items.length || 0))})
+                {t("teacherDeleteTopicConfirm")} ({t("teacherDeleteUncategorizedConfirm").replace("{count}", String(topicSections.find((s) => s.topicId == null)?.items.length || 0))})
               </p>
               <div className="flex flex-col gap-3">
                 <button
