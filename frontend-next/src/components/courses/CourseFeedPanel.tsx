@@ -23,6 +23,7 @@ import { useAuthStore } from "@/store/authStore";
 import { formatLocalizedDate } from "@/utils/dateUtils";
 import { getModalStyle, getTextColors } from "@/utils/themeStyles";
 import { feedLinkDisplayHref, isPlausibleExternalUrl, normalizeFeedLinkForSave } from "@/utils/feedLink";
+import { ALLOWED_EXTENSIONS_STR, ALLOWED_EXTENSIONS_HINT } from "@/constants/fileTypes";
 
 const FEED_ATTACHMENTS_MAX = 12;
 
@@ -302,7 +303,7 @@ export function CourseFeedPanel({
                 ref={fileInputRef}
                 type="file"
                 multiple
-                accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx,.txt,.mp4,.webm"
+                accept={ALLOWED_EXTENSIONS_STR}
                 className="hidden"
                 onChange={onPickFiles}
               />
@@ -315,6 +316,9 @@ export function CourseFeedPanel({
                 {uploadBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Paperclip className="w-3.5 h-3.5" />}
                 {uploadBusy ? t("courseFeedUploading") : t("courseFeedAddFiles")}
               </button>
+              <p className="text-[10px] font-medium" style={{ color: "#F87171" }}>
+                {t("onlyAllowedExtensions").replace("{extensions}", ALLOWED_EXTENSIONS_HINT)}
+              </p>
               {postAttachments.length > 0 ? (
                 <ul className="flex flex-wrap gap-2">
                   {postAttachments.map((u) => (

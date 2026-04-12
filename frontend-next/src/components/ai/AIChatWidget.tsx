@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { MessageCircle, X, Send, Lock, Sparkles } from "lucide-react";
+import { Bot, X, Send, Lock, Sparkles } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { useAuthStore } from "@/store/authStore";
@@ -41,6 +41,34 @@ export function AIChatWidget() {
   useEffect(() => {
     scrollRef.current?.scrollTo(0, scrollRef.current.scrollHeight);
   }, [messages]);
+
+  const STORAGE_KEY = "ai-chat-history";
+
+  // Load history from localStorage on mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const key = user?.id ? `${STORAGE_KEY}-${user.id}` : `${STORAGE_KEY}-guest`;
+      const saved = localStorage.getItem(key);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setMessages(parsed);
+          }
+        } catch (e) {
+          console.error("Failed to parse AI history", e);
+        }
+      }
+    }
+  }, [user?.id]);
+
+  // Save history to localStorage whenever messages change
+  useEffect(() => {
+    if (typeof window !== "undefined" && messages.length > 0) {
+      const key = user?.id ? `${STORAGE_KEY}-${user.id}` : `${STORAGE_KEY}-guest`;
+      localStorage.setItem(key, JSON.stringify(messages.slice(-50)));
+    }
+  }, [messages, user?.id]);
 
   const send = async () => {
     const text = input.trim();
@@ -82,10 +110,10 @@ export function AIChatWidget() {
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="fixed bottom-[96px] right-4 md:bottom-6 md:right-6 w-12 h-12 md:w-14 md:h-14 rounded-full text-white shadow-lg flex items-center justify-center z-[50] transition-all active:scale-95 hover:scale-105"
-        style={{ background: "var(--qit-primary)" }}
+        className="fixed bottom-[96px] right-4 md:bottom-6 md:right-6 w-12 h-12 md:w-14 md:h-14 rounded-full text-white shadow-lg flex items-center justify-center z-[50] transition-all active:scale-95 hover:scale-105 animate-float"
+        style={{ background: "var(--qit-gradient-1)" }}
       >
-        <MessageCircle className="w-5 h-5 md:w-6 md:h-6" />
+        <Bot className="w-6 h-6 md:w-7 md:h-7" />
       </button>
       {open && (
         <div className="fixed bottom-[150px] right-4 md:bottom-24 md:right-6 w-[calc(100vw-2rem)] md:w-96 max-h-[60vh] md:max-h-[28rem] bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 flex flex-col z-[50]">

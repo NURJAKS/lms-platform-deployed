@@ -1,33 +1,50 @@
-# VPS / production: демо SQLite + файлы uploads из образа (первый старт копируются в тома).
-# Перед запуском: cp env.deploy.example .env.deploy && отредактируйте секреты и URL.
-# Запуск: docker compose --env-file .env.deploy -f docker-compose.vps.yml up -d --build
+# VPS / production: PostgreSQL + uploads в томах. API через Next (/api).
+# Перед запуском: cp env.deploy.example .env.deploy — задайте SECRET_KEY, POSTGRES_PASSWORD, ALLOWED_ORIGINS.
 #
-# Сайт на хосте: порт 3000 (Next.js). Бэкенд слушает 8000 только ВНУТРИ сети compose — на хост :8000 не пробрасываем,
-# чтобы не пересекаться с другим проектом на VPS. Swagger из браузера: через /api на том же домене (прокси Next).
-# См. deploy/nginx-qazaqitacademy.example.conf · при занятом :3000 используйте override (ниже).
-# Данные сохраняются в именованных томах Docker (БД и uploads).
+# Миграция данных из старого SQLite: см. deploy/VPS.md (раздел «PostgreSQL и перенос с SQLite»).
+#
+# Запуск: docker compose --env-file .env.deploy -f docker-compose.vps.yml up -d --build
 
 services:
+  db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-lms}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.deploy}
+      POSTGRES_DB: ${POSTGRES_DB:-education_platform}
+    volumes:
+      - lms_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
   backend:
     build: ./backend
     restart: unless-stopped
-    # Не публикуем 8000 на хост — иначе конфликт с другим сервисом на VPS. Доступ к API: контейнер frontend → backend:8000.
-    # Раскомментируйте только если нужен прямой доступ к API с хоста (подберите свободный порт, не 8000):
-    # ports:
-    #   - "8010:8000"
     environment:
-      DATABASE_URL: sqlite:////data/education.db
-      LMS_DATA_DIR: /data
+      DATABASE_URL: postgresql://${POSTGRES_USER:-lms}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-education_platform}
+      LMS_DATA_DIR: ""
       DEBUG: "false"
       SECRET_KEY: ${SECRET_KEY}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
       FRONTEND_PUBLIC_URL: ${FRONTEND_PUBLIC_URL}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
     volumes:
-      - lms_sqlite_data:/data
       - lms_uploads:/app/uploads
-    # Проверка, что порт 8000 слушается (надёжнее, чем HTTP /docs через urllib в slim-образе).
+    depends_on:
+      db:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import socket; s=socket.create_connection(('127.0.0.1',8000),timeout=3); s.close()\""]
       interval: 10s
@@ -41,7 +58,6 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     ports:
-      # Если на сервере занят 3000 — замените на "3010:3000" и в Nginx proxy_pass на 3010
       - "3000:3000"
     environment:
       BACKEND_URL: http://backend:8000
@@ -50,5 +66,5 @@ services:
         condition: service_healthy
 
 volumes:
-  lms_sqlite_data:
+  lms_postgres_data:
   lms_uploads:

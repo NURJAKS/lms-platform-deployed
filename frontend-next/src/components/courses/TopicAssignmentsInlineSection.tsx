@@ -10,6 +10,7 @@ import { CheckCircle2, FileText, Globe, Loader2, Plus, X, MessageSquare, Chevron
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { htmlLinksOpenInNewTab } from "@/lib/htmlLinkNewTab";
+import { ALLOWED_EXTENSIONS_STR, ALLOWED_EXTENSIONS_HINT } from "@/constants/fileTypes";
 
 type AssignmentRow = {
   id: number;
@@ -341,68 +342,74 @@ function TopicAssignmentCard({
             className="w-full min-h-[7rem] sm:min-h-0 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
           />
 
-          <div className="relative" ref={addMenuRef}>
-            <button
-              type="button"
-              onClick={() => {
-                setAddMenuOpen((v) => !v);
-                setLinkFieldOpen(false);
-                setLinkDraft("");
-              }}
-              disabled={attachments.length >= 5 || uploadMutation.isPending}
-              className="w-full rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-700 px-3 py-2 text-sm font-medium inline-flex items-center justify-center gap-2"
-            >
-              <Plus className="w-4 h-4" />
-              {t("addOrCreate")}
-            </button>
+          <div className="space-y-2">
+            <div className="relative" ref={addMenuRef}>
+              <button
+                type="button"
+                onClick={() => {
+                  setAddMenuOpen((v) => !v);
+                  setLinkFieldOpen(false);
+                  setLinkDraft("");
+                }}
+                disabled={attachments.length >= 5 || uploadMutation.isPending}
+                className="w-full rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-700 px-3 py-2 text-sm font-medium inline-flex items-center justify-center gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                {t("addOrCreate")}
+              </button>
 
-            {addMenuOpen && (
-              <div className="absolute z-20 left-0 right-0 mt-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-2 shadow-lg space-y-2">
-                <button
-                  type="button"
-                  className="w-full text-left rounded-lg px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
-                  onClick={() => {
-                    setLinkFieldOpen(false);
-                    fileInputRef.current?.click();
-                  }}
-                >
-                  {t("fileOption")}
-                </button>
-                <button
-                  type="button"
-                  className="w-full text-left rounded-lg px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
-                  onClick={() => setLinkFieldOpen((v) => !v)}
-                >
-                  {t("linkOption")}
-                </button>
-                {linkFieldOpen && (
-                  <div className="space-y-2 pt-1">
-                    <input
-                      type="url"
-                      value={linkDraft}
-                      onChange={(e) => setLinkDraft(e.target.value)}
-                      placeholder={t("studentSubmissionLinkPlaceholder")}
-                      className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
-                    />
-                    <button
-                      type="button"
-                      onClick={tryAddLink}
-                      className="w-full rounded-lg bg-sky-600 hover:bg-sky-700 px-3 py-2 text-sm text-white font-semibold"
-                    >
-                      {t("studentSubmissionAttachLink")}
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-            <input
-              ref={fileInputRef}
-              type="file"
-              className="hidden"
-              accept=".jpg,.jpeg,.png,.gif,.webp,.mp4,.webm,.pdf,.doc,.docx,.txt"
-              onChange={handleFilePick}
-              disabled={attachments.length >= 5}
-            />
+              {addMenuOpen && (
+                <div className="absolute z-20 left-0 right-0 mt-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-2 shadow-lg space-y-2">
+                  <button
+                    type="button"
+                    className="w-full text-left rounded-lg px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+                    onClick={() => {
+                      setLinkFieldOpen(false);
+                      fileInputRef.current?.click();
+                    }}
+                  >
+                    {t("fileOption")}
+                  </button>
+                  <button
+                    type="button"
+                    className="w-full text-left rounded-lg px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+                    onClick={() => setLinkFieldOpen((v) => !v)}
+                  >
+                    {t("linkOption")}
+                  </button>
+                  {linkFieldOpen && (
+                    <div className="space-y-2 pt-1">
+                      <input
+                        type="url"
+                        value={linkDraft}
+                        onChange={(e) => setLinkDraft(e.target.value)}
+                        placeholder={t("studentSubmissionLinkPlaceholder")}
+                        className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
+                      />
+                      <button
+                        type="button"
+                        onClick={tryAddLink}
+                        className="w-full rounded-lg bg-sky-600 hover:bg-sky-700 px-3 py-2 text-sm text-white font-semibold"
+                      >
+                        {t("studentSubmissionAttachLink")}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                className="hidden"
+                accept={ALLOWED_EXTENSIONS_STR}
+                onChange={handleFilePick}
+                disabled={attachments.length >= 5}
+              />
+            </div>
+            
+            <p className="text-[10px] font-medium text-center" style={{ color: "#F87171" }}>
+              {t("onlyAllowedExtensions").replace("{extensions}", ALLOWED_EXTENSIONS_HINT)}
+            </p>
           </div>
         </>
       )}

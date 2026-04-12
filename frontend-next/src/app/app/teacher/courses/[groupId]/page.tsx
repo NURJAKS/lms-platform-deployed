@@ -38,6 +38,8 @@ import {
   Users,
   X,
   StickyNote,
+  Edit,
+  Pencil,
 } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 
@@ -215,7 +217,9 @@ export default function TeacherCourseGroupPage() {
   const [renamingTopic, setRenamingTopic] = useState<CourseTopic | null>(null);
   const [renameTitle, setRenameTitle] = useState("");
 
-  const [activeTopicMenu, setActiveTopicMenu] = useState<number | null>(null);
+  const [activeTopicMenu, setActiveTopicMenu] = useState<number | string | null>(null);
+  const [isRenamingUncategorized, setIsRenamingUncategorized] = useState(false);
+  const [isDeletingUncategorized, setIsDeletingUncategorized] = useState(false);
   const [topicIdPendingDelete, setTopicIdPendingDelete] = useState<number | null>(null);
   const topicMenuRef = useRef<HTMLDivElement>(null);
   useClickOutside(topicMenuRef, () => setActiveTopicMenu(null));
@@ -459,11 +463,33 @@ export default function TeacherCourseGroupPage() {
       );
       return data;
     },
-    onSuccess: () => {
+    onSuccess: async (newTopic) => {
       queryClient.invalidateQueries({ queryKey: ["course-topics", group?.course_id] });
       setTopicModalOpen(false);
       setTopicTitle("");
       setTopicTitleTouched(false);
+
+      if (isRenamingUncategorized) {
+        setIsRenamingUncategorized(false);
+        const uncategorizedItems = localAssignments.filter(a => !a.topic_id);
+        if (uncategorizedItems.length > 0) {
+          const toastId = toast.loading(t("teacherSaving"));
+          try {
+            await Promise.all(uncategorizedItems.map(item => {
+              const endpoint = item.type === "material"
+                ? `/teacher/materials/${item.id}`
+                : item.type === "question"
+                  ? `/teacher/questions/${item.id}`
+                  : `/teacher/assignments/${item.id}`;
+              return api.patch(endpoint, { topic_id: newTopic.id });
+            }));
+            toast.success(t("teacherWorkCreated"), { id: toastId });
+            queryClient.invalidateQueries({ queryKey: ["teacher-assignments", groupId] });
+          } catch (err) {
+            toast.error(t("error"), { id: toastId });
+          }
+        }
+      }
     },
   });
 
@@ -513,6 +539,36 @@ export default function TeacherCourseGroupPage() {
       setExpandedItem((prev) => (prev?.type === "assignment" && prev.id === assignmentId ? null : prev));
     },
   });
+
+  const handleBulkDeleteUncategorized = async () => {
+    const topicIdSet = new Set(localTopics.map((tp) => tp.id));
+    const uniqueAssignments = Array.from(new Map(localAssignments.map(a => [a.id, a])).values());
+    const uncategorizedItems = uniqueAssignments.filter(
+      (a) => a.topic_id == null || !topicIdSet.has(a.topic_id as number)
+    );
+
+    if (!uncategorizedItems.length) {
+      setIsDeletingUncategorized(false);
+      return;
+    }
+
+    const toastId = toast.loading(t("teacherSaving"));
+    try {
+      await Promise.all(uncategorizedItems.map(item => {
+        const endpoint = item.type === "material"
+          ? `/teacher/materials/${item.id}`
+          : item.type === "question"
+            ? `/teacher/questions/${item.id}`
+            : `/teacher/assignments/${item.id}`;
+        return api.delete(endpoint);
+      }));
+      toast.success(t("teacherWorkDeleted") || "Success", { id: toastId });
+      queryClient.invalidateQueries({ queryKey: ["teacher-assignments", groupId] });
+      setIsDeletingUncategorized(false);
+    } catch (err) {
+      toast.error(t("error"), { id: toastId });
+    }
+  };
 
   const topicSections = useMemo(() => {
     const byId = new Map<number, Assignment>();
@@ -686,6 +742,23 @@ export default function TeacherCourseGroupPage() {
     setAssignmentModalMode(item.type === "material" ? "material" : "assignment");
     setClonedItemData(item);
     setAssignmentModalOpen(true);
+  };
+
+  const handleEditItem = async (item: Assignment) => {
+    try {
+      const endpoint = item.type === "material"
+        ? `/teacher/materials/${item.id}`
+        : item.type === "question"
+          ? `/teacher/questions/${item.id}`
+          : `/teacher/assignments/${item.id}`;
+
+      const { data } = await api.get(endpoint);
+      setAssignmentModalMode(item.type);
+      setClonedItemData({ ...data, isEdit: true });
+      setAssignmentModalOpen(true);
+    } catch (e) {
+      console.error("Error fetching item details for edit", e);
+    }
   };
 
   const tabClass = (id: TabId) =>
@@ -969,7 +1042,7 @@ export default function TeacherCourseGroupPage() {
                               <div
                                 ref={provided.innerRef}
                                 {...provided.draggableProps}
-                                className="rounded-2xl overflow-hidden"
+                                className="rounded-2xl"
                                 style={{
                                   ...glassStyle,
                                   ...provided.draggableProps.style,
@@ -992,48 +1065,78 @@ export default function TeacherCourseGroupPage() {
                                   <h3 className="flex-1 text-sm font-semibold font-geologica min-w-0 truncate" style={{ color: textColors.primary }}>
                                     {section.title}
                                   </h3>
-                                  <div className="relative" ref={section.topicId ? (activeTopicMenu === section.topicId ? topicMenuRef : null) : null}>
+                                  <div className="relative" ref={activeTopicMenu === (section.topicId || section.key) ? topicMenuRef : null}>
                                     <button
                                       type="button"
                                       className="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 opacity-60"
                                       aria-label={t("teacherMoreOptions")}
                                       onClick={() => {
-                                        if (section.topicId) {
-                                          setActiveTopicMenu(activeTopicMenu === section.topicId ? null : section.topicId);
-                                        }
+                                        const menuKey = section.topicId || section.key;
+                                        setActiveTopicMenu(activeTopicMenu === menuKey ? null : menuKey);
                                       }}
                                     >
                                       <MoreVertical className="w-5 h-5" style={{ color: textColors.secondary }} />
                                     </button>
-                                    {section.topicId && activeTopicMenu === section.topicId && (
+                                    {activeTopicMenu === (section.topicId || section.key) && (
                                       <div
                                         className="absolute right-0 top-full mt-1 z-50 min-w-[140px] rounded-xl py-1 shadow-xl border animate-in fade-in zoom-in duration-100"
                                         style={{ ...glassStyle }}
                                       >
-                                        <button
-                                          className="w-full text-left px-4 py-2 text-xs hover:bg-black/5 dark:hover:bg-white/10"
-                                          style={{ color: textColors.primary }}
-                                          onClick={() => {
-                                            const tp = localTopics.find(t => t.id === section.topicId);
-                                            if (tp) {
-                                              setRenamingTopic(tp);
-                                              setRenameTitle(tp.title);
-                                              setRenameTopicModalOpen(true);
-                                            }
-                                            setActiveTopicMenu(null);
-                                          }}
-                                        >
-                                          {t("teacherRenameCourse")}
-                                        </button>
-                                        <button
-                                          className="w-full text-left px-4 py-2 text-xs hover:bg-red-500/10 text-red-500"
-                                          onClick={() => {
-                                            setTopicIdPendingDelete(section.topicId!);
-                                            setActiveTopicMenu(null);
-                                          }}
-                                        >
-                                          {t("remove")}
-                                        </button>
+                                        {section.topicId ? (
+                                          <>
+                                            <button
+                                              className="w-full text-left px-4 py-2.5 text-xs hover:bg-black/5 dark:hover:bg-white/10 flex items-center gap-2 transition-colors"
+                                              style={{ color: textColors.primary }}
+                                              onClick={() => {
+                                                const tp = localTopics.find(t => t.id === section.topicId);
+                                                if (tp) {
+                                                  setRenamingTopic(tp);
+                                                  setRenameTitle(tp.title);
+                                                  setRenameTopicModalOpen(true);
+                                                }
+                                                setActiveTopicMenu(null);
+                                              }}
+                                            >
+                                              <Pencil className="w-4 h-4 shrink-0 opacity-60" />
+                                              {t("teacherRenameCourse")}
+                                            </button>
+                                            <button
+                                              className="w-full text-left px-4 py-2.5 text-xs hover:bg-red-500/10 text-red-500 flex items-center gap-2 transition-colors font-medium"
+                                              onClick={() => {
+                                                setTopicIdPendingDelete(section.topicId!);
+                                                setActiveTopicMenu(null);
+                                              }}
+                                            >
+                                              <Trash2 className="w-4 h-4 shrink-0" />
+                                              {t("remove")}
+                                            </button>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <button
+                                              className="w-full text-left px-4 py-2.5 text-xs hover:bg-black/5 dark:hover:bg-white/10 flex items-center gap-2 transition-colors"
+                                              style={{ color: textColors.primary }}
+                                              onClick={() => {
+                                                setIsRenamingUncategorized(true);
+                                                setTopicModalOpen(true);
+                                                setActiveTopicMenu(null);
+                                              }}
+                                            >
+                                              <Pencil className="w-4 h-4 shrink-0 opacity-60" />
+                                              {t("teacherRenameCourse")}
+                                            </button>
+                                            <button
+                                              className="w-full text-left px-4 py-2.5 text-xs hover:bg-red-500/10 text-red-500 flex items-center gap-2 transition-colors font-medium"
+                                              onClick={() => {
+                                                setIsDeletingUncategorized(true);
+                                                setActiveTopicMenu(null);
+                                              }}
+                                            >
+                                              <Trash2 className="w-4 h-4 shrink-0" />
+                                              {t("remove")}
+                                            </button>
+                                          </>
+                                        )}
                                       </div>
                                     )}
                                   </div>
@@ -1077,7 +1180,7 @@ export default function TeacherCourseGroupPage() {
                                                       return { type: item.type, id: item.id };
                                                     });
                                                   }}
-                                                  className="flex items-start gap-3 px-4 py-3 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] cursor-pointer"
+                                                  className="flex items-start gap-3 px-4 py-3 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] cursor-pointer group"
                                                 >
                                                   <div
                                                     {...provided.dragHandleProps}
@@ -1129,6 +1232,9 @@ export default function TeacherCourseGroupPage() {
                                                           {item.title}
                                                         </span>
                                                       )}
+                                                      <p className="text-xs font-medium px-2 py-0.5 rounded-md hidden sm:block" style={{ background: "rgba(59, 130, 246, 0.1)", color: "#3B82F6" }}>
+                                                        {item.type === "question" ? t("quiz") : item.type === "material" ? t("studentMaterials") : t("courseClasswork")}
+                                                      </p>
                                                     </div>
 
                                                     <p className="text-xs mt-1" style={{ color: textColors.secondary }}>
@@ -1168,29 +1274,43 @@ export default function TeacherCourseGroupPage() {
                                                       <MoreVertical className="w-4 h-4" style={{ color: textColors.secondary }} />
                                                     </button>
                                                     {classworkItemMenu?.id === item.id &&
-                                                    classworkItemMenu?.type === item.type &&
-                                                    item.type === "assignment" ? (
-                                                      <div
-                                                        className="absolute left-0 top-full mt-1 z-[60] min-w-[180px] max-h-64 overflow-y-auto rounded-xl py-1 shadow-xl border animate-in fade-in zoom-in duration-100"
-                                                        style={{ ...glassStyle, borderColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)" }}
-                                                        role="menu"
-                                                      >
-                                                        <button
-                                                          type="button"
-                                                          role="menuitem"
-                                                          className="w-full text-left px-4 py-2 text-xs hover:bg-red-500/10 text-red-500 flex items-center gap-2"
-                                                          disabled={deleteClassworkAssignmentMutation.isPending}
-                                                          onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setClassworkItemMenu(null);
-                                                            setDeleteAssignmentConfirmId(item.id);
-                                                          }}
+                                                      classworkItemMenu?.type === item.type ? (
+                                                        <div
+                                                          className="absolute right-0 top-full mt-1 z-[60] min-w-[200px] max-h-64 overflow-y-auto rounded-xl py-1 shadow-2xl border animate-in fade-in zoom-in duration-100"
+                                                          style={{ ...glassStyle, borderColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)" }}
+                                                          role="menu"
                                                         >
-                                                          <Trash2 className="w-3.5 h-3.5 shrink-0" />
-                                                          {t("delete")}
-                                                        </button>
-                                                      </div>
-                                                    ) : null}
+                                                          <button
+                                                            type="button"
+                                                            role="menuitem"
+                                                            className="w-full text-left px-4 py-2.5 text-xs hover:bg-black/5 dark:hover:bg-white/5 flex items-center gap-2 transition-colors"
+                                                            style={{ color: textColors.primary }}
+                                                            onClick={async (e) => {
+                                                              e.stopPropagation();
+                                                              setClassworkItemMenu(null);
+                                                              handleEditItem(item);
+                                                            }}
+                                                          >
+                                                            <Pencil className="w-4 h-4 shrink-0 opacity-60" />
+                                                            {t("edit")}
+                                                          </button>
+                                                          <div className="h-px mx-2 my-1 bg-black/5 dark:bg-white/5" />
+                                                          <button
+                                                            type="button"
+                                                            role="menuitem"
+                                                            className="w-full text-left px-4 py-2.5 text-xs hover:bg-red-500/10 text-red-500 flex items-center gap-2 transition-colors font-medium"
+                                                            disabled={deleteClassworkAssignmentMutation.isPending}
+                                                            onClick={(e) => {
+                                                              e.stopPropagation();
+                                                              setClassworkItemMenu(null);
+                                                              setDeleteAssignmentConfirmId(item.id);
+                                                            }}
+                                                          >
+                                                            <Trash2 className="w-4 h-4 shrink-0" />
+                                                            {t("delete")}
+                                                          </button>
+                                                        </div>
+                                                      ) : null}
                                                   </div>
                                                 </div>
 
@@ -1848,23 +1968,24 @@ export default function TeacherCourseGroupPage() {
       {topicModalOpen && (
         <div
           className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 animate-in fade-in duration-200"
-          onClick={() => setTopicModalOpen(false)}
+          onClick={() => { setTopicModalOpen(false); setIsRenamingUncategorized(false); }}
         >
           <div
             className="rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4 animate-slide-up"
             style={modalStyle}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between mb-5">
-              <h3 className="font-semibold font-geologica" style={{ color: textColors.primary }}>
-                {t("teacherAddTopic")}
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-bold font-geologica" style={{ color: textColors.primary }}>
+                {isRenamingUncategorized ? t("teacherRenameCourse") : t("teacherAddTopic")}
               </h3>
               <button
                 type="button"
-                onClick={() => setTopicModalOpen(false)}
-                className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+                onClick={() => { setTopicModalOpen(false); setIsRenamingUncategorized(false); }}
+                className="p-2 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+                style={{ color: textColors.secondary }}
               >
-                <X className="w-5 h-5" style={{ color: textColors.secondary }} />
+                <X className="w-5 h-5" />
               </button>
             </div>
             <div className="space-y-4">
@@ -1894,46 +2015,45 @@ export default function TeacherCourseGroupPage() {
               </div>
 
               {/* Quick topics suggestions */}
-              <div className="space-y-2">
-                <p className="text-xs font-semibold uppercase tracking-wider opacity-60" style={{ color: textColors.secondary }}>
-                  {t("teacherCourseTopics")}
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    t("topicSuggestion1"),
-                    t("topicSuggestion2"),
-                    t("topicSuggestion3"),
-                    t("topicSuggestion4"),
-                    t("topicSuggestion5"),
-                    t("topicSuggestion6"),
-                    t("topicSuggestion7"),
-                  ].map((suggestion) => (
-                    <button
-                      key={suggestion}
-                      type="button"
-                      onClick={() => setTopicTitle(suggestion)}
-                      className="px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors hover:bg-blue-500 hover:text-white hover:border-blue-500"
-                      style={{
-                        borderColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)",
-                        color: textColors.primary,
-                        background: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.02)"
-                      }}
-                    >
-                      {suggestion}
-                    </button>
-                  ))}
+              {!isRenamingUncategorized && (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-wider opacity-60" style={{ color: textColors.secondary }}>
+                    {t("teacherCourseTopics")}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      t("topicSuggestion1"),
+                      t("topicSuggestion2"),
+                      t("topicSuggestion3"),
+                      t("topicSuggestion4"),
+                      t("topicSuggestion5"),
+                      t("topicSuggestion6"),
+                      t("topicSuggestion7"),
+                    ].map((suggestion) => (
+                      <button
+                        key={suggestion}
+                        type="button"
+                        onClick={() => setTopicTitle(suggestion)}
+                        className="px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors hover:bg-blue-500 hover:text-white hover:border-blue-500"
+                        style={{
+                          borderColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)",
+                          color: textColors.primary,
+                          background: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.02)"
+                        }}
+                      >
+                        {suggestion}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
-            <div className="flex gap-3 mt-6">
+            <div className="flex items-center gap-3 pt-4">
               <button
                 type="button"
-                onClick={() => setTopicModalOpen(false)}
-                className="flex-1 py-2.5 rounded-xl text-sm font-medium transition-colors"
-                style={{
-                  background: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.04)",
-                  color: textColors.secondary,
-                }}
+                onClick={() => { setTopicModalOpen(false); setIsRenamingUncategorized(false); }}
+                className="flex-1 py-2.5 rounded-xl font-medium text-sm transition-all"
+                style={{ background: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)", color: textColors.primary }}
               >
                 {t("teacherCancel")}
               </button>
@@ -1944,7 +2064,7 @@ export default function TeacherCourseGroupPage() {
                 className="flex-1 py-2.5 rounded-xl text-white font-medium text-sm disabled:opacity-50 transition-all hover:shadow-lg"
                 style={{ background: "linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%)" }}
               >
-                {createTopicMutation.isPending ? t("teacherAdding") : t("teacherAddTopic")}
+                {createTopicMutation.isPending ? t("teacherAdding") : (isRenamingUncategorized ? t("teacherSave") : t("teacherAddTopic"))}
               </button>
             </div>
           </div>
@@ -2001,6 +2121,64 @@ export default function TeacherCourseGroupPage() {
                   type="button"
                   onClick={() => setTopicIdPendingDelete(null)}
                   disabled={deleteTopicMutation.isPending}
+                  className="w-full py-4 rounded-2xl font-semibold transition-all flex items-center justify-center gap-2"
+                  style={{
+                    background: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)",
+                    color: textColors.primary,
+                  }}
+                >
+                  <ArrowLeft className="w-5 h-5" />
+                  {t("back")}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {isDeletingUncategorized && (
+        <div
+          className="fixed inset-0 bg-black/40 backdrop-blur-md flex items-center justify-center z-[110] p-4 animate-in fade-in duration-200"
+          onClick={() => setIsDeletingUncategorized(false)}
+        >
+          <div
+            className="relative w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl border animate-in zoom-in-95 duration-200"
+            style={{
+              ...modalStyle,
+              borderColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setIsDeletingUncategorized(false)}
+              className="absolute top-4 right-4 p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+              style={{ color: textColors.secondary }}
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <div className="p-8 text-center">
+              <div className="w-20 h-20 bg-red-50 dark:bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                <AlertTriangle className="w-10 h-10 text-red-500" />
+              </div>
+              <h3 className="text-xl font-bold mb-3 font-geologica" style={{ color: textColors.primary }}>
+                {t("confirmDelete")}
+              </h3>
+              <p className="text-sm mb-8 px-4 leading-relaxed" style={{ color: textColors.secondary }}>
+                {t("teacherDeleteTopicConfirm")} ({t("teacherDeleteUncategorizedConfirm").replace("{count}", String(sections.find(s => !s.topicId)?.items.length || 0))})
+              </p>
+              <div className="flex flex-col gap-3">
+                <button
+                  type="button"
+                  onClick={handleBulkDeleteUncategorized}
+                  disabled={deleteClassworkAssignmentMutation.isPending}
+                  className="w-full py-4 rounded-2xl bg-red-500 hover:bg-red-600 text-white font-bold transition-all shadow-lg shadow-red-500/30 flex items-center justify-center gap-2 disabled:opacity-60"
+                >
+                  <Trash2 className="w-5 h-5" />
+                  {t("delete")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsDeletingUncategorized(false)}
                   className="w-full py-4 rounded-2xl font-semibold transition-all flex items-center justify-center gap-2"
                   style={{
                     background: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)",

@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     SECRET_KEY: str = secrets.token_urlsafe(64)
     OPENAI_API_KEY: str = ""
     GEMINI_API_KEY: str = ""
+    # Модели OpenAI: чат и рекомендации — дешёвая быстрая; challenge — тот же класс по умолчанию
+    OPENAI_CHAT_MODEL: str = "gpt-4o-mini"
+    OPENAI_CHALLENGE_MODEL: str = "gpt-4o-mini"
+    GEMINI_MODEL: str = "gemini-2.0-flash"
     UPLOAD_DIR: str = "./uploads"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 24 * 60  # 24 hours
     PREMIUM_PRICE_TENGE: int = 199999  # цена Premium в тенге

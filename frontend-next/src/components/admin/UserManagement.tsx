@@ -2,13 +2,13 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import { useLanguage } from "@/context/LanguageContext";
 import { useTheme } from "@/context/ThemeContext";
-import { Coins, Download, Pencil, Plus, Trash2, UserPlus, ClipboardList, Info } from "lucide-react";
+import { Coins, Download, Pencil, Plus, Trash2, UserPlus, Info, X } from "lucide-react";
 import { useSidebar } from "@/context/SidebarContext";
 import { getGlassCardStyle, getModalStyle, getInputStyle, getTextColors } from "@/utils/themeStyles";
 import { BlurFade } from "@/components/ui/blur-fade";
@@ -77,23 +77,7 @@ type GroupQueueResponse = {
   counts: { awaiting_confirmation: number; needs_group: number; total: number };
 };
 
-type UsersTabId = "group-queue" | "users" | "parents" | "relations" | "without-group" | "applications";
-
-type Application = {
-  id: number;
-  user_id: number;
-  course_id: number;
-  status: string;
-  email: string;
-  full_name: string;
-  phone: string;
-  parent_email: string;
-  parent_full_name: string;
-  parent_phone: string;
-  created_at: string | null;
-  approved_at: string | null;
-  course_title: string | null;
-};
+type UsersTabId = "group-queue" | "users" | "parents" | "relations";
 
 type TeacherGroupOption = {
   id: number;
@@ -134,16 +118,31 @@ export function UserManagement() {
   const isCurator = user?.role === "curator";
   const searchParams = useSearchParams();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<UsersTabId>("users");
+  /** Skips one searchParams-driven sync after we update the URL ourselves (avoids fighting React state). */
+  const skipSearchParamsSyncRef = useRef(false);
+  const [activeTab, setActiveTab] = useState<UsersTabId>(() =>
+    searchParams.get("tab") === "group-queue" ? "group-queue" : "users"
+  );
+
+  const selectTab = useCallback(
+    (tab: UsersTabId) => {
+      setActiveTab(tab);
+      skipSearchParamsSyncRef.current = true;
+      if (tab === "group-queue") {
+        router.replace("/app/admin/users?tab=group-queue", { scroll: false });
+      } else if (searchParams.get("tab") === "group-queue") {
+        router.replace("/app/admin/users", { scroll: false });
+      } else {
+        skipSearchParamsSyncRef.current = false;
+      }
+    },
+    [router, searchParams]
+  );
   const [search, setSearch] = useState("");
   const [relationStudentSearch, setRelationStudentSearch] = useState("");
   const [relationParentSearch, setRelationParentSearch] = useState("");
   const [showOnlyUnlinked, setShowOnlyUnlinked] = useState(false);
   const [selectedParentByStudent, setSelectedParentByStudent] = useState<Record<number, string>>({});
-  const [statusFilter, setStatusFilter] = useState<string>("paid");
-  const [selectedStatusByApp, setSelectedStatusByApp] = useState<Record<number, string>>({});
-  const [assignCuratorModal, setAssignCuratorModal] = useState<{ appId: number; courseId: number } | null>(null);
-  const [assignCuratorGroupId, setAssignCuratorGroupId] = useState<number | "">("");
   const [uiToast, setUiToast] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [editing, setEditing] = useState<UserRow | null>(null);
   const [addUserOpen, setAddUserOpen] = useState(false);
@@ -186,43 +185,13 @@ export function UserManagement() {
     enabled: activeTab === "users" || activeTab === "relations",
   });
 
-  const { data: studentsWithoutGroup = [] } = useQuery({
-    queryKey: ["admin-students-without-group"],
-    queryFn: async () => {
-      const { data } = await api.get<StudentWithoutGroup[]>("/admin/students-without-group");
-      return data;
-    },
-    enabled: activeTab === "without-group",
-  });
-
-  const { data: applications = [] } = useQuery({
-    queryKey: ["admin-applications", statusFilter],
-    queryFn: async () => {
-      const url = statusFilter ? `/admin/applications?status=${statusFilter}` : "/admin/applications";
-      const { data } = await api.get<Application[]>(url);
-      return data;
-    },
-    enabled: activeTab === "applications",
-  });
-
   const { data: groupQueue } = useQuery({
     queryKey: ["admin-group-assignment-queue"],
     queryFn: async () => {
       const { data } = await api.get<GroupQueueResponse>("/admin/group-assignment-queue");
       return data;
     },
-    enabled: activeTab === "group-queue",
-  });
-
-  const { data: applicationTeacherGroups = [] } = useQuery({
-    queryKey: ["admin-teacher-groups-applications", assignCuratorModal?.courseId],
-    queryFn: async () => {
-      const { data } = await api.get<TeacherGroupOption[]>(
-        `/admin/teacher-groups?course_id=${assignCuratorModal!.courseId}`
-      );
-      return data;
-    },
-    enabled: !!assignCuratorModal?.courseId,
+    enabled: canManageUsers || activeTab === "group-queue",
   });
 
   const updateMutation = useMutation({
@@ -290,16 +259,6 @@ export function UserManagement() {
 
   const [rewardError, setRewardError] = useState<string | null>(null);
 
-  const applicationStatusMutation = useMutation({
-    mutationFn: async ({ appId, status }: { appId: number; status: string }) => {
-      const { data } = await api.patch(`/admin/applications/${appId}/status`, { status });
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-applications"] });
-    },
-  });
-
   const grantAccessMutation = useMutation({
     mutationFn: async (appId: number) => {
       const { data } = await api.post(`/admin/applications/${appId}/grant-access`);
@@ -307,7 +266,6 @@ export function UserManagement() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-applications"] });
-      queryClient.invalidateQueries({ queryKey: ["admin-students-without-group"] });
       queryClient.invalidateQueries({ queryKey: ["admin-group-assignment-queue"] });
       setUiToast({ type: "success", text: t("adminGrantAccessSuccess") });
     },
@@ -316,46 +274,21 @@ export function UserManagement() {
     },
   });
 
-  const assignCuratorMutation = useMutation({
-    mutationFn: async ({ appId, groupId }: { appId: number; groupId: number }) => {
-      const { data } = await api.post(`/admin/applications/${appId}/assign-curator`, {
-        group_id: groupId,
-      });
-      return data;
-    },
-    onSuccess: () => {
-      setAssignCuratorModal(null);
-      setAssignCuratorGroupId("");
-      queryClient.invalidateQueries({ queryKey: ["admin-applications"] });
-      queryClient.invalidateQueries({ queryKey: ["admin-group-assignment-queue"] });
-      setUiToast({ type: "success", text: t("adminAssignToCuratorSuccess") });
-    },
-    onError: (e: { response?: { data?: { detail?: string } } }) => {
-      setUiToast({ type: "error", text: e?.response?.data?.detail ?? t("error") });
-    },
-  });
+  /** `tab` query value only — avoids re-running when the searchParams object identity changes every render. */
+  const tabQueryParam = searchParams.get("tab");
 
+  /** Sync tab from URL when using browser back/forward or external navigation (not after selectTab). */
   useEffect(() => {
-    const requestedTab = searchParams.get("tab");
-    if (requestedTab === "group-queue") {
-      if (activeTab !== "group-queue") setActiveTab("group-queue");
-    } else if (activeTab === "group-queue") {
-      setActiveTab("users");
+    if (skipSearchParamsSyncRef.current) {
+      skipSearchParamsSyncRef.current = false;
+      return;
     }
-  }, [searchParams]);
-
-  useEffect(() => {
-    const currentTabParam = searchParams.get("tab");
-    if (activeTab === "group-queue") {
-      if (currentTabParam !== "group-queue") {
-        router.replace("/app/admin/users?tab=group-queue");
-      }
+    if (tabQueryParam === "group-queue") {
+      setActiveTab((prev) => (prev !== "group-queue" ? "group-queue" : prev));
     } else {
-      if (currentTabParam === "group-queue") {
-        router.replace("/app/admin/users");
-      }
+      setActiveTab((prev) => (prev === "group-queue" ? "users" : prev));
     }
-  }, [activeTab, router, searchParams]);
+  }, [tabQueryParam]);
 
   useEffect(() => {
     const next: Record<number, string> = {};
@@ -372,22 +305,6 @@ export function UserManagement() {
       return prev;
     });
   }, [relationRows]);
-
-  useEffect(() => {
-    const next: Record<number, string> = {};
-    for (const app of applications) {
-      next[app.id] = app.status;
-    }
-    setSelectedStatusByApp((prev) => {
-      const prevKeys = Object.keys(prev);
-      const nextKeys = Object.keys(next);
-      if (prevKeys.length !== nextKeys.length) return next;
-      for (const key of nextKeys) {
-        if (prev[Number(key)] !== next[Number(key)]) return next;
-      }
-      return prev;
-    });
-  }, [applications]);
 
   useEffect(() => {
     if (!uiToast) return;
@@ -435,24 +352,6 @@ export function UserManagement() {
       .slice(0, 2);
   };
 
-  const statusLabel = (s: string) => {
-    if (s === "pending") return t("applicationStatusPending");
-    if (s === "paid") return t("applicationStatusPaid");
-    if (s === "approved") return t("applicationStatusApproved");
-    if (s === "rejected") return t("applicationStatusRejected");
-    return s;
-  };
-
-  const getStatusBadgeColor = (status: string) => {
-    const colors: Record<string, string> = {
-      approved: "bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-300 border-green-300 dark:border-green-500/30",
-      paid: "bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-500/30",
-      rejected: "bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300 border-red-300 dark:border-red-500/30",
-      pending: "bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-500/30",
-    };
-    return colors[status] || "bg-gray-100 dark:bg-gray-500/20 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-500/30";
-  };
-
   const formatDate = (d: string | null) => formatLocalizedDate(d, lang as any, t);
   const parentUsers = users.filter((u) => u.role === "parent");
   const queueAwaitingConfirmation = groupQueue?.awaiting_confirmation ?? [];
@@ -492,21 +391,7 @@ export function UserManagement() {
           <BlurFade delay={0.15} duration={0.4} blur="4px" offset={10}>
             <button
               type="button"
-              onClick={() => setActiveTab("group-queue")}
-              className={`px-3 sm:px-4 py-2 font-medium rounded-lg transition-all whitespace-nowrap text-sm sm:text-base shrink-0 snap-start ${activeTab === "group-queue"
-                  ? "text-white shadow-lg"
-                  : isDark ? "text-white/70 hover:text-white hover:bg-white/10" : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-                }`}
-              style={activeTab === "group-queue" ? { background: "linear-gradient(135deg, #FF4181 0%, #B938EB 100%)", boxShadow: "0 0 12px rgba(255, 65, 129, 0.3)" } : undefined}
-            >
-              {t("adminGroupQueueTab")}
-              {groupQueue?.counts?.total ? ` (${groupQueue.counts.total})` : ""}
-            </button>
-          </BlurFade>
-          <BlurFade delay={0.2} duration={0.4} blur="4px" offset={10}>
-            <button
-              type="button"
-              onClick={() => setActiveTab("users")}
+              onClick={() => selectTab("users")}
               className={`px-3 sm:px-4 py-2 font-medium rounded-lg transition-all whitespace-nowrap text-sm sm:text-base shrink-0 snap-start ${activeTab === "users"
                   ? "text-white shadow-lg"
                   : isDark ? "text-white/70 hover:text-white hover:bg-white/10" : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
@@ -516,10 +401,27 @@ export function UserManagement() {
               {t("adminUsersAll")}
             </button>
           </BlurFade>
+          <BlurFade delay={0.2} duration={0.4} blur="4px" offset={10}>
+            <button
+              type="button"
+              onClick={() => selectTab("group-queue")}
+              title={t("adminGroupQueueTabCountHint")}
+              className={`px-3 sm:px-4 py-2 font-medium rounded-lg transition-all whitespace-nowrap text-sm sm:text-base shrink-0 snap-start max-w-[min(100vw-2rem,22rem)] text-left sm:text-center sm:max-w-none ${activeTab === "group-queue"
+                  ? "text-white shadow-lg"
+                  : isDark ? "text-white/70 hover:text-white hover:bg-white/10" : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                }`}
+              style={activeTab === "group-queue" ? { background: "linear-gradient(135deg, #FF4181 0%, #B938EB 100%)", boxShadow: "0 0 12px rgba(255, 65, 129, 0.3)" } : undefined}
+            >
+              <span className="line-clamp-2 sm:line-clamp-none">
+                {t("adminGroupQueueTab")}
+                {groupQueue?.counts?.total != null ? ` (${groupQueue.counts.total})` : ""}
+              </span>
+            </button>
+          </BlurFade>
           <BlurFade delay={0.25} duration={0.4} blur="4px" offset={10}>
             <button
               type="button"
-              onClick={() => setActiveTab("parents")}
+              onClick={() => selectTab("parents")}
               className={`px-3 sm:px-4 py-2 font-medium rounded-lg transition-all whitespace-nowrap text-sm sm:text-base shrink-0 snap-start ${activeTab === "parents"
                   ? "text-white shadow-lg"
                   : isDark ? "text-white/70 hover:text-white hover:bg-white/10" : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
@@ -532,7 +434,7 @@ export function UserManagement() {
           <BlurFade delay={0.3} duration={0.4} blur="4px" offset={10}>
             <button
               type="button"
-              onClick={() => setActiveTab("relations")}
+              onClick={() => selectTab("relations")}
               className={`px-3 sm:px-4 py-2 font-medium rounded-lg transition-all whitespace-nowrap text-sm sm:text-base shrink-0 snap-start ${activeTab === "relations"
                   ? "text-white shadow-lg"
                   : isDark ? "text-white/70 hover:text-white hover:bg-white/10" : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
@@ -540,32 +442,6 @@ export function UserManagement() {
               style={activeTab === "relations" ? { background: "linear-gradient(135deg, #FF4181 0%, #B938EB 100%)", boxShadow: "0 0 12px rgba(255, 65, 129, 0.3)" } : undefined}
             >
               {t("adminRelationsTab")}
-            </button>
-          </BlurFade>
-          <BlurFade delay={0.35} duration={0.4} blur="4px" offset={10}>
-            <button
-              type="button"
-              onClick={() => setActiveTab("without-group")}
-              className={`px-3 sm:px-4 py-2 font-medium rounded-lg transition-all whitespace-nowrap text-sm sm:text-base shrink-0 snap-start ${activeTab === "without-group"
-                  ? "text-white shadow-lg"
-                  : isDark ? "text-white/70 hover:text-white hover:bg-white/10" : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-                }`}
-              style={activeTab === "without-group" ? { background: "linear-gradient(135deg, #FF4181 0%, #B938EB 100%)", boxShadow: "0 0 12px rgba(255, 65, 129, 0.3)" } : undefined}
-            >
-              {t("adminStudentsWithoutGroup")}
-            </button>
-          </BlurFade>
-          <BlurFade delay={0.4} duration={0.4} blur="4px" offset={10}>
-            <button
-              type="button"
-              onClick={() => setActiveTab("applications")}
-              className={`px-3 sm:px-4 py-2 font-medium rounded-lg transition-all whitespace-nowrap text-sm sm:text-base shrink-0 snap-start ${activeTab === "applications"
-                  ? "text-white shadow-lg"
-                  : isDark ? "text-white/70 hover:text-white hover:bg-white/10" : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-                }`}
-              style={activeTab === "applications" ? { background: "linear-gradient(135deg, #FF4181 0%, #B938EB 100%)", boxShadow: "0 0 12px rgba(255, 65, 129, 0.3)" } : undefined}
-            >
-              {t("applicationsList")}
             </button>
           </BlurFade>
         </div>
@@ -612,25 +488,6 @@ export function UserManagement() {
                   </span>
                 </label>
               </>
-            )}
-            {activeTab === "applications" && (
-              <div className="flex flex-wrap gap-2">
-                {["paid", "pending", "approved", "rejected"].map((s, index) => (
-                  <BlurFade key={s} delay={0.25 + index * 0.05} duration={0.4} blur="4px" offset={10}>
-                    <button
-                      type="button"
-                      onClick={() => setStatusFilter(s)}
-                      className={`px-4 py-2 font-medium rounded-lg transition-all ${statusFilter === s
-                          ? "text-white shadow-lg"
-                          : isDark ? "text-white/70 hover:text-white hover:bg-white/10" : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-                        }`}
-                      style={statusFilter === s ? { background: "linear-gradient(135deg, #FF4181 0%, #B938EB 100%)", boxShadow: "0 0 12px rgba(255, 65, 129, 0.3)" } : undefined}
-                    >
-                      {statusLabel(s)}
-                    </button>
-                  </BlurFade>
-                ))}
-              </div>
             )}
           </div>
           {canManageUsers && activeTab === "users" && (
@@ -958,7 +815,7 @@ export function UserManagement() {
                         <td className="py-4 px-6 text-right">
                           <button
                             type="button"
-                            onClick={() => setActiveTab("relations")}
+                            onClick={() => selectTab("relations")}
                             className="py-2 px-4 rounded-lg text-white text-sm"
                             style={{ background: "linear-gradient(135deg, #10b981 0%, #059669 100%)" }}
                           >
@@ -1074,210 +931,6 @@ export function UserManagement() {
                 </tbody>
               </table>
             </div>
-          ) : activeTab === "without-group" ? (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[720px]">
-                <thead style={{ background: isDark ? "rgba(0,0,0,0.3)" : "rgba(0,0,0,0.05)" }}>
-                  <tr>
-                    <th className="text-left py-4 px-6 font-semibold text-sm" style={{ color: textColors.primary }}>
-                      {t("adminFullName")}
-                    </th>
-                    <th className="text-left py-4 px-6 font-semibold text-sm" style={{ color: textColors.primary }}>
-                      {t("email")}
-                    </th>
-                    <th className="text-left py-4 px-6 font-semibold text-sm" style={{ color: textColors.primary }}>
-                      {t("phone")}
-                    </th>
-                    <th className="text-left py-4 px-6 font-semibold text-sm" style={{ color: textColors.primary }}>
-                      {t("courses")}
-                    </th>
-                    <th className="text-left py-4 px-6 font-semibold text-sm" style={{ color: textColors.primary }}>
-                      {t("adminEnrolledAt")}
-                    </th>
-                    <th className="text-right py-4 px-6 font-semibold text-sm w-32" style={{ color: textColors.primary }}>
-                      {t("adminCoursesActions")}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {studentsWithoutGroup.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="py-12 text-center">
-                        <div className="flex flex-col items-center">
-                          <div className="w-16 h-16 rounded-full flex items-center justify-center mb-4" style={{ background: "rgba(139, 92, 246, 0.2)" }}>
-                            <UserPlus className="w-8 h-8" style={{ color: "#8B5CF6" }} />
-                          </div>
-                          <p style={{ color: textColors.secondary }}>{t("adminNoStudentsWithoutGroup")}</p>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : (
-                    studentsWithoutGroup.map((s) => (
-                      <tr key={`${s.id}-${s.course_id}`} className={`border-b ${isDark ? "border-white/10 hover:bg-white/5" : "border-gray-200 hover:bg-gray-50"} transition-colors`}>
-                        <td className="py-4 px-6">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-semibold shrink-0" style={{ background: "linear-gradient(135deg, #14b8a6 0%, #3b82f6 100%)" }}>
-                              {getInitials(s.full_name)}
-                            </div>
-                            <span className="font-medium" style={{ color: textColors.primary }}>{s.full_name}</span>
-                          </div>
-                        </td>
-                        <td className="py-4 px-6" style={{ color: textColors.primary }}>{s.email}</td>
-                        <td className="py-4 px-6" style={{ color: textColors.secondary }}>{s.phone || "—"}</td>
-                        <td className="py-4 px-6" style={{ color: textColors.primary }}>{getLocalizedCourseTitle({ title: s.course_title } as any, t)}</td>
-                        <td className="py-4 px-6" style={{ color: textColors.secondary }}>
-                          {s.enrolled_at ? formatLocalizedDate(s.enrolled_at, lang as any, t) : "—"}
-                        </td>
-                        <td className="py-4 px-6 text-right">
-                          <button
-                            type="button"
-                            onClick={() => setAssignModal(s)}
-                            className="flex items-center gap-2 ml-auto py-2.5 px-4 rounded-xl text-white hover:opacity-90 text-sm font-medium transition-all shadow-lg"
-                            style={{ background: "linear-gradient(135deg, #10b981 0%, #059669 100%)", boxShadow: "0 4px 14px rgba(16, 185, 129, 0.4)" }}
-                          >
-                            <UserPlus className="w-4 h-4" /> {t("adminAssign")}
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          ) : activeTab === "applications" ? (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[800px]">
-                <thead style={{ background: isDark ? "rgba(0,0,0,0.3)" : "rgba(0,0,0,0.05)" }}>
-                  <tr>
-                    <th className="text-left py-4 px-6 font-semibold text-sm" style={{ color: textColors.primary }}>
-                      {t("date")}
-                    </th>
-                    <th className="text-left py-4 px-6 font-semibold text-sm" style={{ color: textColors.primary }}>
-                      {t("email")}
-                    </th>
-                    <th className="text-left py-4 px-6 font-semibold text-sm" style={{ color: textColors.primary }}>
-                      {t("fullName")}
-                    </th>
-                    <th className="text-left py-4 px-6 font-semibold text-sm" style={{ color: textColors.primary }}>
-                      {t("phone")}
-                    </th>
-                    <th className="text-left py-4 px-6 font-semibold text-sm" style={{ color: textColors.primary }}>
-                      {t("parentEmail")}
-                    </th>
-                    <th className="text-left py-4 px-6 font-semibold text-sm" style={{ color: textColors.primary }}>
-                      {t("parentFullName")}
-                    </th>
-                    <th className="text-left py-4 px-6 font-semibold text-sm" style={{ color: textColors.primary }}>
-                      {t("course")}
-                    </th>
-                    <th className="text-left py-4 px-6 font-semibold text-sm" style={{ color: textColors.primary }}>
-                      {t("status")}
-                    </th>
-                    <th className="text-right py-4 px-6 font-semibold text-sm" style={{ color: textColors.primary }}>
-                      {t("actions")}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {applications.length === 0 ? (
-                    <tr>
-                      <td colSpan={9} className="py-12 text-center">
-                        <div className="flex flex-col items-center">
-                          <div className="w-16 h-16 rounded-full flex items-center justify-center mb-4" style={{ background: "rgba(139, 92, 246, 0.2)" }}>
-                            <ClipboardList className="w-8 h-8" style={{ color: "#8B5CF6" }} />
-                          </div>
-                          <p style={{ color: textColors.secondary }}>{t("noApplications")}</p>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : (
-                    applications.map((app) => (
-                      <tr key={app.id} className={`border-b ${isDark ? "border-white/10 hover:bg-white/5" : "border-gray-200 hover:bg-gray-50"} transition-colors`}>
-                        <td className="py-4 px-6 text-sm" style={{ color: textColors.secondary }}>{formatDate(app.created_at)}</td>
-                        <td className="py-4 px-6">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-semibold shrink-0" style={{ background: "linear-gradient(135deg, #14b8a6 0%, #3b82f6 100%)" }}>
-                              {getInitials(app.full_name)}
-                            </div>
-                            <span className="text-sm" style={{ color: textColors.primary }}>{app.email}</span>
-                          </div>
-                        </td>
-                        <td className="py-4 px-6 text-sm font-medium" style={{ color: textColors.primary }}>{app.full_name}</td>
-                        <td className="py-4 px-6 text-sm" style={{ color: textColors.secondary }}>{app.phone || "—"}</td>
-                        <td className="py-4 px-6 text-sm" style={{ color: textColors.secondary }}>{app.parent_email || "—"}</td>
-                        <td className="py-4 px-6 text-sm" style={{ color: textColors.secondary }}>{app.parent_full_name || "—"}</td>
-                        <td className="py-4 px-6 text-sm" style={{ color: textColors.primary }}>{app.course_title ? getLocalizedCourseTitle({ title: app.course_title } as any, t) : "—"}</td>
-                        <td className="py-4 px-6">
-                          <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${getStatusBadgeColor(app.status)}`}>
-                            {statusLabel(app.status)}
-                          </span>
-                        </td>
-                        <td className="py-4 px-6 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <select
-                              value={selectedStatusByApp[app.id] ?? app.status}
-                              onChange={(e) =>
-                                setSelectedStatusByApp((prev) => ({
-                                  ...prev,
-                                  [app.id]: e.target.value,
-                                }))
-                              }
-                              className="border-0 rounded-lg px-3 py-2 text-sm"
-                              style={inputStyle}
-                            >
-                              <option value="paid">{statusLabel("paid")}</option>
-                              <option value="pending">{statusLabel("pending")}</option>
-                              <option value="approved">{statusLabel("approved")}</option>
-                              <option value="rejected">{statusLabel("rejected")}</option>
-                            </select>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                applicationStatusMutation.mutate({
-                                  appId: app.id,
-                                  status: selectedStatusByApp[app.id] ?? app.status,
-                                })
-                              }
-                              disabled={
-                                applicationStatusMutation.isPending ||
-                                (selectedStatusByApp[app.id] ?? app.status) === app.status
-                              }
-                              className="py-2 px-3 rounded-lg text-white text-sm disabled:opacity-60"
-                              style={{ background: "linear-gradient(135deg, #10b981 0%, #059669 100%)" }}
-                            >
-                              {t("save")}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => grantAccessMutation.mutate(app.id)}
-                              disabled={grantAccessMutation.isPending}
-                              className="py-2 px-3 rounded-lg text-white text-sm disabled:opacity-60"
-                              style={{ background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)" }}
-                              title={t("adminGrantAccessHint")}
-                            >
-                              {grantAccessMutation.isPending ? "..." : t("adminGrantAccess")}
-                            </button>
-                            {app.status === "paid" && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setAssignCuratorModal({ appId: app.id, courseId: app.course_id });
-                                  setAssignCuratorGroupId("");
-                                }}
-                                className="py-2 px-3 rounded-lg text-white text-sm"
-                                style={{ background: "linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)" }}
-                              >
-                                {t("adminAssignToCurator")}
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
           ) : null}
         </div>
       </BlurFade>
@@ -1287,65 +940,10 @@ export function UserManagement() {
           student={assignModal}
           onClose={() => setAssignModal(null)}
           onSuccess={() => {
-            queryClient.invalidateQueries({ queryKey: ["admin-students-without-group"] });
             queryClient.invalidateQueries({ queryKey: ["admin-group-assignment-queue"] });
             setAssignModal(null);
           }}
         />
-      )}
-
-      {assignCuratorModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" role="dialog" aria-modal="true">
-          <div className="rounded-xl shadow-xl p-6 max-w-md mx-4 w-full" style={modalStyle}>
-            <h2 className="text-lg font-semibold mb-2" style={{ color: textColors.primary }}>{t("adminAssignToCurator")}</h2>
-            <p className="text-sm mb-4" style={{ color: textColors.secondary }}>{t("adminAssignToCuratorHint")}</p>
-            {applicationTeacherGroups.length === 0 ? (
-              <p className="text-sm" style={{ color: "#f59e0b" }}>{t("adminNoGroupsForCourse")}</p>
-            ) : (
-              <select
-                value={assignCuratorGroupId}
-                onChange={(e) => setAssignCuratorGroupId(e.target.value ? Number(e.target.value) : "")}
-                className="w-full border-0 rounded-lg px-3 py-2 mb-4"
-                style={inputStyle}
-              >
-                <option value="">— {t("adminSelectNone")}</option>
-                {applicationTeacherGroups.map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {g.group_name} ({g.teacher_name})
-                  </option>
-                ))}
-              </select>
-            )}
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setAssignCuratorModal(null);
-                  setAssignCuratorGroupId("");
-                }}
-                className="flex-1 py-2 rounded-lg"
-                style={{ border: "1px solid rgba(148,163,184,0.4)", color: textColors.primary }}
-              >
-                {t("cancel")}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (typeof assignCuratorGroupId !== "number") return;
-                  assignCuratorMutation.mutate({
-                    appId: assignCuratorModal.appId,
-                    groupId: assignCuratorGroupId,
-                  });
-                }}
-                disabled={assignCuratorMutation.isPending || typeof assignCuratorGroupId !== "number"}
-                className="flex-1 py-2 rounded-lg text-white disabled:opacity-50"
-                style={{ background: "linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)" }}
-              >
-                {assignCuratorMutation.isPending ? "..." : t("adminAssignConfirm")}
-              </button>
-            </div>
-          </div>
-        </div>
       )}
 
       {uiToast && (
@@ -1613,11 +1211,21 @@ function AddUserModal({
   const isDark = theme === "dark";
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="rounded-xl shadow-xl p-6 max-w-3xl mx-4 w-full border-0 backdrop-blur-xl max-h-[90vh] overflow-y-auto" style={modalStyle}>
-        <h3 className="font-semibold mb-4 text-lg" style={{ color: textColors.primary }}>{t("adminAddUserTitle")}</h3>
+    <div
+      className="fixed inset-0 z-[200] flex items-end justify-center sm:items-center bg-black/50 backdrop-blur-sm p-0 sm:p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="admin-add-user-title"
+    >
+      <div
+        className="w-full sm:max-w-3xl max-h-[min(92dvh,100vh)] sm:max-h-[90vh] overflow-y-auto rounded-t-2xl sm:rounded-xl shadow-xl p-4 sm:p-6 border-0 backdrop-blur-xl pb-[max(1rem,env(safe-area-inset-bottom))]"
+        style={modalStyle}
+      >
+        <h3 id="admin-add-user-title" className="font-semibold mb-4 text-base sm:text-lg" style={{ color: textColors.primary }}>
+          {t("adminAddUserTitle")}
+        </h3>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
             {/* Левая колонка */}
             <div className="space-y-4">
               <div>
@@ -1729,7 +1337,7 @@ function AddUserModal({
               </div>
               <div>
                 <label className="block text-xs mb-1" style={{ color: textColors.secondary }}>{t("adminOrAddNewParent")}</label>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <input
                     type="email"
                     value={parentEmail}
@@ -1767,7 +1375,7 @@ function AddUserModal({
                     value={parentCity}
                     onChange={(e) => setParentCity(e.target.value)}
                     placeholder={t("parentCity")}
-                    className="w-full border-0 rounded-lg px-3 py-2 text-sm md:col-span-2"
+                    className="w-full border-0 rounded-lg px-3 py-2 text-sm sm:col-span-2"
                     style={inputStyle}
                   />
                 </div>
@@ -1776,11 +1384,11 @@ function AddUserModal({
           )}
 
           {error && <p className="text-red-400 text-sm">{error}</p>}
-          <div className="flex gap-2 justify-end">
+          <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end pt-3">
             <button
               type="button"
               onClick={onClose}
-              className="py-2 px-4 rounded-lg hover:opacity-90"
+              className="w-full sm:w-auto py-3 sm:py-2 px-4 rounded-xl sm:rounded-lg hover:opacity-90 text-center"
               style={{ background: isDark ? "rgba(30, 41, 59, 0.7)" : "rgba(0, 0, 0, 0.05)", border: isDark ? "1px solid rgba(255, 255, 255, 0.1)" : "1px solid rgba(0, 0, 0, 0.12)", color: textColors.primary }}
             >
               {t("cancel")}
@@ -1788,7 +1396,7 @@ function AddUserModal({
             <button
               type="submit"
               disabled={createMutation.isPending}
-              className="py-2 px-4 rounded-lg text-white hover:opacity-90"
+              className="w-full sm:w-auto py-3 sm:py-2 px-4 rounded-xl sm:rounded-lg text-white hover:opacity-90"
               style={{ background: "linear-gradient(135deg, #FF4181 0%, #B938EB 100%)" }}
             >
               {createMutation.isPending ? t("loading") : t("adminAddUser")}
@@ -2384,7 +1992,6 @@ function AssignStudentModal({
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-students-without-group"] });
       onSuccess();
     },
   });
@@ -2397,47 +2004,71 @@ function AssignStudentModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="rounded-xl shadow-xl p-6 max-w-md mx-4 w-full border-0 backdrop-blur-xl" style={{ background: "rgba(26, 34, 56, 0.95)", backdropFilter: "blur(12px)", border: "1px solid rgba(255, 255, 255, 0.08)" }}>
-        <h3 className="font-semibold text-white mb-2">
-          {t("adminAssignTitle")}
-        </h3>
-        <p className="text-sm mb-4" style={{ color: "#94A3B8" }}>
-          {student.full_name} ({student.email}) — {getLocalizedCourseTitle({ title: student.course_title } as any, t)}
-        </p>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-1" style={{ color: "#94A3B8" }}>
-              {t("adminAssignGroup")} ({t("adminAssignTeacher")})
-            </label>
-            <select
-              value={groupId}
-              onChange={(e) => setGroupId(e.target.value ? Number(e.target.value) : "")}
-              className="w-full border-0 rounded-lg px-3 py-2 text-white"
-              style={{ background: "rgba(30, 41, 59, 0.7)", border: "1px solid rgba(255, 255, 255, 0.1)" }}
-              required
-            >
-              <option value="">— {t("adminSelectNone")}</option>
-              {groups.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.group_name} ({g.teacher_name})
-                </option>
-              ))}
-            </select>
+    <div
+      className="fixed inset-0 z-[200] flex items-end justify-center sm:items-center bg-black/60 backdrop-blur-sm p-0 sm:p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="assign-student-modal-title"
+      onClick={onClose}
+    >
+      <div
+        className="rounded-t-2xl sm:rounded-xl shadow-2xl w-full max-w-md max-h-[min(90dvh,100vh)] flex flex-col border-0 sm:mx-4 overflow-hidden"
+        style={{ background: "rgba(26, 34, 56, 0.98)", backdropFilter: "blur(12px)", border: "1px solid rgba(255, 255, 255, 0.1)" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3 px-5 pt-5 pb-3 sm:px-6 sm:pt-6 shrink-0 border-b border-white/10">
+          <div className="min-w-0 flex-1 pr-2">
+            <h3 id="assign-student-modal-title" className="font-semibold text-white text-base sm:text-lg leading-snug">
+              {t("adminAssignTitle")}
+            </h3>
+            <p className="text-sm mt-2 break-words" style={{ color: "#94A3B8" }}>
+              {student.full_name} ({student.email}) — {getLocalizedCourseTitle({ title: student.course_title } as any, t)}
+            </p>
           </div>
-          <div className="flex gap-2 justify-end pt-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="shrink-0 rounded-xl p-2.5 text-white/90 hover:bg-white/10 hover:text-white transition-colors"
+            aria-label={t("close")}
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 px-5 sm:px-6">
+          <div className="overflow-y-auto flex-1 py-4 space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-1" style={{ color: "#94A3B8" }}>
+                {t("adminAssignGroup")} ({t("adminAssignTeacher")})
+              </label>
+              <select
+                value={groupId}
+                onChange={(e) => setGroupId(e.target.value ? Number(e.target.value) : "")}
+                className="w-full border-0 rounded-lg px-3 py-2.5 text-white text-base"
+                style={{ background: "rgba(30, 41, 59, 0.7)", border: "1px solid rgba(255, 255, 255, 0.1)" }}
+                required
+              >
+                <option value="">— {t("adminSelectNone")}</option>
+                {groups.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.group_name} ({g.teacher_name})
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="shrink-0 flex flex-col-reverse sm:flex-row gap-2 sm:justify-end pt-2 border-t border-white/10 mt-2 pb-[calc(5.25rem+env(safe-area-inset-bottom))] sm:pb-4">
             <button
               type="button"
               onClick={onClose}
-              className="py-2 px-4 rounded-lg text-white hover:opacity-90"
-              style={{ background: "rgba(30, 41, 59, 0.7)", border: "1px solid rgba(255, 255, 255, 0.1)" }}
+              className="w-full sm:w-auto py-3.5 sm:py-2.5 px-4 rounded-xl sm:rounded-lg text-white hover:opacity-90"
+              style={{ background: "rgba(30, 41, 59, 0.85)", border: "1px solid rgba(255, 255, 255, 0.12)" }}
             >
               {t("cancel")}
             </button>
             <button
               type="submit"
               disabled={createTaskMutation.isPending || groupId === ""}
-              className="py-2 px-4 rounded-lg text-white hover:opacity-90 disabled:opacity-50"
+              className="w-full sm:w-auto py-3.5 sm:py-2.5 px-4 rounded-xl sm:rounded-lg text-white hover:opacity-90 disabled:opacity-50"
               style={{ background: "linear-gradient(135deg, #FF4181 0%, #B938EB 100%)" }}
             >
               {t("adminAssignConfirm")}

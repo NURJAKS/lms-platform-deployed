@@ -1,3 +1,4 @@
+import logging
 from typing import Annotated
 from datetime import datetime, timezone, timedelta, date
 
@@ -16,6 +17,8 @@ from app.models.assignment_submission import AssignmentSubmission
 from app.models.group_student import GroupStudent
 from app.models.progress import StudentProgress
 from app.services.ai_service import chat_with_openai
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
@@ -213,8 +216,14 @@ def ai_chat(
         assignment_id=active_assignment_id,
     )
     db.add(record)
-    db.commit()
-    db.refresh(record)
+    try:
+        db.commit()
+        db.refresh(record)
+    except Exception:
+        db.rollback()
+        logger.exception("AI chat history commit failed; returning reply without persisted id")
+        return ChatResponse(response=response_text, message_id=None)
+
     return ChatResponse(response=response_text, message_id=record.id)
 
 

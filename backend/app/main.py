@@ -99,6 +99,7 @@ uploads_path = Path(__file__).resolve().parent.parent / "uploads"
 uploads_path.mkdir(parents=True, exist_ok=True)
 (uploads_path / "videos").mkdir(exist_ok=True)
 (uploads_path / "certificates").mkdir(exist_ok=True)
+(uploads_path / "certificates" / "issued").mkdir(exist_ok=True)
 (uploads_path / "avatars").mkdir(exist_ok=True)
 (uploads_path / "submissions").mkdir(exist_ok=True)
 (uploads_path / "topic-synopsis").mkdir(exist_ok=True)

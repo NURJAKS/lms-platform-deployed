@@ -315,8 +315,13 @@ export default function TeacherAssignmentPage() {
     : [];
   const activeFile = selectedFileUrl ?? selectedFiles[0] ?? null;
   const activeFileIndex = activeFile ? selectedFiles.findIndex((u) => u === activeFile) : -1;
-  const fileNameFromUrl = (u: string, i: number) =>
-    u.split("/").pop()?.split("?")[0] || t("teacherGradingFileFallback").replace("{n}", String(i + 1));
+  const fileNameFromUrl = (u: string, i: number) => {
+    const rawName = u.split("/").pop()?.split("?")[0] || t("teacherGradingFileFallback").replace("{n}", String(i + 1));
+    if (rawName.length > 20) {
+      return rawName.slice(0, 15) + "..." + (rawName.includes(".") ? rawName.split(".").pop() : "");
+    }
+    return rawName;
+  };
   const openFileGradingTab = (fileIndex: number) => {
     const studentId = selectedSubmission?.student_id ?? selectedStudentId;
     if (studentId == null) return;
@@ -711,28 +716,24 @@ export default function TeacherAssignmentPage() {
                             key={`${u}-${i}`}
                             type="button"
                             onClick={() => openFileGradingTab(i)}
-                            className={`rounded-2xl border p-4 text-left transition-colors ${
+                            className={`relative rounded-2xl border p-4 text-left transition-all duration-300 ${
                               u === activeFile
-                                ? "border-blue-200 bg-blue-50 shadow-sm dark:border-blue-800 dark:bg-blue-950/30"
+                                ? "border-blue-500 bg-blue-50/50 shadow-md ring-2 ring-blue-500/20 dark:border-blue-400 dark:bg-blue-500/10"
                                 : "border-gray-200 bg-gray-50 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700"
                             }`}
                           >
-                            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-2.5 overflow-hidden">
-                              <FileText className="mt-0.5 h-5 w-5 shrink-0 text-[var(--qit-primary)]" />
-                              <div className="min-w-0 flex-1 overflow-hidden w-full">
-                                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-2">
-                                  <span className="min-w-0 flex-1 text-base font-semibold leading-snug break-words sm:truncate">
+                            <div className="flex items-start gap-2.5 overflow-visible">
+                              <FileText className={cn("mt-1.5 h-5 w-5 shrink-0", u === activeFile ? "text-blue-600 dark:text-blue-400" : "text-[var(--qit-primary)]")} />
+                              <div className="min-w-0 flex-1 w-full relative">
+                                <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                                  <span className={cn("min-w-0 flex-1 text-base font-bold leading-none break-all sm:truncate py-1", u === activeFile ? "text-blue-700 dark:text-blue-300" : "text-gray-900 dark:text-white")}>
                                     {fileNameFromUrl(u, i)}
                                   </span>
-                                  {u === activeFile ? (
-                                    <span className="shrink-0 self-start rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-semibold text-blue-800 dark:bg-blue-950/90 dark:text-blue-100 border border-blue-200/80 dark:border-blue-700/80 whitespace-normal text-left max-w-full">
-                                      {t("teacherFileActive")}
-                                    </span>
-                                  ) : null}
+                                  {/* Active checkmark removed as requested */}
                                 </div>
                               </div>
                             </div>
-                            <span className="mt-2 block text-sm text-gray-600 dark:text-gray-300">
+                            <span className={cn("mt-2 block text-sm font-medium", u === activeFile ? "text-blue-600 dark:text-blue-400" : "text-gray-500 dark:text-gray-400")}>
                                 {/\.(jpeg|jpg|gif|png|webp)$/i.test(u.split("?")[0])
                                   ? t("teacherAssignmentOpenLink")
                                   : t("teacherDownloadFile")}

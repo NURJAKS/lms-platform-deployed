@@ -790,11 +790,24 @@ export default function AIChallengePage() {
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="relative text-center">
             <div className="w-16 h-16 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin mx-auto" />
-            <p className="mt-4 text-center text-gray-600 dark:text-gray-400">
-              {startMutation.isError
-                ? getApiErrorMessage(startMutation.error, t("error"))
-                : t("aiJoining")}
-            </p>
+            <div className="mt-4 space-y-2">
+              <p className="text-center text-gray-600 dark:text-gray-400 font-medium">
+                {startMutation.isError
+                  ? getApiErrorMessage(startMutation.error, t("error"))
+                  : t("aiJoining")}
+              </p>
+              {!startMutation.isError && (
+                <div className="flex flex-col items-center gap-1 opacity-70">
+                  <div className="flex items-center gap-2 text-xs text-purple-600 dark:text-purple-400">
+                    <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                    {t("aiVerifying")}
+                  </div>
+                  <p className="text-[10px] text-gray-500 dark:text-gray-400 italic">
+                    {t("aiAnalyzingStrategy")}
+                  </p>
+                </div>
+              )}
+            </div>
             {startMutation.isError && (
               <div className="mt-4 space-y-2">
                 <Link
@@ -843,9 +856,18 @@ export default function AIChallengePage() {
                   <Star className="w-full h-full text-blue-400 fill-current" />
                 </div>
               </div>
-              <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent mb-2">
+              <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent mb-1">
                 {t("aiVsStudent")}
               </h1>
+              
+              <div className="flex items-center justify-center gap-2 mb-4 animate-in fade-in zoom-in duration-700 delay-300">
+                <div className="px-3 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-800 flex items-center gap-1.5 shadow-sm">
+                  <Bot className="w-3.5 h-3.5 text-purple-600" />
+                  <span className="text-[10px] font-bold text-purple-700 dark:text-purple-300 uppercase tracking-wider">
+                    {t("aiPoweredByGemini")}
+                  </span>
+                </div>
+              </div>
               <p className="text-gray-600 dark:text-gray-400 mb-6">
                 {gameMode === "flashcard"
                   ? t("aiGameDescriptionFlashcardTrack").replace("{track}", topicDescriptionLabel)

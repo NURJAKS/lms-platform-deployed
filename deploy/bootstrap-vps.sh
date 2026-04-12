@@ -17,7 +17,7 @@ if [[ ! -f .env.deploy ]]; then
     KEY="$(openssl rand -hex 32)"
     sed -i.bak "s/^SECRET_KEY=.*/SECRET_KEY=${KEY}/" .env.deploy && rm -f .env.deploy.bak 2>/dev/null || true
   fi
-  echo "Создан .env.deploy — проверьте ALLOWED_ORIGINS и FRONTEND_PUBLIC_URL перед продакшеном."
+  echo "Создан .env.deploy — задайте POSTGRES_PASSWORD, проверьте ALLOWED_ORIGINS и FRONTEND_PUBLIC_URL."
 fi
 
 echo "Сборка и запуск docker compose..."

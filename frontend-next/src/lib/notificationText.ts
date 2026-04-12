@@ -122,6 +122,27 @@ export function getLocalizedNotificationText<K extends string>(
         title: T("notificationTestFailedTitle"),
         message: T("notificationTestFailedBody"),
       };
+    case "support_ticket": {
+      try {
+        const p = JSON.parse(n.message) as { student_name: string; course_title?: string | null; message_snippet: string };
+        const title = T("notificationSupportTicketTitle");
+        const bodyTemplate = p.course_title
+          ? T("notificationSupportTicketBodyWithCourse")
+          : T("notificationSupportTicketBody");
+
+        const message = bodyTemplate
+          .replace("{student_name}", p.student_name)
+          .replace("{course_title}", p.course_title || "")
+          .replace("{message_snippet}", p.message_snippet);
+
+        return { title, message };
+      } catch {
+        return {
+          title: n.title,
+          message: n.message,
+        };
+      }
+    }
     default:
       return {
         title: n.title,

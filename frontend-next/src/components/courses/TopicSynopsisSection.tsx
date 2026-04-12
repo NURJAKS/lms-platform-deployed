@@ -7,6 +7,7 @@ import { api } from "@/api/client";
 import { useLanguage } from "@/context/LanguageContext";
 import type { AxiosError } from "axios";
 import { cn } from "@/lib/utils";
+import { ALLOWED_EXTENSIONS_STR, ALLOWED_EXTENSIONS_HINT } from "@/constants/fileTypes";
 
 type AssignmentRow = {
   id: number;
@@ -196,6 +197,7 @@ export function TopicSynopsisSection({ topicId, courseId }: Props) {
         ref={fileInputRef}
         type="file"
         className="hidden"
+        accept={ALLOWED_EXTENSIONS_STR}
         onChange={(e) => {
           const f = e.target.files?.[0];
           if (f) uploadMutation.mutate(f);
@@ -239,15 +241,20 @@ export function TopicSynopsisSection({ topicId, courseId }: Props) {
 
       {/* Add file button */}
       {!synopsis.submitted && !isLocked && (
-        <button
-          type="button"
-          disabled={isBusy || attachments.length >= 5}
-          onClick={() => fileInputRef.current?.click()}
-          className="mb-4 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 border-dashed border-teal-300 dark:border-teal-800 text-teal-700 dark:text-teal-400 hover:bg-teal-100/50 dark:hover:bg-teal-900/30 transition-all text-sm font-bold"
-        >
-          {uploadMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-          {t("topicFlowChooseFile")}
-        </button>
+        <div className="space-y-2 mb-4">
+          <button
+            type="button"
+            disabled={isBusy || attachments.length >= 5}
+            onClick={() => fileInputRef.current?.click()}
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 border-dashed border-teal-300 dark:border-teal-800 text-teal-700 dark:text-teal-400 hover:bg-teal-100/50 dark:hover:bg-teal-900/30 transition-all text-sm font-bold"
+          >
+            {uploadMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+            {t("topicFlowChooseFile")}
+          </button>
+          <p className="text-[10px] font-medium text-center" style={{ color: "#F87171" }}>
+            {t("onlyAllowedExtensions").replace("{extensions}", ALLOWED_EXTENSIONS_HINT)}
+          </p>
+        </div>
       )}
 
       {/* Note textarea */}

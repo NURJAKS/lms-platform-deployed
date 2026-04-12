@@ -6,6 +6,7 @@ import { api } from "@/api/client";
 import { useLanguage } from "@/context/LanguageContext";
 import { formatLocalizedDate } from "@/utils/dateUtils";
 import { useAuthStore } from "@/store/authStore";
+import { toast } from "@/store/notificationStore";
 import { MessageCircle, Send, CheckCircle2, AlertCircle, Loader2, BookOpen, Activity } from "lucide-react";
 import type { Course } from "@/types";
 
@@ -54,6 +55,10 @@ export default function StudentSupportPage() {
       setMessage("");
       setSelectedCourseId("");
       queryClient.invalidateQueries({ queryKey: ["my-support-tickets"] });
+      toast.success(t("supportTicketSent"));
+    },
+    onError: () => {
+      toast.error(t("error"));
     },
   });
 
@@ -118,19 +123,7 @@ export default function StudentSupportPage() {
                 />
               </div>
 
-              {sendTicket.isSuccess && (
-                <div className="flex items-center gap-2 p-4 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 rounded-xl border border-emerald-100 dark:border-emerald-800/30">
-                  <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
-                  <p className="text-sm font-medium">{t("supportTicketSent")}</p>
-                </div>
-              )}
 
-              {sendTicket.isError && (
-                <div className="flex items-center gap-2 p-4 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 rounded-xl border border-red-100 dark:border-red-800/30">
-                  <AlertCircle className="w-5 h-5 flex-shrink-0" />
-                  <p className="text-sm font-medium">{t("error")}</p>
-                </div>
-              )}
 
               <button
                 type="submit"

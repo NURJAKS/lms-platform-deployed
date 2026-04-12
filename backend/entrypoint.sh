@@ -49,6 +49,15 @@ while True:
 END
 echo "Postgres is up!"
 
+# Первый запуск с пустым томом uploads: шаблоны сертификатов и демо-файлы из образа (см. Dockerfile /opt/lms-bundled/uploads)
+if [ -z "$(ls -A /app/uploads 2>/dev/null)" ]; then
+  if [ -d /opt/lms-bundled/uploads ]; then
+    echo "Populating /app/uploads from bundle (certificates template, etc.)."
+    mkdir -p /app/uploads
+    cp -a /opt/lms-bundled/uploads/. /app/uploads/
+  fi
+fi
+
 python init_db.py
 python seed_data.py 2>/dev/null || true
 python seed_shop.py 2>/dev/null || true

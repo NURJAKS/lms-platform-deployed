@@ -3,7 +3,7 @@
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { isAxiosError } from "axios";
 import { api } from "@/api/client";
 import { useLanguage } from "@/context/LanguageContext";
@@ -36,7 +36,7 @@ function hasVideo(topic: { title: string; video_url?: string | null }): boolean 
 function buildVideoSrc(
   videoUrl: string | undefined | null,
 ): string | undefined {
-  if (!videoUrl) return undefined;
+  if (!videoUrl || videoUrl === "undefined" || videoUrl === "null") return undefined;
   return videoUrl.startsWith("http") ? videoUrl : videoUrl.startsWith("/") ? videoUrl : `/uploads/${videoUrl}`;
 }
 
@@ -244,7 +244,7 @@ export default function TopicViewPage() {
     }
   }, [tId, videoWatched]);
 
-  const onVideoProgress = (seconds: number) => {
+  const onVideoProgress = useCallback((seconds: number) => {
     setLocalWatchedSeconds(seconds);
 
     const denom = duration > 0 ? duration : 1;
@@ -286,7 +286,7 @@ export default function TopicViewPage() {
           }
         });
     }
-  };
+  }, [cId, duration, hasShownTheoryCoinsToast, progress?.is_completed, queryClient, t, tId, topic, userId]);
 
   useEffect(() => {
     if (!validTopicId || !isVideoTopic || actualVideoDuration == null || actualVideoDuration <= 0 || localWatchedSeconds <= 0) {
@@ -513,7 +513,7 @@ export default function TopicViewPage() {
                   </p>
                 </div>
               )}
-              <div className="bg-black rounded-lg overflow-hidden mb-4 w-full max-w-4xl mx-auto relative min-h-[180px] sm:min-h-[220px]">
+              <div className="bg-black rounded-lg overflow-hidden mb-4 w-full max-w-4xl mx-auto relative">
                 {!isPremium && dailyVideoLimit && !dailyVideoLimit.is_allowed && (
                   <div className="absolute inset-0 bg-black/70 z-10 flex items-center justify-center">
                     <div className="text-center text-white p-6">

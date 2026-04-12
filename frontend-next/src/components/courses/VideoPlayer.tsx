@@ -2,10 +2,8 @@
 
 import { useRef, useState, useEffect, useCallback } from "react";
 import dynamic from "next/dynamic";
-import { Gauge, SkipForward } from "lucide-react";
+import { Gauge, SkipForward, Loader2, AlertCircle } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
-
-const ReactPlayer = dynamic(() => import("react-player"), { ssr: false });
 
 /** Matches progressInterval (ms) below */
 const PROGRESS_INTERVAL_SEC = 1;
@@ -15,6 +13,15 @@ const MAX_STEP_SLACK = 3;
 function maxAllowedForwardStep(playbackRate: number) {
   return playbackRate * PROGRESS_INTERVAL_SEC * MAX_STEP_COEFF + MAX_STEP_SLACK;
 }
+
+const ReactPlayer = dynamic(() => import("react-player"), { 
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-full flex items-center justify-center bg-black/90 aspect-video rounded-lg">
+      <Loader2 className="w-8 h-8 text-purple-500 animate-spin" />
+    </div>
+  )
+});
 
 interface VideoPlayerProps {
   src?: string;
@@ -38,6 +45,8 @@ export function VideoPlayer({
   const { t } = useLanguage();
   const playerRef = useRef<any>(null);
   const [mounted, setMounted] = useState(false);
+  const [isReady, setIsReady] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [watched, setWatched] = useState(initialWatched);
   const [playbackRate, setPlaybackRate] = useState(1.0);
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
@@ -70,6 +79,8 @@ export function VideoPlayer({
   useEffect(() => {
     syncRefsFromInitial(initialWatched);
     setHasSetInitialProgress(false);
+    setIsReady(false);
+    setError(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only reset player bookkeeping when the media URL changes
   }, [src]);
 
@@ -192,11 +203,15 @@ export function VideoPlayer({
   }, [showSpeedMenu]);
 
   if (!mounted) {
-    return <div className="relative bg-black rounded-lg overflow-hidden aspect-video skeleton-pulse" />;
+    return (
+      <div className="relative bg-black rounded-lg overflow-hidden aspect-video flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-purple-500 animate-spin" />
+      </div>
+    );
   }
 
   return (
-    <div className="relative bg-black rounded-lg overflow-hidden aspect-video">
+    <div className="relative w-full bg-black rounded-lg overflow-hidden aspect-video">
       {videoSrc ? (
         <>
           {showSkipWarning && (
@@ -206,22 +221,53 @@ export function VideoPlayer({
             </div>
           )}
 
-          <div className="w-full h-full">
+          {!isReady && !error && (
+            <div className="absolute inset-0 z-[25] flex items-center justify-center bg-black/60 pointer-events-none">
+              <div className="flex flex-col items-center gap-2">
+                <Loader2 className="w-10 h-10 text-purple-500 animate-spin" />
+                <span className="text-white text-sm font-medium">{t("loading")}...</span>
+              </div>
+            </div>
+          )}
+
+          {error && (
+            <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/80 p-6">
+              <div className="text-center text-white">
+                <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-3" />
+                <p className="font-semibold mb-2">{t("videoLoadError") || "Error loading video"}</p>
+                <button 
+                  onClick={() => { setError(null); setIsReady(false); }}
+                  className="px-4 py-2 bg-purple-600 rounded-lg text-sm hover:bg-purple-700 transition-colors"
+                >
+                  {t("retry") || "Retry"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="absolute inset-0 z-0 min-h-0 overflow-hidden [&>div]:!h-full [&>div]:!w-full [&>div]:!min-h-0">
             <Player
               ref={playerRef}
               url={videoSrc}
               controls={!disabled}
               width="100%"
               height="100%"
+              playsinline
               progressInterval={1000}
+              playing={false} // Force manual play to avoid autoplay issues
               playbackRate={isPremium ? playbackRate : 1.0}
               onProgress={handleProgress}
               onSeek={handleSeek}
               onEnded={handleEnded}
+              onError={(e: any) => {
+                console.error("Video error:", e);
+                setError("Failed to load video");
+              }}
               onDuration={(dur: number) => {
                 if (onDurationLoaded) onDurationLoaded(Math.floor(dur));
               }}
               onReady={() => {
+                setIsReady(true);
                 if (initialWatched > 0 && playerRef.current && !hasSetInitialProgress) {
                   playerRef.current.seekTo(initialWatched, "seconds");
                   syncRefsFromInitial(initialWatched);
@@ -243,6 +289,7 @@ export function VideoPlayer({
                 file: {
                   attributes: {
                     controlsList: "nodownload",
+                    preload: "auto",
                   },
                 },
               }}
@@ -250,7 +297,7 @@ export function VideoPlayer({
           </div>
 
           {isPremium && !disabled && (
-            <div className="absolute top-4 right-4 z-10">
+            <div className="absolute top-4 right-4 z-30 pointer-events-auto">
               <div className="relative" ref={speedMenuRef}>
                 <button
                   type="button"

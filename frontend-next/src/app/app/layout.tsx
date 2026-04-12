@@ -8,6 +8,7 @@ import { useSidebar } from "@/context/SidebarContext";
 import { AppDashboardSidebar } from "@/components/dashboard/AppDashboardSidebar";
 import { AppDashboardHeader } from "@/components/dashboard/AppDashboardHeader";
 import { MobileBottomNav } from "@/components/dashboard/MobileBottomNav";
+import { AIChatWidget } from "@/components/ai/AIChatWidget";
 
 export default function AppLayout({
   children,
@@ -54,6 +55,7 @@ export default function AppLayout({
         </main>
       </div>
       <MobileBottomNav />
+      <AIChatWidget />
     </div>
   );
 }

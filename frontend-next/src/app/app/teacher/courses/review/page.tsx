@@ -220,24 +220,24 @@ export default function TeacherCoursesReviewPage() {
                   </div>
                 </div>
                 <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6 text-sm sm:justify-end w-full sm:w-auto">
-                  <div className="grid grid-cols-3 sm:flex items-center gap-4 sm:gap-6 flex-1 sm:flex-none">
-                    <div className="text-center">
-                      <div className="font-semibold text-base sm:text-sm" style={{ color: textColors.primary }}>
+                  <div className="grid grid-cols-3 gap-1 sm:flex sm:items-center sm:gap-6 w-full sm:w-auto flex-1 sm:flex-none min-w-0">
+                    <div className="text-center min-w-0">
+                      <div className="font-bold text-base sm:text-sm" style={{ color: textColors.primary }}>
                         {submittedToReview}
                       </div>
-                      <div className="text-[10px] sm:text-xs uppercase tracking-wider opacity-70" style={{ color: textColors.secondary }}>{t("submitted")}</div>
+                      <div className="text-[9px] sm:text-[10px] uppercase tracking-wider opacity-70 break-words leading-tight" style={{ color: textColors.secondary }}>{t("submitted")}</div>
                     </div>
-                    <div className="text-center">
-                      <div className="font-semibold text-base sm:text-sm" style={{ color: textColors.primary }}>
+                    <div className="text-center min-w-0">
+                      <div className="font-bold text-base sm:text-sm" style={{ color: textColors.primary }}>
                         {assignedNotSubmitted}
                       </div>
-                      <div className="text-[10px] sm:text-xs uppercase tracking-wider opacity-70" style={{ color: textColors.secondary }}>{t("assigned")}</div>
+                      <div className="text-[9px] sm:text-[10px] uppercase tracking-wider opacity-70 break-words leading-tight" style={{ color: textColors.secondary }}>{t("assigned")}</div>
                     </div>
-                    <div className="text-center">
-                      <div className="font-semibold text-base sm:text-sm" style={{ color: textColors.primary }}>
+                    <div className="text-center min-w-0">
+                      <div className="font-bold text-base sm:text-sm" style={{ color: textColors.primary }}>
                         {gradedDone}
                       </div>
-                      <div className="text-[10px] sm:text-xs uppercase tracking-wider opacity-70" style={{ color: textColors.secondary }}>{t("graded")}</div>
+                      <div className="text-[9px] sm:text-[10px] uppercase tracking-wider opacity-70 break-words leading-tight" style={{ color: textColors.secondary }}>{t("graded")}</div>
                     </div>
                   </div>
                   <div className="relative flex justify-end sm:block">

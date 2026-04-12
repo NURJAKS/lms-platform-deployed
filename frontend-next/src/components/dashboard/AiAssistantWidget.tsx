@@ -4,15 +4,43 @@ import { useState, useRef, useEffect } from "react";
 import { Bot, Send, X } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 import { api } from "@/api/client";
+import { useAuthStore } from "@/store/authStore";
 
 export function AiAssistantWidget() {
   const { t } = useLanguage();
+  const userId = useAuthStore((s) => s.user?.id);
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Array<{ role: "user" | "bot"; text: string }>>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const scrollRefDesktop = useRef<HTMLDivElement>(null);
   const scrollRefMobile = useRef<HTMLDivElement>(null);
+
+  const STORAGE_KEY = "ai-chat-history";
+
+  // Load history
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const key = userId ? `${STORAGE_KEY}-${userId}` : `${STORAGE_KEY}-guest`;
+      const saved = localStorage.getItem(key);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setMessages(parsed);
+          }
+        } catch (e) {}
+      }
+    }
+  }, [userId]);
+
+  // Save history
+  useEffect(() => {
+    if (typeof window !== "undefined" && messages.length > 0) {
+      const key = userId ? `${STORAGE_KEY}-${userId}` : `${STORAGE_KEY}-guest`;
+      localStorage.setItem(key, JSON.stringify(messages.slice(-50)));
+    }
+  }, [messages, userId]);
 
   useEffect(() => {
     scrollRefDesktop.current?.scrollTo(0, scrollRefDesktop.current.scrollHeight);

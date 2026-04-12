@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timezone
 from typing import Annotated
 
@@ -50,14 +51,20 @@ def create_support_ticket(
     db.flush()
 
     staff_users = db.query(User).filter(User.role.in_(("admin", "director", "curator"))).all()
-    course_part = f" по курсу «{course.title}»" if course else ""
+    msg_data = {
+        "student_name": current_user.full_name or current_user.email,
+        "course_title": course.title if course else None,
+        "message_snippet": ticket.message[:180],
+    }
+    msg_json = json.dumps(msg_data, ensure_ascii=False)
+
     for staff in staff_users:
         db.add(
             Notification(
                 user_id=staff.id,
                 type="support_ticket",
                 title="Новое обращение в поддержку",
-                message=f"Студент {current_user.full_name or current_user.email}{course_part}: {ticket.message[:180]}",
+                message=msg_json,
                 link="/app/admin/support",
             )
         )

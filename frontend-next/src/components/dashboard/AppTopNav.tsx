@@ -202,8 +202,8 @@ export function AppTopNav() {
                             }`}
                           >
                             <p className={cn("text-sm", !n.is_read ? "font-bold" : "font-medium text-gray-700 dark:text-gray-200")}>{title}</p>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">{message}</p>
-                            <p className="text-[10px] text-gray-400 mt-1">
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2 break-words">{message}</p>
+                            <p className="text-[10px] text-gray-400 mt-1 whitespace-nowrap">
                               {formatLocalizedDate(n.created_at, lang, t, { includeTime: true, shortMonth: true })}
                             </p>
                           </button>

@@ -1,3 +1,5 @@
+import logging
+from datetime import datetime, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -20,10 +22,11 @@ from app.models.group_student import GroupStudent
 from app.models.course_topic import CourseTopic
 from app.schemas.test import TestResponse, TestQuestionForStudent, TestSubmitRequest, TestSubmitResponse
 from app.services.coins import add_coins, has_received_coins_for_reason
+from app.services.certificate_render import render_certificate_png
 from app.services.topic_flow import can_take_topic_test, topic_test_gate_message
 from app.api.course_access import assert_can_access_course_materials
 
-CERTIFICATE_SAMPLE_URL = "/uploads/certificates/image.png"
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/tests", tags=["tests"])
 
@@ -274,7 +277,6 @@ def submit_test(
             prog.test_score = score
             prog.is_completed = passed
         if prog:
-            from datetime import datetime, timezone
             if passed:
                 prog.completed_at = datetime.now(timezone.utc)
         db.commit()
@@ -287,7 +289,6 @@ def submit_test(
     db.add(n)
 
     if passed and test.is_final:
-        from datetime import datetime, timezone
         existing_cert = db.query(Certificate).filter(
             Certificate.user_id == current_user.id,
             Certificate.course_id == test.course_id,
@@ -300,10 +301,29 @@ def submit_test(
             cert = Certificate(
                 user_id=current_user.id,
                 course_id=test.course_id,
-                certificate_url=CERTIFICATE_SAMPLE_URL,
+                certificate_url="",
                 final_score=score,
             )
             db.add(cert)
+            db.flush()
+            course_row = db.query(Course).filter(Course.id == test.course_id).first()
+            # Полное официальное название курса из БД (например, на казахском в courses.title)
+            course_title = ((course_row.title if course_row else "") or "").strip()
+            student_label = (current_user.full_name or "").strip() or (current_user.email or "Студент")
+            try:
+                cert.certificate_url = render_certificate_png(
+                    cert.id,
+                    student_label,
+                    course_title,
+                    issued_at=datetime.now(timezone.utc),
+                )
+            except Exception:
+                logger.exception(
+                    "certificate_render_failed course_id=%s user_id=%s",
+                    test.course_id,
+                    current_user.id,
+                )
+                cert.certificate_url = "/uploads/certificates/certification.png"
             n_cert = Notification(
                 user_id=current_user.id,
                 type="certificate_issued",

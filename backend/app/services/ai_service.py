@@ -1,9 +1,11 @@
 import re
 import json
-import time
 import random
+import logging
 from app.core.config import settings
 from app.i18n.translations import AI_CHALLENGE_TRANSLATIONS
+
+logger = logging.getLogger(__name__)
 
 # Prefer OpenAI when key is set, otherwise fall back to Gemini
 USE_GEMINI = not bool(settings.OPENAI_API_KEY) and bool(settings.GEMINI_API_KEY)
@@ -17,7 +19,7 @@ if USE_GEMINI:
     def _get_gemini_model():
         global _gemini_model
         if _gemini_model is None:
-            _gemini_model = genai.GenerativeModel("gemini-2.0-flash")
+            _gemini_model = genai.GenerativeModel(settings.GEMINI_MODEL)
         return _gemini_model
 
     def get_openai_client():
@@ -240,7 +242,7 @@ def chat_with_openai(message: str, context: str = "", is_test_context: bool = Fa
             sys += f"\n\nҚосымша контекст (курс/тақырып): {context}"
         try:
             r = client.chat.completions.create(
-                model="gpt-4",
+                model=settings.OPENAI_CHAT_MODEL,
                 messages=[
                     {"role": "system", "content": sys},
                     {"role": "user", "content": message},
@@ -287,7 +289,7 @@ def get_challenge_recommendations(
         client = get_openai_client()
         try:
             r = client.chat.completions.create(
-                model="gpt-4",
+                model=settings.OPENAI_CHAT_MODEL,
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=300,
             )
@@ -314,6 +316,12 @@ def solve_quiz_questions(
     Simulates a real AI opponent by asking an LLM to solve questions.
     Returns a list of dicts with 'question_id', 'answer', 'is_correct', and 'thinking_time'.
     """
+    logger.debug(
+        "solve_quiz_questions: count=%s level=%s mode=%s",
+        len(questions),
+        ai_level,
+        game_mode,
+    )
     if not questions:
         return []
 
@@ -349,7 +357,7 @@ def solve_quiz_questions(
             if cached:
                 return json.loads(cached.response_json)
         except Exception as ce:
-            print(f"Error checking AI cache: {ce}")
+            logger.warning("AI challenge cache read failed: %s", ce)
 
     # 2. If not in cache, call LLM
     prompt = "Here is a list of questions for you to solve as a JSON array of objects:\n"
@@ -381,7 +389,7 @@ def solve_quiz_questions(
         else:
             client = get_openai_client()
             r = client.chat.completions.create(
-                model="gpt-4o-mini",
+                model=settings.OPENAI_CHALLENGE_MODEL,
                 messages=[
                     {"role": "system", "content": CHALLENGE_OPPONENT_PROMPT.format(level=ai_level)},
                     {"role": "user", "content": prompt},
@@ -453,12 +461,12 @@ def solve_quiz_questions(
                 db.add(new_cache)
                 db.commit()
             except Exception as ce:
-                print(f"Error saving to AI cache: {ce}")
+                logger.warning("AI challenge cache save failed: %s", ce)
                 db.rollback()
 
         return final_results
     except Exception as e:
-        print(f"Error in solve_quiz_questions: {e}")
+        logger.exception("solve_quiz_questions LLM/parsing failed: %s", e)
         # Fallback if AI fails
         lo, hi = (1.2, 2.0) if ai_level == "expert" else (2.0, 3.0) if ai_level == "intermediate" else (3.0, 4.0)
         return [

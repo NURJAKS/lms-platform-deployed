@@ -45,3 +45,12 @@ Thumbs.db
 *.swo
 *~
 *.local
+
+# Референс-картинки в корне (jpeg, icons8-*, image copy*.png, image.png, uyfydu6.jpg и т.д.) — не удалять; см. deploy/ROOT_ASSETS_NOTE.txt
+
+# Случайные медиа и логи в корне репозитория (не часть сборки; не коммитить повторно)
+/*.webm
+/*.mp4
+/ngrok.log
+/start.log
+notification_fix_report.txt

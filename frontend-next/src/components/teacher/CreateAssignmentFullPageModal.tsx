@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { X, Plus, ChevronDown, Paperclip, Upload, Link as LinkIcon, CalendarDays, Users, Loader2 } from "lucide-react";
+import { ALLOWED_EXTENSIONS_STR, ALLOWED_EXTENSIONS_HINT } from "@/constants/fileTypes";
 import { api } from "@/api/client";
 import { useLanguage } from "@/context/LanguageContext";
 import { mapApiErrorToUserMessage } from "@/lib/mapApiError";
@@ -444,10 +445,17 @@ export function CreateAssignmentFullPageModal({
     setRubricSortDesc(true);
     setHasQuiz(mode === "assignmentWithTest");
     setQuizQuestions([{ question: "", options: ["", ""], correct_option_index: 0 }]);
-    setQuestionType("short_answer");
-    setQuestionOptions([""]);
-    setCanComment(true);
-    setCanEdit(false);
+    if (initialData?.type === "question") {
+      setQuestionType(initialData.question_type === "single_choice" ? "multiple_choice" : "short_answer");
+      setQuestionOptions(Array.isArray(initialData.options) ? initialData.options : [""]);
+      setCanComment(initialData.can_comment !== false);
+      setCanEdit(!!initialData.can_edit);
+    } else {
+      setQuestionType("short_answer");
+      setQuestionOptions([""]);
+      setCanComment(true);
+      setCanEdit(false);
+    }
     setYoutubeDialogOpen(false);
     setYoutubeSearch("");
     setYoutubeUrl("");
@@ -634,60 +642,108 @@ export function CreateAssignmentFullPageModal({
 
       const groupById = new Map(teacherGroups.map((g) => [g.id, g] as const));
       const targetGroupIds = [...new Set(selectedGroupIds.length ? selectedGroupIds : [currentGroup.id])];
+      const isEdit = !!initialData?.isEdit;
+      const itemId = initialData?.id;
+
       for (const gid of targetGroupIds) {
         const g = groupById.get(gid);
         if (!g) continue;
         const resolvedTopic = await resolveTopicIdForSubmit(g.course_id);
 
         if (mode === "material") {
-          await createMaterialMutation.mutateAsync({
-            groupId: gid,
-            courseId: g.course_id,
-            topicId: resolvedTopic,
-            title: cleanedTitle,
-            description: instructionsHtml || undefined,
-            attachmentUrls,
-            attachmentLinks,
-            videoUrls,
-          });
+          if (isEdit && itemId) {
+            await api.patch(`/teacher/materials/${itemId}`, {
+              title: cleanedTitle,
+              description: instructionsHtml || undefined,
+              topic_id: resolvedTopic,
+              attachment_urls,
+              attachment_links,
+              video_urls,
+            });
+          } else {
+            await createMaterialMutation.mutateAsync({
+              groupId: gid,
+              courseId: g.course_id,
+              topicId: resolvedTopic,
+              title: cleanedTitle,
+              description: instructionsHtml || undefined,
+              attachmentUrls,
+              attachmentLinks,
+              videoUrls,
+            });
+          }
         } else if (mode === "question") {
-          await createQuestionMutation.mutateAsync({
-            groupId: gid,
-            courseId: g.course_id,
-            topicId: resolvedTopic,
-            questionText: cleanedTitle,
-            instructions: instructionsHtml || undefined,
-            questionType,
-            options: questionType === "multiple_choice" ? questionOptions.filter(o => o.trim()) : undefined,
-            deadlineIso,
-            maxPoints: payloadMaxPoints,
-            attachmentUrls,
-            attachmentLinks,
-            videoUrls,
-            canComment,
-            canEdit,
-          });
+          if (isEdit && itemId) {
+            await api.patch(`/teacher/questions/${itemId}`, {
+              question_text: cleanedTitle,
+              instructions: instructionsHtml || undefined,
+              topic_id: resolvedTopic,
+              question_type: questionType === "multiple_choice" ? "single_choice" : "open",
+              options: questionType === "multiple_choice" ? questionOptions.filter(o => o.trim()) : undefined,
+              deadline: deadlineIso,
+              max_points: payloadMaxPoints,
+              attachment_urls,
+              attachment_links,
+              video_urls,
+              can_comment: canComment,
+              can_edit: canEdit,
+            });
+          } else {
+            await createQuestionMutation.mutateAsync({
+              groupId: gid,
+              courseId: g.course_id,
+              topicId: resolvedTopic,
+              questionText: cleanedTitle,
+              instructions: instructionsHtml || undefined,
+              questionType,
+              options: questionType === "multiple_choice" ? questionOptions.filter(o => o.trim()) : undefined,
+              deadlineIso,
+              maxPoints: payloadMaxPoints,
+              attachmentUrls,
+              attachmentLinks,
+              videoUrls,
+              canComment,
+              canEdit,
+            });
+          }
         } else {
           const includeTest =
             mode === "assignmentWithTest" || (mode === "assignment" && hasQuiz);
           const apiTestQuestions = includeTest ? quizQuestionsToApiFormat(quizQuestions) : [];
           const mainIsSynopsis = !!isSynopsis;
-          await createAssignmentMutation.mutateAsync({
-            groupId: gid,
-            courseId: g.course_id,
-            topicId: resolvedTopic,
-            title: cleanedTitle,
-            description: instructionsHtml || undefined,
-            deadlineIso,
-            maxPoints: payloadMaxPoints,
-            attachmentUrls,
-            attachmentLinks,
-            videoUrls,
-            rubric: rubricToSend,
-            testQuestions: apiTestQuestions.length ? apiTestQuestions : undefined,
-            rejectSubmissionsAfterDeadline: rejectPayload,
-            isSynopsis: mainIsSynopsis,
-          });
+
+          if (isEdit && itemId) {
+            await api.patch(`/teacher/assignments/${itemId}`, {
+              title: cleanedTitle,
+              description: instructionsHtml || undefined,
+              topic_id: resolvedTopic,
+              deadline: deadlineIso,
+              max_points: payloadMaxPoints,
+              attachment_urls,
+              attachment_links,
+              video_urls,
+              rubric: rubricToSend,
+              reject_submissions_after_deadline: rejectPayload,
+              is_synopsis: mainIsSynopsis,
+            });
+          } else {
+            await createAssignmentMutation.mutateAsync({
+              groupId: gid,
+              courseId: g.course_id,
+              topicId: resolvedTopic,
+              title: cleanedTitle,
+              description: instructionsHtml || undefined,
+              deadlineIso,
+              maxPoints: payloadMaxPoints,
+              attachmentUrls,
+              attachmentLinks,
+              videoUrls,
+              rubric: rubricToSend,
+              testQuestions: apiTestQuestions.length ? apiTestQuestions : undefined,
+              rejectSubmissionsAfterDeadline: rejectPayload,
+              isSynopsis: mainIsSynopsis,
+            });
+          }
           if (companionSynopsisEnabled && !mainIsSynopsis) {
             const synTitle =
               companionSynopsisTitle.trim() ||
@@ -718,6 +774,10 @@ export function CreateAssignmentFullPageModal({
       queryClient.invalidateQueries({ queryKey: ["teacher-topics-missing-assignments", currentGroup.id] });
       queryClient.invalidateQueries({ queryKey: ["teacher-group-feed", currentGroup.id] });
       queryClient.invalidateQueries({ queryKey: ["teacher-reusable-rubrics"] });
+      if (isEdit && itemId) {
+        queryClient.invalidateQueries({ queryKey: ["teacher-assignment-details", itemId] });
+        queryClient.invalidateQueries({ queryKey: ["teacher-material-details", itemId] });
+      }
       onClose();
     } catch (e: any) {
       const detail = e?.response?.data?.detail;
@@ -728,7 +788,7 @@ export function CreateAssignmentFullPageModal({
     }
   };
 
-  const attachmentInputAccept = ".jpg,.jpeg,.png,.gif,.webp,.mp4,.webm,.pdf,.doc,.docx,.txt";
+  const attachmentInputAccept = ALLOWED_EXTENSIONS_STR;
 
   if (!isOpen) return null;
 
@@ -753,13 +813,13 @@ export function CreateAssignmentFullPageModal({
                 <Plus className="w-5 h-5" />
               </div>
               <h2 className="text-lg font-semibold font-geologica" style={{ color: textColors.primary }}>
-                {mode === "material"
+                {initialData?.isEdit ? t("teacherEditAssignment") : (mode === "material"
                   ? t("assignmentTypeMaterial")
                   : mode === "question"
                     ? t("assignmentTypeQuestion")
                     : mode === "assignmentWithTest"
                       ? t("assignmentTypeAssignmentWithTest")
-                      : t("assignmentTypeAssignment")}
+                      : t("assignmentTypeAssignment"))}
               </h2>
             </div>
             <p className="text-xs mt-1" style={{ color: textColors.secondary }}>
@@ -782,8 +842,8 @@ export function CreateAssignmentFullPageModal({
                 style={{ background: "linear-gradient(135deg,#2563EB,#7C3AED)" }}
               >
                 {submitting
-                  ? mode === "material" ? t("publishing") : t("asking")
-                  : mode === "material" ? t("publish") : t("ask")}
+                  ? (initialData?.isEdit ? t("teacherSaving") : (mode === "material" ? t("publishing") : t("asking")))
+                  : (initialData?.isEdit ? t("teacherSave") : (mode === "material" ? t("publish") : t("ask")))}
               </button>
             )}
             <button
@@ -943,9 +1003,12 @@ export function CreateAssignmentFullPageModal({
                           <span className="truncate">{t("quiz")}</span>
                         </button>
                       )}
-                      <UploadButton />
                       <LinkButton />
                     </div>
+
+                    <p className="text-[10px] sm:text-xs font-medium" style={{ color: "#F87171" }}>
+                      {t("onlyAllowedExtensions").replace("{extensions}", ALLOWED_EXTENSIONS_HINT)}
+                    </p>
 
                     {/* Attachment previews */}
                     {videoUrls.length > 0 ||
