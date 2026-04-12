@@ -42,6 +42,8 @@ services:
       SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
       AUTH_LOGIN_RATELIMIT: ${AUTH_LOGIN_RATELIMIT:-60/minute}
       AUTH_REGISTER_RATELIMIT: ${AUTH_REGISTER_RATELIMIT:-10/minute}
+      # 1 = не запускать seed_* при старте (нужно после импорта SQLite, чтобы данные не «разъезжались»)
+      LMS_SKIP_ENTRYPOINT_SEED: ${LMS_SKIP_ENTRYPOINT_SEED:-0}
     volumes:
       - lms_uploads:/app/uploads
     depends_on:
