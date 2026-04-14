@@ -22,6 +22,8 @@ backend/**/*.py[cod]
 backend/**/*.so
 backend/.pytest_cache/
 backend/.mypy_cache/
+backend/test_email_config.py
+backend/test_smtp.py
 
 # === Frontend ===
 node_modules/

@@ -499,9 +499,9 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
             {[
-              { target: 1000, suffix: "+", labelKey: "statsStudents", color: "text-[#1a237e]" },
+              { target: 100, suffix: "+", labelKey: "statsStudents", color: "text-[#1a237e]" },
               { target: 24, suffix: "+", labelKey: "statsCourses", color: "text-[#00b0ff]" },
-              { target: 40, suffix: "+", labelKey: "statsTeachers", color: "text-[#1a237e]" },
+              { target: 3, suffix: "+", labelKey: "statsTeachers", color: "text-[#1a237e]" },
               { target: 95, suffix: "%", labelKey: "statsSatisfaction", color: "text-[#ff4081]" },
             ].map(({ target, suffix, labelKey, color }, i) => (
               <div

@@ -1,10 +1,10 @@
 import re
 import secrets
 import string
+import logging
 from datetime import datetime, timezone, date
 from typing import Annotated, Literal, Optional
-
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, BackgroundTasks
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
 from app.api.deps import get_current_admin_user, get_current_user
@@ -23,6 +23,8 @@ from app.services.email_sender import (
     send_course_purchase_email,
     send_purchase_pending_confirmation_email,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/applications", tags=["applications"])
 
@@ -107,9 +109,8 @@ def pay_application(
     request: Request,
     body: PayApplicationRequest,
     db: Annotated[Session, Depends(get_db)],
+    background_tasks: BackgroundTasks,
 ):
-    """Публичный эндпоинт: оплата курса без авторизации. MVP: симуляция оплаты.
-    Возвращает confirmation_token — студент должен подтвердить покупку по ссылке из email."""
     course = db.query(Course).filter(Course.id == body.course_id).first()
     if not course:
         raise HTTPException(status_code=404, detail="Курс не найден")
@@ -281,7 +282,8 @@ def pay_application(
         user_lang = resolve_email_lang(user)
         base = (settings.FRONTEND_PUBLIC_URL or "http://localhost:3000").rstrip("/")
         confirm_url = f"{base}/confirm-purchase/{confirmation_token}"
-        send_purchase_pending_confirmation_email(
+        background_tasks.add_task(
+            send_purchase_pending_confirmation_email,
             to_email=user.email,
             student_name=user.full_name,
             course_title=course.title,
@@ -292,8 +294,8 @@ def pay_application(
             parent_temp_password=parent_temp_password,
             lang=user_lang,
         )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.exception("Failed to queue purchase pending email to %s: %s", user.email, e)
 
     return PayApplicationResponse(
         message="Оплата принята. Подтвердите покупку по ссылке, отправленной на ваш email.",
@@ -322,6 +324,7 @@ class ConfirmPurchaseResponse(BaseModel):
 def confirm_purchase(
     token: str,
     db: Annotated[Session, Depends(get_db)],
+    background_tasks: BackgroundTasks,
 ):
     """Публичный эндпоинт: студент подтверждает покупку по ссылке из email."""
     app = db.query(CourseApplication).filter(
@@ -383,7 +386,8 @@ def confirm_purchase(
     db.commit()
 
     try:
-        send_course_purchase_email(
+        background_tasks.add_task(
+            send_course_purchase_email,
             to_email=user.email,
             student_name=user.full_name,
             course_title=course.title,
@@ -393,8 +397,8 @@ def confirm_purchase(
             parent_temp_password=parent_temp_password,
             lang=resolve_email_lang(user),
         )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.exception("Failed to queue course purchase confirmation email to %s: %s", user.email, e)
 
     return ConfirmPurchaseResponse(
         message="Поздравляем! Вы добавлены на курс. Удачи в обучении!",

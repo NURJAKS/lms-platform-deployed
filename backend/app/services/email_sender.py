@@ -1,6 +1,5 @@
-from __future__ import annotations
-
 import smtplib
+import logging
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Optional
@@ -8,36 +7,32 @@ from typing import Optional
 from app.core.config import settings
 from app.i18n.translations import get_email_translation
 
+logger = logging.getLogger(__name__)
+
 
 def _get_smtp_client() -> Optional[smtplib.SMTP]:
   """
   Возвращает SMTP‑клиент, если в окружении заданы настройки.
-
-  Ожидаемые переменные в .env (опционально):
-  - SMTP_HOST
-  - SMTP_PORT (int)
-  - SMTP_USER
-  - SMTP_PASSWORD
-  - SMTP_USE_TLS (bool, по умолчанию True)
   """
-  host = getattr(settings, "SMTP_HOST", None)
+  host = getattr(settings, "SMTP_HOST", "")
   port = int(getattr(settings, "SMTP_PORT", 587) or 587)
-  user = getattr(settings, "SMTP_USER", None)
-  password = getattr(settings, "SMTP_PASSWORD", None)
+  user = getattr(settings, "SMTP_USER", "")
+  password = getattr(settings, "SMTP_PASSWORD", "")
   use_tls = getattr(settings, "SMTP_USE_TLS", True)
 
   if not host or not user or not password:
+    logger.warning("SMTP settings are missing (host: %s, user: %s)", bool(host), bool(user))
     return None
 
-  client = smtplib.SMTP(host, port, timeout=10)
   try:
+    client = smtplib.SMTP(host, port, timeout=10)
     if use_tls:
       client.starttls()
     client.login(user, password)
-  except Exception:
-    client.quit()
+    return client
+  except Exception as e:
+    logger.error("Failed to connect/login to SMTP server: %s", e)
     return None
-  return client
 
 
 def _frontend_base_url() -> str:
@@ -64,8 +59,9 @@ def _send_html_email(to_email: str, subject: str, html_body: str) -> None:
 
   try:
     client.send_message(msg)
-  except Exception:
-    pass
+    logger.info("Email '%s' sent successfully to %s", subject, to_email)
+  except Exception as e:
+    logger.error("Failed to send email to %s: %s", to_email, e)
   finally:
     try:
       client.quit()

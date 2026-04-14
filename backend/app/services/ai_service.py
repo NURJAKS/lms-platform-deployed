@@ -116,7 +116,7 @@ Return ONLY the JSON array. Do not include any other text."""
 
 
 
-# Подозрительные паттерны, указывающие на попытку получить ответы на тесты/задания
+# Мұнда SUSPICIOUS_PATTERNS және промпт инъекциясынан қорғау логикасы
 SUSPICIOUS_PATTERNS = [
     r"какой\s+(правильный|верный|корректный)\s+ответ",
     r"что\s+(правильный|верный|корректный)\s+ответ",
@@ -137,7 +137,7 @@ SUSPICIOUS_PATTERNS = [
     r"multiple\s+choice",
     r"выбери\s+один",
     r"выбери\s+несколько",
-    # Дополнительные паттерны для защиты от обхода
+
     r"ignore\s+(all\s+)?previous\s+instructions",
     r"забудь\s+(все\s+)?предыдущие\s+инструкции",
     r"алдыңғы\s+нұсқауларды\s+ұмытыңыз",
@@ -332,8 +332,8 @@ def solve_quiz_questions(
         lo, hi = (1.2, 2.0) if ai_level == "expert" else (2.0, 3.0) if ai_level == "intermediate" else (3.0, 4.0)
         return [
             {
-                "id": q.get("id"),
-                "answer": q.get("correct_answer") or "a",
+                "id": q["id"] if isinstance(q, dict) else q.id,
+                "answer": (q.get("correct_answer") if isinstance(q, dict) else q.correct_answer) or "a",
                 "is_correct": random.random() < (0.95 if ai_level == "expert" else 0.85 if ai_level == "intermediate" else 0.6),
                 "thinking_time": round(random.uniform(lo, hi), 2)
             }
@@ -345,7 +345,7 @@ def solve_quiz_questions(
     if db:
         try:
             # Sort IDs to ensure stable hash for same question set
-            sorted_ids = sorted([str(q.get("id")) for q in questions])
+            sorted_ids = sorted([str(q["id"] if isinstance(q, dict) else q.id) for q in questions])
             q_hash = hashlib.md5(",".join(sorted_ids).encode()).hexdigest()
             
             cached = db.query(AIChallengeCache).filter(
@@ -363,18 +363,21 @@ def solve_quiz_questions(
     prompt = "Here is a list of questions for you to solve as a JSON array of objects:\n"
     simplified_questions = []
     for q in questions:
+        is_dict = isinstance(q, dict)
         item = {
-            "id": q.get("id"),
-            "text": q.get("question_text") or q.get("task") or "",
+            "id": q["id"] if is_dict else q.id,
+            "text": (q.get("question_text") if is_dict else q.question_text) or (q.get("task") if is_dict else getattr(q, "task", "")) or "",
             "options": {
-                "a": q.get("option_a"),
-                "b": q.get("option_b"),
-                "c": q.get("option_c"),
-                "d": q.get("option_d"),
-            } if "option_a" in q else q.get("options")
+                "a": q.get("option_a") if is_dict else q.option_a,
+                "b": q.get("option_b") if is_dict else q.option_b,
+                "c": q.get("option_c") if is_dict else q.option_c,
+                "d": q.get("option_d") if is_dict else q.option_d,
+            } if (is_dict and "option_a" in q) or (not is_dict and hasattr(q, "option_a")) else (q.get("options") if is_dict else getattr(q, "options", None))
         }
-        if q.get("code"):
+        if is_dict and q.get("code"):
             item["code"] = q["code"]
+        elif not is_dict and hasattr(q, "code"):
+            item["code"] = q.code
         simplified_questions.append(item)
 
     prompt = f"Mode: {game_mode}\nLevel: {ai_level}\nLanguage: {lang}\nQuestions:\n{json.dumps(simplified_questions, ensure_ascii=False)}"
@@ -436,15 +439,15 @@ def solve_quiz_questions(
         
         final_results = []
         for q in questions:
-            qid = str(q.get("id"))
+            qid = str(q["id"] if isinstance(q, dict) else q.id)
             if qid in results_map:
                 final_results.append(results_map[qid])
             else:
                 # Fallback for missing question in AI response
                 lo, hi = (1.2, 2.0) if ai_level == "expert" else (2.0, 3.0) if ai_level == "intermediate" else (3.0, 4.0)
                 final_results.append({
-                    "id": q.get("id"),
-                    "answer": q.get("correct_answer") or "a",
+                    "id": q["id"] if isinstance(q, dict) else q.id,
+                    "answer": (q.get("correct_answer") if isinstance(q, dict) else q.correct_answer) or "a",
                     "is_correct": True,
                     "thinking_time": round(random.uniform(lo, hi), 2)
                 })
@@ -471,8 +474,8 @@ def solve_quiz_questions(
         lo, hi = (1.2, 2.0) if ai_level == "expert" else (2.0, 3.0) if ai_level == "intermediate" else (3.0, 4.0)
         return [
             {
-                "id": q.get("id"),
-                "answer": q.get("correct_answer") or "a",
+                "id": q["id"] if isinstance(q, dict) else q.id,
+                "answer": (q.get("correct_answer") if isinstance(q, dict) else q.correct_answer) or "a",
                 "is_correct": True,
                 "thinking_time": round(random.uniform(lo, hi), 2)
             }
