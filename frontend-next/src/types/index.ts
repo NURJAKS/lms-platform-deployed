@@ -17,6 +17,7 @@ export interface User {
   is_approved?: boolean;
   has_group_access?: boolean;
   created_at?: string;
+  ai_level?: string;
 }
 
 export interface Course {

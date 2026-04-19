@@ -510,8 +510,30 @@ def _ensure_support_tickets_table(db_engine: Engine) -> None:
         return
 
 
-def run_migrations() -> None:
-    """Entry point for running lightweight, in‑app migrations."""
+def _assert_critical_schema(db_engine: Engine) -> None:
+    """Fail fast when critical columns are still missing after migrations."""
+    insp = inspect(db_engine)
+    checks = [
+        ("users", "city"),
+        ("student_progress", "updated_at"),
+    ]
+    missing: list[str] = []
+    for table, column in checks:
+        if not insp.has_table(table):
+            continue
+        cols = {c["name"] for c in insp.get_columns(table)}
+        if column not in cols:
+            missing.append(f"{table}.{column}")
+    if missing:
+        raise RuntimeError(f"Critical schema columns are missing after migration: {', '.join(missing)}")
+
+
+def run_migrations(strict: bool = False) -> None:
+    """Entry point for lightweight, in-app migrations.
+
+    strict=True is intended for deterministic bootstrap flows where migration
+    problems must fail setup instead of being ignored.
+    """
     _ensure_topic_synopsis_and_feed_tables(engine)
     _ensure_course_feed_posts_attachment_urls(engine)
     _ensure_user_city_column(engine)
@@ -532,4 +554,6 @@ def run_migrations() -> None:
     _ensure_topic_synopsis_columns(engine)
     _ensure_shop_items_secret_content_column(engine)
     _ensure_support_tickets_table(engine)
+    if strict:
+        _assert_critical_schema(engine)
 

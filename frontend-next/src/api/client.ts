@@ -44,7 +44,11 @@ api.interceptors.response.use(
       useAuthStore.getState().logout();
       if (typeof window !== "undefined") {
         localStorage.removeItem("auth-storage");
-        window.location.href = "/login";
+        const currentPath = `${window.location.pathname}${window.location.search}`;
+        const redirect = currentPath.startsWith("/app")
+          ? `?redirect=${encodeURIComponent(currentPath)}`
+          : "";
+        window.location.href = `/login${redirect}`;
       }
     }
     return Promise.reject(err);

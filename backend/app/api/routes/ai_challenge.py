@@ -17,12 +17,20 @@ from app.models.ai_challenge import AIChallenge
 from app.models.notification import Notification
 from app.models.course_topic import CourseTopic
 from app.models.course import Course
-from app.services.ai_service import get_challenge_recommendations, solve_quiz_questions
+from app.services.ai_service import (
+    get_challenge_recommendations,
+    solve_quiz_questions,
+    generate_ai_personal_plan,
+    transform_ai_personal_plan,
+    AIProviderUnavailable,
+)
+from app.api.routes.analytics_student import build_personal_plan_insights_snapshot
 from app.data.challenge_questions import (
     get_questions_by_mode,
     CHALLENGE_CATEGORIES,
     CATEGORY_LABELS,
 )
+from app.data.diagnostic_questions import DIAGNOSTIC_QUESTIONS
 
 router = APIRouter(prefix="/challenge", tags=["ai_challenge"])
 
@@ -892,6 +900,32 @@ def _get_answer_text(q: TestQuestion) -> str:
     return {"a": q.option_a, "b": q.option_b, "c": q.option_c, "d": q.option_d}.get(key, q.option_a)
 
 
+def _shuffle_choice_options(
+    options: list[str],
+    correct_key: str,
+) -> tuple[list[str], dict[str, str]]:
+    """
+    Shuffle answer options and build key remap.
+    Returns:
+      - shuffled options list
+      - key map: displayed_key -> original_key (e.g. {"a": "c", ...})
+    """
+    indexed = list(enumerate(options))
+    random.shuffle(indexed)
+    letters = ("a", "b", "c", "d")
+    key_map: dict[str, str] = {}
+    shuffled: list[str] = []
+    for new_idx, (old_idx, option_text) in enumerate(indexed):
+        displayed_key = letters[new_idx]
+        original_key = letters[old_idx]
+        key_map[displayed_key] = original_key
+        shuffled.append(option_text)
+    # Keep a predictable fallback mapping when options are malformed.
+    if correct_key not in key_map.values():
+        key_map = {"a": "a", "b": "b", "c": "c", "d": "d"}
+    return shuffled, key_map
+
+
 class MemoryCardsResponse(BaseModel):
     cards: list[dict]
 
@@ -1127,14 +1161,16 @@ def start_challenge(
         )
     effective_limit = min(limit, available)
     questions = questions[:effective_limit]
-    # Get real AI results
-    ai_results = solve_quiz_questions(
-        questions=questions,
-        ai_level=ai_level,
-        lang=lang or "ru",
-        game_mode=game_mode,
-        db=db
-    )
+    try:
+        ai_results = solve_quiz_questions(
+            questions=questions,
+            ai_level=ai_level,
+            lang=lang or "ru",
+            game_mode=game_mode,
+            db=db,
+        )
+    except AIProviderUnavailable as exc:
+        raise HTTPException(status_code=503, detail=exc.user_message) from exc
     
     ai_times = [r.get("thinking_time", 2.0) for r in ai_results]
     ai_correct_count = sum(1 for r in ai_results if r.get("is_correct"))
@@ -1466,18 +1502,21 @@ def start_new_mode_challenge(
     if len(questions) < 2:
         raise HTTPException(status_code=400, detail=get_error_msg("not_enough_questions", lang))
 
-    # Get real AI results
-    ai_results = solve_quiz_questions(
-        questions=questions,
-        ai_level=ai_level,
-        lang=lang or "ru",
-        game_mode=game_mode,
-        db=db
-    )
+    try:
+        ai_results = solve_quiz_questions(
+            questions=questions,
+            ai_level=ai_level,
+            lang=lang or "ru",
+            game_mode=game_mode,
+            db=db,
+        )
+    except AIProviderUnavailable as exc:
+        raise HTTPException(status_code=503, detail=exc.user_message) from exc
     
     ai_times = [r.get("thinking_time", 2.0) for r in ai_results]
     ai_correct = sum(1 for r in ai_results if r.get("is_correct"))
     local_answer_map = {str(r.get("id")): (r.get("answer") or "a").strip().lower() for r in ai_results}
+    option_key_maps: dict[str, dict[str, str]] = {}
 
     anchor_cid = _ai_challenge_anchor_course_id(db)
     challenge = AIChallenge(
@@ -1491,7 +1530,13 @@ def start_new_mode_challenge(
         round_time_limit_seconds=time_limit,
         ai_bonus_points=random.randint(0, 2),
         game_type=game_mode,
-        ai_times_json=json.dumps({"times": ai_times, "local_answer_map": local_answer_map}),
+        ai_times_json=json.dumps(
+            {
+                "times": ai_times,
+                "local_answer_map": local_answer_map,
+                "option_key_maps": option_key_maps,
+            }
+        ),
     )
     db.add(challenge)
     db.commit()
@@ -1507,7 +1552,10 @@ def start_new_mode_challenge(
             item["total_lines"] = len(q["code"].split("\n"))
         elif game_mode == "guess_output":
             item["code"] = q["code"]
-            item["options"] = q["options"]
+            correct_key = (q.get("correct") or "a").strip().lower()
+            shuffled_options, key_map = _shuffle_choice_options(q["options"], correct_key)
+            item["options"] = shuffled_options
+            option_key_maps[q["id"]] = key_map
         elif game_mode == "speed_code":
             if locale == "kk" and "task_kk" in q:
                 item["task"] = q["task_kk"]
@@ -1515,8 +1563,21 @@ def start_new_mode_challenge(
                 item["task"] = q["task_en"]
             else:
                 item["task"] = q["task"]
-            item["options"] = q["options"]
+            correct_key = (q.get("correct") or "a").strip().lower()
+            shuffled_options, key_map = _shuffle_choice_options(q["options"], correct_key)
+            item["options"] = shuffled_options
+            option_key_maps[q["id"]] = key_map
         formatted.append(item)
+
+    try:
+        ai_payload = json.loads(challenge.ai_times_json or "{}")
+        if not isinstance(ai_payload, dict):
+            ai_payload = {}
+    except (json.JSONDecodeError, TypeError):
+        ai_payload = {}
+    ai_payload["option_key_maps"] = option_key_maps
+    challenge.ai_times_json = json.dumps(ai_payload)
+    db.commit()
 
     return {
         "challenge_id": challenge.id,
@@ -1559,6 +1620,18 @@ def submit_new_mode_challenge(
     # Load questions for verification
     all_questions = get_questions_by_mode(game_type, limit=200)
     q_by_id = {q["id"]: q for q in all_questions}
+    option_key_maps: dict[str, dict[str, str]] = {}
+    try:
+        parsed_ai_payload = json.loads(challenge.ai_times_json or "{}")
+        if isinstance(parsed_ai_payload, dict):
+            raw_maps = parsed_ai_payload.get("option_key_maps", {}) or {}
+            option_key_maps = {
+                str(qid): {str(k).strip().lower(): str(v).strip().lower() for k, v in key_map.items()}
+                for qid, key_map in raw_maps.items()
+                if isinstance(key_map, dict)
+            }
+    except (json.JSONDecodeError, TypeError):
+        option_key_maps = {}
 
     user_correct = 0
     user_time = 0.0
@@ -1588,11 +1661,15 @@ def submit_new_mode_challenge(
             explanation = _get_localized_field(q, "explanation", lang)
         elif game_type == "guess_output":
             correct_key = q.get("correct", "a").strip().lower()
-            is_correct = user_answer.strip().lower() == correct_key
+            submitted_key = user_answer.strip().lower()
+            original_key = option_key_maps.get(qid, {}).get(submitted_key, submitted_key)
+            is_correct = original_key == correct_key
             correct_answer = correct_key
         elif game_type == "speed_code":
             correct_key = q.get("correct", "a").strip().lower()
-            is_correct = user_answer.strip().lower() == correct_key
+            submitted_key = user_answer.strip().lower()
+            original_key = option_key_maps.get(qid, {}).get(submitted_key, submitted_key)
+            is_correct = original_key == correct_key
             correct_answer = correct_key
 
         if is_correct:
@@ -1701,3 +1778,184 @@ def submit_new_mode_challenge(
             "ai_strategy_bonus": challenge.ai_bonus_points or 0,
         },
     }
+
+
+class PersonalPlanRequest(BaseModel):
+    level: str
+    weak_topics: list[str] = []
+
+
+class PersonalPlanTransformRequest(BaseModel):
+    plan: str
+    action: str  # short | focus_weak | simplify
+    weak_topics: list[str] = []
+    custom_instruction: str | None = None
+
+
+@router.get("/diagnostic/questions")
+def get_diagnostic_questions(
+    current_user: Annotated[User, Depends(get_current_user)],
+    lang: str | None = "ru",
+):
+    """Возвращает список вопросов для диагностического теста (перемешанные) с локализацией."""
+    questions = []
+    for q in DIAGNOSTIC_QUESTIONS:
+        # Убираем правильный ответ из вывода для клиента
+        q_copy = q.copy()
+        q_copy.pop("correct_answer", None)
+        
+        # Локализация полей
+        q_copy["question_text"] = _get_localized_field(q, "question_text", lang)
+        q_copy["option_a"] = _get_localized_field(q, "option_a", lang)
+        q_copy["option_b"] = _get_localized_field(q, "option_b", lang)
+        q_copy["option_c"] = _get_localized_field(q, "option_c", lang)
+        q_copy["option_d"] = _get_localized_field(q, "option_d", lang)
+        
+        questions.append(q_copy)
+    
+    random.shuffle(questions)
+    return questions
+
+
+class DiagnosticSubmitRequest(BaseModel):
+    answers: list[dict]  # [{"question_id": str, "answer": str}]
+
+
+@router.post("/diagnostic/submit")
+def submit_diagnostic_test(
+    body: DiagnosticSubmitRequest,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """Оценивает результаты теста и сохраняет уровень в профиль пользователя."""
+    correct_by_level = {"beginner": 0, "intermediate": 0, "expert": 0}
+    total_by_level = {"beginner": 0, "intermediate": 0, "expert": 0}
+    
+    q_map = {q["id"]: q for q in DIAGNOSTIC_QUESTIONS}
+    
+    for ans in body.answers:
+        qid = ans.get("question_id")
+        user_ans = ans.get("answer", "").strip().lower()
+        if qid in q_map:
+            q = q_map[qid]
+            level = q["level"]
+            total_by_level[level] += 1
+            if q["correct_answer"] == user_ans:
+                correct_by_level[level] += 1
+    
+    # Логика определения уровня:
+    # 1. Если решено >= 2 expert -> Expert
+    # 2. Если решено >= 2 intermediate -> Intermediate
+    # 3. Иначе Beginner
+    
+    determined_level = "beginner"
+    if correct_by_level["expert"] >= 2:
+        determined_level = "expert"
+    elif correct_by_level["intermediate"] >= 2:
+        determined_level = "intermediate"
+    
+    # Сохраняем в базу
+    current_user.ai_level = determined_level
+    db.commit()
+    db.refresh(current_user)
+    
+    return {
+        "level": determined_level,
+        "correct_by_level": correct_by_level,
+        "total_by_level": total_by_level
+    }
+
+
+class SetLevelRequest(BaseModel):
+    level: str
+
+
+@router.post("/level")
+def set_user_ai_level(
+    body: SetLevelRequest,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """Вручную устанавливает уровень пользователя."""
+    level = body.level.lower()
+    if level not in ["beginner", "intermediate", "expert"]:
+        raise HTTPException(status_code=400, detail="Invalid level")
+    
+    current_user.ai_level = level
+    db.commit()
+    db.refresh(current_user)
+    return {"level": level}
+
+
+@router.post("/personal-plan")
+def create_personal_plan(
+    request: PersonalPlanRequest,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+    lang: str = "ru",
+):
+    """
+    Персональный план (LLM): опирается на данные текущего пользователя из БД.
+
+    - Темп: число завершённых тем за 7 дней (StudentProgress).
+    - insights: слабые темы по тестам <60%, RPG-навыки, сравнение с когортой студентов.
+    - weak_topics в теле: если список пуст — в промпт подставляются слабые темы из аналитики;
+      если переданы (например с AI Challenge) — приоритет у них. Пустой weakTopics в URL сам
+      по себе не означает отсутствие слабых тем в системе — см. аналитику / insights.
+    """
+    from datetime import datetime, timedelta, timezone
+    from sqlalchemy import func
+
+    now = datetime.now(timezone.utc)
+    week_ago = now - timedelta(days=7)
+    recent_count = (
+        db.query(func.count(StudentProgress.id))
+        .filter(
+            StudentProgress.user_id == current_user.id,
+            StudentProgress.is_completed == True,
+            func.coalesce(StudentProgress.completed_at, StudentProgress.created_at) >= week_ago,
+        )
+        .scalar()
+    ) or 0
+    current_pace = recent_count / 7
+
+    insights = build_personal_plan_insights_snapshot(db, current_user.id, lang)
+
+    weak_for_prompt = list(request.weak_topics)
+    if not weak_for_prompt:
+        weak_for_prompt = [w["topic_title"] for w in insights.get("weak_topics_detail") or []]
+
+    analytics_data = {
+        "current_pace_per_day": round(current_pace, 1),
+        "insights": insights,
+        "weak_topics_source": "challenge_or_client" if request.weak_topics else "analytics_db",
+    }
+
+    plan_markdown = generate_ai_personal_plan(
+        student_level=request.level,
+        analytics_data=analytics_data,
+        weak_topics=weak_for_prompt,
+        lang=lang,
+    )
+
+    return {"plan": plan_markdown}
+
+
+@router.post("/personal-plan/transform")
+def transform_personal_plan(
+    request: PersonalPlanTransformRequest,
+    _current_user: Annotated[User, Depends(get_current_user)],
+    lang: str = "ru",
+):
+    """
+    Быстрая трансформация уже сгенерированного персонального плана.
+    Используется для UX-кнопок: короткий план, фокус на слабых темах, упрощённая версия.
+    """
+    transformed = transform_ai_personal_plan(
+        plan_markdown=request.plan,
+        action=request.action,
+        weak_topics=request.weak_topics,
+        custom_instruction=request.custom_instruction,
+        lang=lang,
+    )
+    return {"plan": transformed}

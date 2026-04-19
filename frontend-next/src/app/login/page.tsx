@@ -39,6 +39,7 @@ function LoginContent() {
   const registered = searchParams.get("registered") === "1";
   
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
   }, []);
 
@@ -149,7 +150,7 @@ function LoginContent() {
                 strokeWidth={1.5}
               />
               <span className="text-xl font-bold text-gray-900 dark:text-white tracking-tight">
-                Білім
+                QIT Білім
               </span>
               <span className="text-xl font-bold text-indigo-600 tracking-tight">
                 платформасы

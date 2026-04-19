@@ -4,20 +4,24 @@ import Link from "next/link";
 import { useLanguage } from "@/context/LanguageContext";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api/client";
-import { Users, BookOpen, UserPlus, ArrowUpRight, ArrowDownRight, TrendingUp } from "lucide-react";
+import { Users, BookOpen, UserPlus, ArrowUpRight, ArrowDownRight, TrendingUp, Info } from "lucide-react";
 import { SparklineChart } from "./SparklineChart";
 import { WelcomeWidget } from "./WelcomeWidget";
 import { ActivityFeedWidget } from "./ActivityFeedWidget";
 import { UpcomingDeadlinesWidget } from "./UpcomingDeadlinesWidget";
 import { useTheme } from "@/context/ThemeContext";
 import { getGlassCardStyle, getTextColors } from "@/utils/themeStyles";
+import { useAuthStore } from "@/store/authStore";
 
 export function TeacherDashboard() {
   const { t } = useLanguage();
   const { theme } = useTheme();
+  const user = useAuthStore((s) => s.user);
+  const canManageUsers = useAuthStore((s) => s.canManageUsers());
   const glassStyle = getGlassCardStyle(theme);
   const textColors = getTextColors(theme);
   const isDark = theme === "dark";
+  const showCuratorLimitedAccess = user?.role === "curator" && !canManageUsers;
   
   const { data: stats } = useQuery({
     queryKey: ["teacher-stats"],
@@ -89,6 +93,29 @@ export function TeacherDashboard() {
       <div className="min-w-0 space-y-6">
         {/* Welcome Widget */}
         <WelcomeWidget />
+
+        {showCuratorLimitedAccess && (
+          <div
+            className="rounded-xl p-4 border-l-4 flex items-start gap-3"
+            style={{
+              ...glassStyle,
+              borderLeftColor: "#F59E0B",
+              background: isDark
+                ? "rgba(245, 158, 11, 0.1)"
+                : "rgba(245, 158, 11, 0.05)",
+            }}
+          >
+            <Info className="w-5 h-5 shrink-0 mt-0.5" style={{ color: "#F59E0B" }} />
+            <div className="flex-1">
+              <p className="font-semibold mb-1" style={{ color: textColors.primary }}>
+                {t("curatorLimitedAccess")}
+              </p>
+              <p className="text-sm" style={{ color: textColors.secondary }}>
+                {t("adminCuratorAccessInfo")}
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Stats Cards with Sparklines - улучшенный дизайн */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

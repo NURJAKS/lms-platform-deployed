@@ -60,6 +60,7 @@ export function VideoPlayer({
   const effectiveRate = isPremium ? playbackRate : 1.0;
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
   }, []);
 

@@ -23,5 +23,7 @@ if (-not (Test-Path $envFile)) {
 }
 
 Set-Location (Join-Path $Root "backend")
+Write-Host "Bootstrapping database schema/data..."
+& $venvPy bootstrap_db.py
 Write-Host "Backend: http://127.0.0.1:8000  (docs: http://127.0.0.1:8000/docs)"
 & $venvPy -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload

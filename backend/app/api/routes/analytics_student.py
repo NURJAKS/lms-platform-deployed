@@ -53,19 +53,14 @@ def _match_skill(course_title: str) -> dict:
 # ---------------------------------------------------------------------------
 # 1. Анализ слабых тем
 # ---------------------------------------------------------------------------
-@router.get("/weak-topics")
-def get_weak_topics(
-    db: Annotated[Session, Depends(get_db)],
-    current_user: Annotated[User, Depends(get_current_user)],
-):
-    """Темы, где test_score < 60%. Только реальные данные из student_progress."""
-
+def fetch_weak_topic_entries(db: Session, user_id: int) -> list[dict]:
+    """Темы с test_score < 60% из student_progress. Общая логика для API и AI-плана."""
     rows = (
         db.query(StudentProgress, CourseTopic, Course)
         .join(CourseTopic, StudentProgress.topic_id == CourseTopic.id)
         .join(Course, StudentProgress.course_id == Course.id)
         .filter(
-            StudentProgress.user_id == current_user.id,
+            StudentProgress.user_id == user_id,
             StudentProgress.is_completed == True,
             StudentProgress.test_score.isnot(None),
             StudentProgress.test_score < 60,
@@ -85,6 +80,172 @@ def get_weak_topics(
         }
         for sp, topic, course in rows
     ]
+
+
+def _comparison_stats_for_user(db: Session, user_id: int) -> dict:
+    """Средний балл, перцентиль и глобальное среднее (логика как в GET /comparison)."""
+    my_avg_row = (
+        db.query(func.avg(StudentProgress.test_score))
+        .filter(
+            StudentProgress.user_id == user_id,
+            StudentProgress.is_completed == True,
+            StudentProgress.test_score.isnot(None),
+        )
+        .scalar()
+    )
+    my_avg = round(float(my_avg_row), 1) if my_avg_row else 0
+
+    student_avgs_sq = (
+        db.query(
+            StudentProgress.user_id,
+            func.avg(StudentProgress.test_score).label("avg_score"),
+        )
+        .join(User, StudentProgress.user_id == User.id)
+        .filter(
+            User.role == "student",
+            StudentProgress.is_completed == True,
+            StudentProgress.test_score.isnot(None),
+        )
+        .group_by(StudentProgress.user_id)
+        .subquery()
+    )
+    all_avgs = db.query(student_avgs_sq.c.avg_score).all()
+    all_scores = [float(r[0]) for r in all_avgs if r[0] is not None]
+    total_students = len(all_scores)
+    global_avg = round(sum(all_scores) / total_students, 1) if total_students else 0
+
+    if total_students > 0 and my_avg > 0:
+        lower_count = len([s for s in all_scores if s < my_avg])
+        percentile = round((lower_count / total_students) * 100)
+    else:
+        percentile = 0
+
+    return {
+        "my_avg": my_avg,
+        "global_avg": global_avg,
+        "percentile": percentile,
+        "total_students": total_students,
+    }
+
+
+def compute_skill_tree_for_user(db: Session, user_id: int) -> dict:
+    """Те же данные, что GET /skill-tree, для переиспользования (в т.ч. AI-план)."""
+    enrollments = (
+        db.query(CourseEnrollment)
+        .filter(CourseEnrollment.user_id == user_id)
+        .all()
+    )
+    course_ids = [e.course_id for e in enrollments]
+    if not course_ids:
+        return {"hero_level": 1, "total_xp": 0, "skills": []}
+
+    courses = db.query(Course).filter(Course.id.in_(course_ids)).all()
+    skills = []
+    total_xp = 0
+
+    for course in courses:
+        total_topics = (
+            db.query(func.count(CourseTopic.id))
+            .filter(CourseTopic.course_id == course.id)
+            .scalar()
+        ) or 0
+        if total_topics == 0:
+            continue
+
+        completed = (
+            db.query(func.count(StudentProgress.id))
+            .filter(
+                StudentProgress.user_id == user_id,
+                StudentProgress.course_id == course.id,
+                StudentProgress.is_completed == True,
+            )
+            .scalar()
+        ) or 0
+
+        avg_score_row = (
+            db.query(func.avg(StudentProgress.test_score))
+            .filter(
+                StudentProgress.user_id == user_id,
+                StudentProgress.course_id == course.id,
+                StudentProgress.is_completed == True,
+                StudentProgress.test_score.isnot(None),
+            )
+            .scalar()
+        )
+        avg_score = float(avg_score_row) if avg_score_row else 0
+
+        progress_pct = round((completed / total_topics) * 100) if total_topics else 0
+        level = round(progress_pct * 0.6 + avg_score * 0.4)
+        xp = completed * 100 + round(avg_score * completed)
+        total_xp += xp
+
+        skill_meta = _match_skill(course.title)
+        skills.append({
+            "course_id": course.id,
+            "course_title": course.title,
+            "skill_name": skill_meta["name_ru"],
+            "skill_name_kk": skill_meta["name_kk"],
+            "skill_name_en": skill_meta["name_en"],
+            "icon": skill_meta["icon"],
+            "color": skill_meta["color"],
+            "level": min(level, 100),
+            "max_level": 100,
+            "xp": xp,
+            "progress_pct": progress_pct,
+            "avg_score": round(avg_score, 1),
+            "completed_topics": completed,
+            "total_topics": total_topics,
+        })
+
+    hero_level = round(sum(s["level"] for s in skills) / len(skills)) if skills else 1
+    return {
+        "hero_level": max(1, hero_level),
+        "total_xp": total_xp,
+        "skills": sorted(skills, key=lambda s: s["level"], reverse=True),
+    }
+
+
+def build_personal_plan_insights_snapshot(db: Session, user_id: int, lang: str = "ru") -> dict:
+    """
+    Снимок аналитики из БД для POST /challenge/personal-plan (промпт LLM).
+    Слабые темы, RPG-навыки, сравнение с когортой студентов.
+    """
+    locale = lang if lang in ("ru", "kk", "en") else "ru"
+    weak = fetch_weak_topic_entries(db, user_id)
+    tree = compute_skill_tree_for_user(db, user_id)
+    comp = _comparison_stats_for_user(db, user_id)
+
+    name_key = "skill_name_kk" if locale == "kk" else "skill_name_en" if locale == "en" else "skill_name"
+    skills_top = []
+    for s in (tree.get("skills") or [])[:6]:
+        skills_top.append({
+            "label": s.get(name_key) or s.get("skill_name", ""),
+            "level": s.get("level"),
+            "progress_pct": s.get("progress_pct"),
+            "avg_score": s.get("avg_score"),
+            "course_title": s.get("course_title"),
+        })
+
+    return {
+        "weak_topics_detail": weak[:20],
+        "hero_level": tree.get("hero_level"),
+        "total_xp": tree.get("total_xp"),
+        "skills_top": skills_top,
+        "my_avg_score": comp.get("my_avg"),
+        "percentile_vs_students": comp.get("percentile"),
+        "global_avg_score": comp.get("global_avg"),
+        "students_in_cohort": comp.get("total_students"),
+    }
+
+
+@router.get("/weak-topics")
+def get_weak_topics(
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """Темы, где test_score < 60%. Только реальные данные из student_progress."""
+
+    return fetch_weak_topic_entries(db, current_user.id)
 
 
 # ---------------------------------------------------------------------------
@@ -201,90 +362,7 @@ def get_skill_tree(
     current_user: Annotated[User, Depends(get_current_user)],
 ):
     """RPG-маппинг: курсы → навыки с уровнями."""
-
-    enrollments = (
-        db.query(CourseEnrollment)
-        .filter(CourseEnrollment.user_id == current_user.id)
-        .all()
-    )
-    course_ids = [e.course_id for e in enrollments]
-    if not course_ids:
-        return {"hero_level": 1, "total_xp": 0, "skills": []}
-
-    courses = db.query(Course).filter(Course.id.in_(course_ids)).all()
-
-    skills = []
-    total_xp = 0
-
-    for course in courses:
-        # Общее число тем в курсе
-        total_topics = (
-            db.query(func.count(CourseTopic.id))
-            .filter(CourseTopic.course_id == course.id)
-            .scalar()
-        ) or 0
-
-        if total_topics == 0:
-            continue
-
-        # Завершённые темы
-        completed = (
-            db.query(func.count(StudentProgress.id))
-            .filter(
-                StudentProgress.user_id == current_user.id,
-                StudentProgress.course_id == course.id,
-                StudentProgress.is_completed == True,
-            )
-            .scalar()
-        ) or 0
-
-        # Средний балл по курсу
-        avg_score_row = (
-            db.query(func.avg(StudentProgress.test_score))
-            .filter(
-                StudentProgress.user_id == current_user.id,
-                StudentProgress.course_id == course.id,
-                StudentProgress.is_completed == True,
-                StudentProgress.test_score.isnot(None),
-            )
-            .scalar()
-        )
-        avg_score = float(avg_score_row) if avg_score_row else 0
-
-        progress_pct = round((completed / total_topics) * 100) if total_topics else 0
-        # Уровень навыка: 1-100, зависит от прогресса и среднего балла
-        # level = progress * 0.6 + avg_score * 0.4  (взвешенный)
-        level = round(progress_pct * 0.6 + avg_score * 0.4)
-        xp = completed * 100 + round(avg_score * completed)
-
-        total_xp += xp
-
-        skill_meta = _match_skill(course.title)
-        skills.append({
-            "course_id": course.id,
-            "course_title": course.title,
-            "skill_name": skill_meta["name_ru"],
-            "skill_name_kk": skill_meta["name_kk"],
-            "skill_name_en": skill_meta["name_en"],
-            "icon": skill_meta["icon"],
-            "color": skill_meta["color"],
-            "level": min(level, 100),
-            "max_level": 100,
-            "xp": xp,
-            "progress_pct": progress_pct,
-            "avg_score": round(avg_score, 1),
-            "completed_topics": completed,
-            "total_topics": total_topics,
-        })
-
-    # Уровень героя: средний уровень навыков
-    hero_level = round(sum(s["level"] for s in skills) / len(skills)) if skills else 1
-
-    return {
-        "hero_level": max(1, hero_level),
-        "total_xp": total_xp,
-        "skills": sorted(skills, key=lambda s: s["level"], reverse=True),
-    }
+    return compute_skill_tree_for_user(db, current_user.id)
 
 
 # ---------------------------------------------------------------------------

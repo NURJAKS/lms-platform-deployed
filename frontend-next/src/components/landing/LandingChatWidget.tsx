@@ -34,7 +34,7 @@ function saveMessages(userId: number | undefined, messages: Array<{ role: "user"
 }
 
 export function LandingChatWidget() {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const token = useAuthStore((s) => s.token);
   const userId = useAuthStore((s) => s.user?.id);
   const [open, setOpen] = useState(false);
@@ -63,7 +63,7 @@ export function LandingChatWidget() {
     setMessages((m) => [...m, { role: "user", text }]);
     setLoading(true);
     try {
-      const { data } = await api.post<{ response: string }>("/ai/chat", { message: text });
+      const { data } = await api.post<{ response: string }>("/ai/chat", { message: text }, { params: { lang } });
       setMessages((m) => [...m, { role: "bot", text: data.response }]);
     } catch {
       setMessages((m) => [...m, { role: "bot", text: t("aiError") }]);

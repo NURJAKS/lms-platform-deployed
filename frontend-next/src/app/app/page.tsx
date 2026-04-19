@@ -239,7 +239,7 @@ export default function DashboardPage() {
           <div className="rounded-xl p-5 text-center" style={glassStyle}>
             <p className="mb-3 text-sm" style={{ color: textColors.secondary }}>{t("catalogHint")}</p>
             <Link
-              href="/courses"
+              href="/app/courses"
               className="inline-flex items-center gap-1 font-medium hover:underline text-sm"
               style={{ color: "#14b8a6" }}
             >

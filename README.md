@@ -52,7 +52,7 @@ cd lms-platfrom-localversion
 
    Либо двойной щелчок по **`start-windows.cmd`**.
 
-Скрипт создаст `backend\.venv`, установит зависимости, при необходимости скопирует **`backend\.env.example` → `backend\.env`**, запустит API и фронт.
+Скрипт создаст `backend\.venv`, установит зависимости, при необходимости скопирует **`backend\.env.example` → `backend\.env`**, затем **автоматически выполнит bootstrap БД** (`create_all + миграции + seed при пустой БД`) и запустит API + фронт.
 
 4. В браузере: **http://localhost:3000** · Swagger: **http://127.0.0.1:8000/docs**
 
@@ -78,12 +78,11 @@ powershell -ExecutionPolicy Bypass -File .\start-frontend-windows.ps1
 
 - **`backend\.env`** — не коммитится; шаблон: **`backend\.env.example`**.
 - **ИИ (чат):** при необходимости укажите **`OPENAI_API_KEY`** и/или **`GEMINI_API_KEY`**. Без ключей приложение работает в демо-режиме.
-- **SQLite:** файл **`backend\education.db`**. Если файл удалён или повреждён:
+- **SQLite:** файл **`backend\education.db`**. Обычно руками делать ничего не нужно — `start-windows.ps1` сам выполняет bootstrap БД. Если хотите прогнать bootstrap отдельно:
 
   ```powershell
   cd backend
-  .\.venv\Scripts\python.exe init_db.py
-  .\.venv\Scripts\python.exe seed_data.py
+  .\.venv\Scripts\python.exe bootstrap_db.py
   ```
 
 ### 6. Тестовые входы

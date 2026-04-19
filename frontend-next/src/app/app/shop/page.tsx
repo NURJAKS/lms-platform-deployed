@@ -854,10 +854,6 @@ export default function ShopPage() {
                 <h2 id="purchase-detail-title" className="text-xl font-bold mb-2" style={{ color: textColors.primary }}>
                   {getLocalizedShopItemTitle(viewingPurchase as any, lang, t)}
                 </h2>
-                <p className="text-xs mb-4" style={{ color: textColors.secondary }}>
-                  Purchase #{viewingPurchase.id}
-                </p>
-
                 <div className="space-y-2 text-sm mb-5">
                   <div className="flex items-center justify-between gap-4">
                     <span style={{ color: textColors.secondary }}>{t("shopDeliveryStatus")}</span>

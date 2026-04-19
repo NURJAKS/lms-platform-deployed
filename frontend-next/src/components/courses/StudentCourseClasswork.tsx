@@ -513,15 +513,14 @@ export function StudentCourseClasswork({
   const queryClient = useQueryClient();
   const courseIdOk = Number.isFinite(courseId) && courseId > 0;
 
-  const [activeView, setActiveView] = useState<"list" | "detail">("list");
-  const [selectedAssignmentId, setSelectedAssignmentId] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (initialAssignmentId != null && Number.isFinite(initialAssignmentId) && initialAssignmentId > 0) {
-      setSelectedAssignmentId(initialAssignmentId);
-      setActiveView("detail");
-    }
-  }, [initialAssignmentId]);
+  const initialAssignmentIdValid =
+    initialAssignmentId != null && Number.isFinite(initialAssignmentId) && initialAssignmentId > 0;
+  const [activeView, setActiveView] = useState<"list" | "detail">(
+    initialAssignmentIdValid ? "detail" : "list"
+  );
+  const [selectedAssignmentId, setSelectedAssignmentId] = useState<number | null>(
+    initialAssignmentIdValid ? initialAssignmentId : null
+  );
 
   const [submissionAttachments, setSubmissionAttachments] = useState<SubmissionAttachment[]>([]);
   const [submissionDraft, setSubmissionDraft] = useState("");
@@ -680,36 +679,45 @@ export function StudentCourseClasswork({
     const row = assignments.find((a) => a.id === selectedAssignmentId);
     const idChanged = prevSelectedAssignmentIdRef.current !== selectedAssignmentId;
     prevSelectedAssignmentIdRef.current = selectedAssignmentId;
+    let cancelled = false;
 
-    if (!row) {
-      setWorkActionError(null);
-      setLinkFieldOpen(false);
-      setLinkDraft("");
-      setSubmissionAttachments([]);
-      setSubmissionDraft("");
-      return;
-    }
+    queueMicrotask(() => {
+      if (cancelled) return;
 
-    if (idChanged) {
-      setWorkActionError(null);
-      setLinkFieldOpen(false);
-      setLinkDraft("");
-    }
+      if (!row) {
+        setWorkActionError(null);
+        setLinkFieldOpen(false);
+        setLinkDraft("");
+        setSubmissionAttachments([]);
+        setSubmissionDraft("");
+        return;
+      }
 
-    if (row.submitted) {
-      setSubmissionAttachments(
-        (row.submission_file_urls ?? []).map((url) => ({
-          kind: classifySubmissionAttachment(url),
-          url,
-        }))
-      );
-      setSubmissionDraft("");
-      return;
-    }
-    if (idChanged) {
-      setSubmissionAttachments([]);
-      setSubmissionDraft("");
-    }
+      if (idChanged) {
+        setWorkActionError(null);
+        setLinkFieldOpen(false);
+        setLinkDraft("");
+      }
+
+      if (row.submitted) {
+        setSubmissionAttachments(
+          (row.submission_file_urls ?? []).map((url) => ({
+            kind: classifySubmissionAttachment(url),
+            url,
+          }))
+        );
+        setSubmissionDraft("");
+        return;
+      }
+      if (idChanged) {
+        setSubmissionAttachments([]);
+        setSubmissionDraft("");
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [selectedAssignmentId, assignments, assignmentsPending, courseIdOk]);
 
   const submitMutation = useMutation({

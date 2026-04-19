@@ -26,7 +26,6 @@ export const COURSE_TITLE_KEYS: Record<string, string> = {
   "1С:Предприятие 8": "course1CTitle",
   "1С:Кәсіпорын 8": "course1CTitle",
   "Информатика және ақпараттық технологиялар негіздері": "courseInformaticsTitle",
-  "Машина жасау және трансформациялау": "courseMechanicalEngineeringTitle",
   // Russian variants
   "Python для начинающих": "coursePythonTitle",
   "Web разработка": "courseWebTitle",
@@ -39,7 +38,6 @@ export const COURSE_TITLE_KEYS: Record<string, string> = {
     "AutoCAD": "courseAutoCADTitle",
   "Blender 3D": "courseBlender3DTitle",
   "Основы информатики и ИТ": "courseInformaticsTitle",
-  "Машиностроение и трансформация": "courseMechanicalEngineeringTitle",
   // English variants
   "Python Programming": "coursePythonTitle",
   "Web Development": "courseWebTitle",
@@ -47,7 +45,6 @@ export const COURSE_TITLE_KEYS: Record<string, string> = {
   "Web Development Fundamentals": "courseWebTitle",
   "Machine Learning Fundamentals": "courseMLTitle",
   "Informatics and IT Fundamentals": "courseInformaticsTitle",
-  "Mechanical Engineering and Transformation": "courseMechanicalEngineeringTitle",
 };
 
 /** Maps API course title to custom banner image URL */
@@ -91,7 +88,6 @@ export const COURSE_DESC_KEYS: Record<string, string> = {
   "1С:Предприятие 8": "course1CDesc",
   "1С:Кәсіпорын 8": "course1CDesc",
   "Информатика және ақпараттық технологиялар негіздері": "courseInformaticsDesc",
-  "Машина жасау және трансформациялау": "courseMechanicalEngineeringDesc",
   // Russian-only course names (mapped to shared descriptions)
   "Веб-дизайнер": "courseWebDesignerDesc",
   "C++ разработчик": "courseCPPDeveloperDesc",
@@ -99,7 +95,6 @@ export const COURSE_DESC_KEYS: Record<string, string> = {
   "AutoCAD": "courseAutoCADDesc",
   "Blender 3D": "courseBlender3DDesc",
   "Основы информатики и ИТ": "courseInformaticsDesc",
-  "Машиностроение и трансформация": "courseMechanicalEngineeringDesc",
 };
 
 /** Maps API topic title (Kazakh/Russian/English) to translation key for localized display */

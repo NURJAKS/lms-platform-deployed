@@ -71,6 +71,7 @@ class User(Base):
     can_configure_system = Column(Boolean, default=False)
     points = Column(Integer, default=0)
     is_premium = Column(Integer, default=0)
+    ai_level = Column(String(20))  # beginner, intermediate, expert
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     enrollments = relationship("CourseEnrollment", back_populates="user")

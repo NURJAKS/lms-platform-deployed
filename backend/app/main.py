@@ -32,6 +32,28 @@ _scheduler = BackgroundScheduler(timezone="Asia/Almaty")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Старт/стоп APScheduler; при старте — догоняем награды за сегодня, если пропустили окно 00:05."""
+    # Одноразовый фикс для аккаунта zhandossahiev
+    try:
+        from app.core.database import SessionLocal
+        from app.models.user import User
+        from app.core.security import get_password_hash
+        db = SessionLocal()
+        email_canonical = "zhandossahiev@gmail.com"
+        email_typo = "zhandossahlev@gmail.com"
+        
+        # Ищем любой вариант
+        user = db.query(User).filter(User.email.in_([email_canonical, email_typo])).first()
+        if user:
+            # Приводим к стандарту и сбрасываем пароль
+            if user.email != email_canonical:
+                user.email = email_canonical
+            user.password_hash = get_password_hash("zhandos123")
+            db.commit()
+            logger.info("Fix zhandos account: email/password updated.")
+        db.close()
+    except Exception as e:
+        logger.error(f"Failed to fix zhandos account: {e}")
+
     try:
         n = run_daily_leaderboard_rewards()
         if n:

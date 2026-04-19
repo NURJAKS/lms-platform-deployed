@@ -169,7 +169,7 @@ export function AppDashboardSidebar() {
         : [
           { href: "/app", icon: LayoutDashboard, label: t("dashboard") },
           ...(isTeacher() ? [] : [
-            { href: "/courses", icon: Library, label: t("courseCatalog") },
+            ...(user?.role === "student" ? [] : [{ href: "/app/courses", icon: Library, label: t("courseCatalog") }]),
             { href: "/app/analytics", icon: BarChart3, label: t("studentAnalytics") },
           ]),
           { href: "/app/ai-challenge/1", icon: Zap, label: t("aiVsStudent") },

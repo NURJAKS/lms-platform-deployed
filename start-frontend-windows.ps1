@@ -11,7 +11,10 @@ if (-not (Test-Path (Join-Path $fe "package.json"))) {
 }
 
 Set-Location $fe
-if (-not (Test-Path "node_modules")) {
+if (Test-Path "package-lock.json") {
+    Write-Host "npm ci..."
+    npm ci
+} elseif (-not (Test-Path "node_modules")) {
     Write-Host "npm install..."
     npm install
 }

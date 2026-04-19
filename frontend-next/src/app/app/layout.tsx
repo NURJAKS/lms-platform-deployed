@@ -28,7 +28,13 @@ export default function AppLayout({
 
   useEffect(() => {
     if (!hasHydrated) return;
-    if (!token) router.replace("/login");
+    if (!token && typeof window !== "undefined") {
+      const currentPath = `${window.location.pathname}${window.location.search}`;
+      const redirect = currentPath.startsWith("/app")
+        ? `?redirect=${encodeURIComponent(currentPath)}`
+        : "";
+      router.replace(`/login${redirect}`);
+    }
   }, [hasHydrated, token, router]);
 
   useEffect(() => {

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, BookOpen, User, ClipboardList, Bot } from "lucide-react";
+import { LayoutDashboard, BookOpen, User, ClipboardList } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 import { useAuthStore } from "@/store/authStore";
  
@@ -48,11 +48,6 @@ export function MobileBottomNav() {
         icon: BookOpen,
         label: t("studentCoursesTabHint"),
       },
-           {
-        href: "/app/qazaq-ai",
-        icon: Bot,
-        label: t("qazaqAiNav"),
-      }
     ]),
     {
       href: "/app/profile",

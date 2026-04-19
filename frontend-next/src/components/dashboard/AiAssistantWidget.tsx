@@ -7,7 +7,7 @@ import { api } from "@/api/client";
 import { useAuthStore } from "@/store/authStore";
 
 export function AiAssistantWidget() {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const userId = useAuthStore((s) => s.user?.id);
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Array<{ role: "user" | "bot"; text: string }>>([]);
@@ -54,7 +54,7 @@ export function AiAssistantWidget() {
     setMessages((m) => [...m, { role: "user", text }]);
     setLoading(true);
     try {
-      const { data } = await api.post<{ response: string }>("/ai/chat", { message: text });
+      const { data } = await api.post<{ response: string }>("/ai/chat", { message: text }, { params: { lang } });
       setMessages((m) => [...m, { role: "bot", text: data.response }]);
     } catch {
       setMessages((m) => [...m, { role: "bot", text: t("aiError") }]);

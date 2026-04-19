@@ -108,10 +108,6 @@ export default function TeacherPage() {
     else if (tabParam === "groups") setActiveTab("groups");
   }, [tabParam]);
 
-  if (user && !isTeacher()) {
-    return null;
-  }
-
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const glassStyle = getGlassCardStyle(theme);
@@ -935,6 +931,10 @@ export default function TeacherPage() {
 
   const inputClasses = "w-full rounded-xl px-4 py-2.5 text-sm outline-none transition-all duration-200 focus:ring-2 focus:ring-blue-500/40";
   const selectClasses = "rounded-xl px-4 py-2.5 text-sm outline-none transition-all duration-200 focus:ring-2 focus:ring-blue-500/40 appearance-none cursor-pointer";
+
+  if (user && !isTeacher()) {
+    return null;
+  }
 
   return (
     <div className="max-w-5xl mx-auto pb-12 space-y-6">

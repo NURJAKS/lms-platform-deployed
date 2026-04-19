@@ -344,8 +344,9 @@ export default function CourseDetailPage() {
 
   if (!course) return <p className="text-gray-500">{t("loading")}</p>;
 
-  const localizedCourseTitle = getLocalizedCourseTitle(course as any, t as any);
-  const localizedCourseDesc = getLocalizedCourseDesc(course as any, t as any);
+  const translate = (key: string) => t(key as TranslationKey);
+  const localizedCourseTitle = getLocalizedCourseTitle(course, translate);
+  const localizedCourseDesc = getLocalizedCourseDesc(course, translate);
 
   const isPremiumUser = user?.is_premium === 1;
   const isPremiumOnlyLocked = course.is_premium_only && !isPremiumUser;

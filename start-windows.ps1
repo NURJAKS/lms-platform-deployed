@@ -55,6 +55,10 @@ if (-not (Test-Path $envDest)) {
 $backendDir = Join-Path $Root "backend"
 $feDir = Join-Path $Root "frontend-next"
 
+Write-Host "Bootstrapping database schema/data..."
+Set-Location $backendDir
+& $venvPy bootstrap_db.py
+
 Write-Host "Starting backend (uvicorn)..."
 $beArgs = @(
     "-m", "uvicorn", "app.main:app",
@@ -65,7 +69,10 @@ $beProc = Start-Process -FilePath $venvPy -ArgumentList $beArgs -WorkingDirector
 Start-Sleep -Seconds 2
 
 Set-Location $feDir
-if (-not (Test-Path "node_modules")) {
+if (Test-Path "package-lock.json") {
+    Write-Host "npm ci (frontend)..."
+    npm ci
+} else {
     Write-Host "npm install (frontend)..."
     npm install
 }

@@ -70,12 +70,17 @@ fi
 echo -e "${GREEN}✅ Backend: http://127.0.0.1:8000${NC}"
 (
   cd "$SCRIPT_DIR/backend"
+  echo -e "${BLUE}🗄️ Bootstrap БД (create/migrate/seed) …${NC}"
+  "$VENV_PY" bootstrap_db.py
   exec "$VENV_PY" -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ) &
 BACKEND_PID=$!
 
 cd "$SCRIPT_DIR/frontend-next"
-if [ ! -d "node_modules" ]; then
+if [ -f "package-lock.json" ]; then
+  echo -e "${BLUE}📥 npm ci (frontend) …${NC}"
+  npm ci
+elif [ ! -d "node_modules" ]; then
   echo -e "${BLUE}📥 npm install (frontend) …${NC}"
   npm install
 fi

@@ -80,13 +80,8 @@ export default function MyCoursesPage() {
   const glassStyle = getGlassCardStyle(theme);
   const textColors = getTextColors(theme);
   const [indexTab, setIndexTab] = useState<"courses" | "assignments">("courses");
-
-  useEffect(() => {
-    const tab = searchParams.get("tab");
-    if (tab === "assignments") {
-      setIndexTab("assignments");
-    }
-  }, [searchParams]);
+  const tabFromQuery = searchParams.get("tab");
+  const activeTab: "courses" | "assignments" = tabFromQuery === "assignments" ? "assignments" : indexTab;
 
   useEffect(() => {
     if (user?.role === "parent") {
@@ -164,7 +159,7 @@ export default function MyCoursesPage() {
           type="button"
           onClick={() => setIndexTab("courses")}
           className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
-            indexTab === "courses"
+            activeTab === "courses"
               ? "border-blue-600 text-blue-600"
               : "border-transparent text-gray-600 dark:text-gray-400 hover:opacity-90"
           }`}
@@ -175,7 +170,7 @@ export default function MyCoursesPage() {
           type="button"
           onClick={() => setIndexTab("assignments")}
           className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
-            indexTab === "assignments"
+            activeTab === "assignments"
               ? "border-blue-600 text-blue-600"
               : "border-transparent text-gray-600 dark:text-gray-400 hover:opacity-90"
           }`}
@@ -184,7 +179,7 @@ export default function MyCoursesPage() {
         </button>
       </div>
 
-      {indexTab === "assignments" ? (
+      {activeTab === "assignments" ? (
         <StudentAssignmentsListView embedded />
       ) : (
         <div className="space-y-6">

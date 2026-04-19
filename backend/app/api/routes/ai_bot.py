@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/ai", tags=["ai"])
 
 # Лимиты для Free пользователей
-FREE_AI_CHAT_DAILY_LIMIT = 5
+FREE_AI_CHAT_DAILY_LIMIT = 10
 
 
 class ChatRequest(BaseModel):
@@ -174,6 +174,7 @@ def ai_chat(
     body: ChatRequest,
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
+    lang: str = "ru",
 ):
     # Проверяем лимит для Free пользователей
     is_premium = getattr(current_user, "is_premium", 0) == 1
@@ -198,11 +199,13 @@ def ai_chat(
     )
     
     # Получаем ответ от AI с проверкой на подозрительные запросы
+    locale = lang if lang in ("ru", "kk", "en") else "ru"
     response_text, is_suspicious = chat_with_openai(
         body.message,
         context,
         is_test_context=is_test_context,
         is_assignment_context=is_assignment_context,
+        lang=locale,
     )
     
     # Сохраняем запрос с информацией о подозрительности и контексте

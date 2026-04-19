@@ -117,7 +117,7 @@ export default function RegisterPage() {
                 strokeWidth={1.5}
               />
               <span className="text-xl font-bold text-gray-900 dark:text-white tracking-tight">
-                Білім
+                QIT Білім
               </span>
               <span className="text-xl font-bold text-indigo-600 tracking-tight">
                 платформасы

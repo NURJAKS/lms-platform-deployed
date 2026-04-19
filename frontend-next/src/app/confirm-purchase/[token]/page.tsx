@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
+import { useQuery } from "@tanstack/react-query";
 
 interface ConfirmResult {
   message: string;
@@ -20,35 +21,26 @@ export default function ConfirmPurchasePage() {
   const params = useParams();
   const token = params.token as string;
   const { t } = useLanguage();
-  const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
-  const [result, setResult] = useState<ConfirmResult | null>(null);
-  const [errorMessage, setErrorMessage] = useState("");
 
-  const confirmPurchase = useCallback(async () => {
-    try {
+  const { data: result, isLoading, isError, error } = useQuery({
+    queryKey: ["confirm-purchase", token],
+    queryFn: async () => {
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "";
       const res = await fetch(`${backendUrl}/api/applications/confirm/${token}`);
       const data = await res.json();
 
       if (!res.ok) {
-        setErrorMessage(data.detail || t("confirmError"));
-        setStatus("error");
-        return;
+        throw new Error(data.detail || t("confirmError"));
       }
 
-      setResult(data);
-      setStatus("success");
-    } catch {
-      setErrorMessage(t("confirmServerError"));
-      setStatus("error");
-    }
-  }, [token, t]);
+      return data as ConfirmResult;
+    },
+    enabled: !!token,
+    retry: false,
+  });
 
-  useEffect(() => {
-    if (token) {
-      confirmPurchase();
-    }
-  }, [token, confirmPurchase]);
+  const errorMessage = error instanceof Error ? error.message : t("confirmServerError");
+  const status = isLoading ? "loading" : isError ? "error" : "success";
 
   return (
     <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">

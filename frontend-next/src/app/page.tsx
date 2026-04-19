@@ -167,9 +167,10 @@ export default function HomePage() {
     }
   }, [courses]);
 
-  useEffect(() => {
-    if (token) router.replace("/app");
-  }, [token, router]);
+  // Remove automatic redirect to allow users to see the home page even when logged in
+  // useEffect(() => {
+  //   if (token) router.replace("/app");
+  // }, [token, router]);
 
   useEffect(() => {
     const el = advantagesRef.current;
@@ -204,7 +205,8 @@ export default function HomePage() {
     };
   }, [mobileMenuOpen]);
 
-  if (token) return null;
+  // Allow logged in users to view the home page
+  // if (token) return null;
 
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900 overflow-x-hidden">
@@ -278,11 +280,11 @@ export default function HomePage() {
             </nav>
             <div className="flex items-center gap-2 sm:gap-6 ml-auto shrink-0 min-w-0">
               <Link
-                href="/login"
+                href={token ? "/app" : "/login"}
                 className="hidden md:flex px-3 py-2 text-sm xl:px-5 xl:py-2.5 xl:text-base rounded-full font-semibold text-white transition-all hover:opacity-90 whitespace-nowrap"
                 style={{ background: "var(--qit-gradient-3)" }}
               >
-                {t("navPersonalCabinet")}
+                {token ? t("navGoToDashboard") : t("navPersonalCabinet")}
               </Link>
               <div className="hidden md:block">
                 <AppHeader />
@@ -382,11 +384,10 @@ export default function HomePage() {
                     key={l}
                     type="button"
                     onClick={() => setLang(l)}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left font-medium min-h-[44px] touch-manipulation ${
-                      lang === l
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left font-medium min-h-[44px] touch-manipulation ${lang === l
                         ? "bg-[var(--qit-primary)]/10 text-[var(--qit-primary)] dark:text-[var(--qit-secondary)]"
                         : "text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
-                    }`}
+                      }`}
                   >
                     <Globe className="w-5 h-5 shrink-0" />
                     {t(l === "ru" ? "russian" : l === "kk" ? "kazakh" : "english")}
@@ -405,12 +406,12 @@ export default function HomePage() {
                 </button>
               </div>
               <Link
-                href="/login"
+                href={token ? "/app" : "/login"}
                 onClick={() => setMobileMenuOpen(false)}
                 className="mt-4 flex items-center justify-center gap-2 w-full py-3 rounded-xl font-semibold text-white transition-all hover:opacity-90"
                 style={{ background: "var(--qit-gradient-3)" }}
               >
-                {t("navPersonalCabinet")}
+                {token ? t("navGoToDashboard") : t("navPersonalCabinet")}
               </Link>
             </nav>
           </div>
@@ -815,7 +816,7 @@ export default function HomePage() {
             {t("reviewsSubtitle")}
           </p>
         </div>
-        
+
         <ReviewsMarquee speed={60} />
       </section>
 
